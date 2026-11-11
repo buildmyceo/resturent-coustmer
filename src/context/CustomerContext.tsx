@@ -1,0 +1,433 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  RestaurantProfile,
+  RestaurantTable,
+  TableSession,
+  SessionParticipant,
+  CartItem,
+  Dish,
+  Order,
+  ServiceRequest,
+  ServiceRequestType,
+} from '@/types';
+import { createClient } from '@/lib/supabase/client';
+import { customerAudio } from '@/lib/audio';
+import { touchGuestSession, isSessionExpired, getGuestSession } from '@/lib/guest-session';
+
+export interface ToastMessage {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'success' | 'error' | 'info';
+}
+
+interface CustomerContextType {
+  restaurant: RestaurantProfile | null;
+  setRestaurant: (restaurant: RestaurantProfile | null) => void;
+  table: RestaurantTable | null;
+  setTable: (table: RestaurantTable | null) => void;
+  session: TableSession | null;
+  setSession: (session: TableSession | null) => void;
+  participant: SessionParticipant | null;
+  setParticipant: (participant: SessionParticipant | null) => void;
+  cart: CartItem[];
+  addToCart: (
+    dish: Dish,
+    options?: {
+      variantId?: string;
+      variantName?: string;
+      variantPrice?: number;
+      selectedAddons?: { id: string; name: string; additionalPrice: number }[];
+      quantity?: number;
+      specialInstructions?: string;
+    }
+  ) => void;
+  updateCartQuantity: (cartItemId: string, newQuantity: number) => void;
+  removeFromCart: (cartItemId: string) => void;
+  clearCart: () => void;
+  cartTotals: {
+    subtotal: number;
+    taxAmount: number;
+    serviceFee: number;
+    totalAmount: number;
+    itemCount: number;
+  };
+  orders: Order[];
+  refreshOrders: () => Promise<void>;
+  isOrdersLoading: boolean;
+  activeServiceRequests: ServiceRequest[];
+  submitServiceRequest: (type: ServiceRequestType, notes?: string) => Promise<{ success: boolean; error?: string }>;
+  isCallWaiterModalOpen: boolean;
+  setIsCallWaiterModalOpen: (open: boolean) => void;
+  isCartDrawerOpen: boolean;
+  setIsCartDrawerOpen: (open: boolean) => void;
+  selectedDishModal: Dish | null;
+  setSelectedDishModal: (dish: Dish | null) => void;
+  toasts: ToastMessage[];
+  showToast: (title: string, description?: string, type?: 'success' | 'error' | 'info') => void;
+  dismissToast: (id: string) => void;
+  isSessionActive: boolean;
+}
+
+const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
+
+export function CustomerProvider({
+  children,
+  initialRestaurant,
+  initialTable,
+  initialSession,
+  initialParticipant,
+}: {
+  children: React.ReactNode;
+  initialRestaurant?: RestaurantProfile | null;
+  initialTable?: RestaurantTable | null;
+  initialSession?: TableSession | null;
+  initialParticipant?: SessionParticipant | null;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(initialRestaurant || null);
+  const [table, setTable] = useState<RestaurantTable | null>(initialTable || null);
+  const [session, setSession] = useState<TableSession | null>(initialSession || null);
+  const [participant, setParticipant] = useState<SessionParticipant | null>(initialParticipant || null);
+
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+  const [activeServiceRequests, setActiveServiceRequests] = useState<ServiceRequest[]>([]);
+
+  const [isCallWaiterModalOpen, setIsCallWaiterModalOpen] = useState(false);
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [selectedDishModal, setSelectedDishModal] = useState<Dish | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Toast Notification Manager
+  const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setToasts((prev) => [...prev, { id, title, description, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Cart Management
+  const addToCart = useCallback(
+    (
+      dish: Dish,
+      options?: {
+        variantId?: string;
+        variantName?: string;
+        variantPrice?: number;
+        selectedAddons?: { id: string; name: string; additionalPrice: number }[];
+        quantity?: number;
+        specialInstructions?: string;
+      }
+    ) => {
+      touchGuestSession();
+      customerAudio.playTap();
+
+      const quantity = Math.max(1, options?.quantity || 1);
+      const variantId = options?.variantId;
+      const variantName = options?.variantName;
+      const variantPrice = options?.variantPrice;
+      const selectedAddons = options?.selectedAddons || [];
+      const specialInstructions = (options?.specialInstructions || '').trim();
+
+      const unitBasePrice = variantPrice !== undefined ? variantPrice : dish.price;
+      const addonsPrice = selectedAddons.reduce((sum, a) => sum + a.additionalPrice, 0);
+      const unitPrice = unitBasePrice + addonsPrice;
+      const totalPrice = unitPrice * quantity;
+
+      // Unique hash key for cart item based on customizations
+      const addonKey = selectedAddons.map((a) => a.id).sort().join('-');
+      const cartItemId = `${dish.id}_${variantId || 'base'}_${addonKey}_${specialInstructions}`;
+
+      setCart((prevCart) => {
+        const existingIndex = prevCart.findIndex((item) => item.cartItemId === cartItemId);
+        if (existingIndex > -1) {
+          const updated = [...prevCart];
+          const newQty = updated[existingIndex].quantity + quantity;
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            quantity: newQty,
+            totalPrice: updated[existingIndex].unitPrice * newQty,
+          };
+          return updated;
+        } else {
+          const newItem: CartItem = {
+            cartItemId,
+            dishId: dish.id,
+            dishName: dish.name,
+            dishImage: dish.image,
+            dietaryType: dish.dietaryType,
+            basePrice: dish.price,
+            variantId,
+            variantName,
+            variantPrice,
+            selectedAddons,
+            quantity,
+            specialInstructions: specialInstructions || undefined,
+            unitPrice,
+            totalPrice,
+          };
+          return [...prevCart, newItem];
+        }
+      });
+
+      showToast(`Added to cart`, `${quantity}x ${dish.name}`, 'success');
+    },
+    [showToast]
+  );
+
+  const updateCartQuantity = useCallback((cartItemId: string, newQuantity: number) => {
+    touchGuestSession();
+    customerAudio.playTap();
+    setCart((prevCart) => {
+      if (newQuantity <= 0) {
+        return prevCart.filter((item) => item.cartItemId !== cartItemId);
+      }
+      return prevCart.map((item) =>
+        item.cartItemId === cartItemId
+          ? {
+              ...item,
+              quantity: newQuantity,
+              totalPrice: item.unitPrice * newQuantity,
+            }
+          : item
+      );
+    });
+  }, []);
+
+  const removeFromCart = useCallback((cartItemId: string) => {
+    touchGuestSession();
+    customerAudio.playTap();
+    setCart((prevCart) => prevCart.filter((item) => item.cartItemId !== cartItemId));
+  }, []);
+
+  const clearCart = useCallback(() => {
+    setCart([]);
+  }, []);
+
+  // Server-matching Cart Totals Calculation
+  const cartTotals = useMemo(() => {
+    const subtotal = Number(cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2));
+    const taxRate = restaurant?.settings?.taxEnabled ? Number(restaurant?.settings?.taxPercentage ?? 8.5) : 0;
+    const serviceFeeRate = restaurant?.settings?.serviceChargeEnabled ? Number(restaurant?.settings?.serviceChargePercentage ?? 10.0) : 0;
+
+    const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
+    const serviceFee = Number(((subtotal * serviceFeeRate) / 100).toFixed(2));
+    const totalAmount = Number((subtotal + taxAmount + serviceFee).toFixed(2));
+    const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+    return { subtotal, taxAmount, serviceFee, totalAmount, itemCount };
+  }, [cart, restaurant]);
+
+  // Fetch Table Orders
+  const refreshOrders = useCallback(async () => {
+    if (!session?.id) return;
+    setIsOrdersLoading(true);
+    try {
+      const res = await fetch(`/api/orders/track?sessionId=${session.id}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.orders)) {
+        setOrders(data.orders);
+      }
+    } catch (err) {
+      console.warn('Error refreshing orders:', err);
+    } finally {
+      setIsOrdersLoading(false);
+    }
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (session?.id) {
+      refreshOrders();
+    }
+  }, [session?.id, refreshOrders]);
+
+  // Submit Call Waiter Service Request
+  const submitServiceRequest = useCallback(
+    async (type: ServiceRequestType, notes?: string): Promise<{ success: boolean; error?: string }> => {
+      if (!restaurant?.id || !table?.id) {
+        return { success: false, error: 'Restaurant or table is not identified.' };
+      }
+
+      try {
+        const res = await fetch('/api/service-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurantId: restaurant.id,
+            tableId: table.id,
+            sessionId: session?.id,
+            requestType: type,
+            notes,
+            requestedByName: participant?.name || 'Guest',
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          customerAudio.playServiceAlert();
+          showToast(
+            'Request Sent',
+            `Waiter notified for "${type.replace('_', ' ')}". They will assist you shortly.`,
+            'info'
+          );
+          return { success: true };
+        } else {
+          return { success: false, error: data.error };
+        }
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to dispatch request.' };
+      }
+    },
+    [restaurant, table, session, participant, showToast]
+  );
+
+  // Supabase Realtime Subscriptions for Live Order Tracking and Table Session Status
+  useEffect(() => {
+    if (!session?.id) return;
+
+    const channelName = `customer-session-${session.id}-${Date.now()}`;
+    const channel = supabase.channel(channelName);
+
+    // 1. Listen for Order status changes (Preparing, Ready, Served, Cancelled)
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `table_session_id=eq.${session.id}`,
+      },
+      (payload: any) => {
+        if (payload.eventType === 'UPDATE') {
+          const newStatus = payload.new?.status;
+          const oldStatus = payload.old?.status;
+
+          if (newStatus === 'ready' && oldStatus !== 'ready') {
+            customerAudio.playFoodReady();
+            showToast(
+              'Your Food is Ready! 🍽️',
+              `Order #${payload.new?.order_number} has been prepared by the kitchen and is on its way to your table!`,
+              'success'
+            );
+          } else if (newStatus === 'served' && oldStatus !== 'served') {
+            customerAudio.playTap();
+            showToast(
+              'Food Served ✨',
+              `Order #${payload.new?.order_number} has been served. Enjoy your meal!`,
+              'info'
+            );
+          } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+            showToast(
+              'Order Cancelled',
+              `Order #${payload.new?.order_number} was cancelled by restaurant management.`,
+              'error'
+            );
+          }
+        }
+        refreshOrders();
+      }
+    );
+
+    // 2. Listen for Table Session changes (Totals, Payment status, Closure)
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'table_sessions',
+        filter: `id=eq.${session.id}`,
+      },
+      (payload: any) => {
+        if (payload.new) {
+          setSession((prev) => (prev ? { ...prev, ...payload.new } : payload.new));
+          if (payload.new.status === 'completed') {
+            showToast('Session Completed', 'Your table bill has been settled. Thank you for dining with us!', 'success');
+          }
+        }
+      }
+    );
+
+    // 3. Listen for Service Request acknowledgments
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'service_requests',
+        filter: `session_id=eq.${session.id}`,
+      },
+      (payload: any) => {
+        if (payload.new?.status === 'acknowledged') {
+          customerAudio.playServiceAlert();
+          showToast('Waiter Coming', 'A staff member acknowledged your request and is heading to your table.', 'info');
+        }
+      }
+    );
+
+    channel.subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.id, supabase, refreshOrders, showToast]);
+
+  const isSessionActive = useMemo(() => {
+    return !!session && session.status !== 'completed' && session.status !== 'cancelled';
+  }, [session]);
+
+  return (
+    <CustomerContext.Provider
+      value={{
+        restaurant,
+        setRestaurant,
+        table,
+        setTable,
+        session,
+        setSession,
+        participant,
+        setParticipant,
+        cart,
+        addToCart,
+        updateCartQuantity,
+        removeFromCart,
+        clearCart,
+        cartTotals,
+        orders,
+        refreshOrders,
+        isOrdersLoading,
+        activeServiceRequests,
+        submitServiceRequest,
+        isCallWaiterModalOpen,
+        setIsCallWaiterModalOpen,
+        isCartDrawerOpen,
+        setIsCartDrawerOpen,
+        selectedDishModal,
+        setSelectedDishModal,
+        toasts,
+        showToast,
+        dismissToast,
+        isSessionActive,
+      }}
+    >
+      {children}
+    </CustomerContext.Provider>
+  );
+}
+
+export function useCustomer(): CustomerContextType {
+  const context = useContext(CustomerContext);
+  if (!context) {
+    throw new Error('useCustomer must be used within a CustomerProvider');
+  }
+  return context;
+}
