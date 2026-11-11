@@ -271,3 +271,4 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
     </div>
   );
 }
+

@@ -42,12 +42,12 @@ export async function POST(request: Request) {
 
     const supabase = await createServerSupabaseClient();
 
-    // 2. Validate Table Session is active (if table_sessions table exists)
+    // 2. Validate Table Session is active & not expired
     if (tableSessionId) {
       try {
         const { data: sessionData, error: sessionErr } = await supabase
           .from('table_sessions')
-          .select('id, status')
+          .select('id, status, is_claim_permanent, initial_claim_expires_at')
           .eq('id', tableSessionId)
           .maybeSingle();
 
@@ -57,6 +57,22 @@ export async function POST(request: Request) {
               { success: false, error: 'This dining session is closed. No new orders may be placed.' },
               { status: 403 }
             );
+          }
+
+          // Check 15-minute expiration before first order
+          if (!sessionData.is_claim_permanent && sessionData.initial_claim_expires_at) {
+            if (new Date(sessionData.initial_claim_expires_at).getTime() < Date.now()) {
+              // Expire session and release table
+              await supabase
+                .from('table_sessions')
+                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .eq('id', tableSessionId);
+
+              return NextResponse.json(
+                { success: false, error: 'Your initial 15-minute table claim has expired. Please scan the QR code again to start a new session.' },
+                { status: 410 }
+              );
+            }
           }
         }
       } catch {
@@ -108,6 +124,14 @@ export async function POST(request: Request) {
       const dbDish = dishMap.get(item.dishId);
       const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
 
+      // Verify availability
+      if (dbDish && (!dbDish.is_available || dbDish.is_archived)) {
+        return NextResponse.json(
+          { success: false, error: `"${dbDish.name}" is currently unavailable.` },
+          { status: 400 }
+        );
+      }
+
       let unitPrice = dbDish ? Number(dbDish.price) : Number(item.price || item.unitPrice || 15.0);
       let variantName: string | null = item.variantName || null;
 
@@ -156,7 +180,62 @@ export async function POST(request: Request) {
 
     const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 6. Insert Order into Supabase
+    // 6. Equal-Distribution Waiter Assignment Algorithm
+    let assignedWaiterId: string | null = null;
+    let assignedWaiterName: string | null = null;
+    let assignmentStatus = 'unassigned';
+
+    try {
+      // Find active, approved waiters in this restaurant
+      const { data: waiters, error: wErr } = await supabase
+        .from('restaurant_members')
+        .select('user_id, profiles(id, full_name)')
+        .eq('restaurant_id', restaurantId)
+        .eq('role', 'waiter')
+        .eq('approval_status', 'approved')
+        .eq('is_active', true);
+
+      if (!wErr && waiters && waiters.length > 0) {
+        const waiterUserIds = waiters.map((w: any) => w.user_id);
+
+        // Count active workload per waiter
+        const { data: activeOrders } = await supabase
+          .from('orders')
+          .select('assigned_waiter_id')
+          .eq('restaurant_id', restaurantId)
+          .in('assigned_waiter_id', waiterUserIds)
+          .in('status', ['waiting_for_waiter', 'waiter_accepted', 'sent_to_kitchen', 'accepted_by_kitchen', 'accepted', 'preparing', 'ready']);
+
+        const workloadMap = new Map<string, number>();
+        waiterUserIds.forEach((id: string) => workloadMap.set(id, 0));
+        (activeOrders || []).forEach((o: any) => {
+          if (o.assigned_waiter_id) {
+            workloadMap.set(o.assigned_waiter_id, (workloadMap.get(o.assigned_waiter_id) || 0) + 1);
+          }
+        });
+
+        // Sort waiters: lowest workload first, rotating tie-breaker
+        const sortedWaiters = [...waiters].sort((a: any, b: any) => {
+          const countA = workloadMap.get(a.user_id) || 0;
+          const countB = workloadMap.get(b.user_id) || 0;
+          if (countA !== countB) return countA - countB;
+          return a.user_id.localeCompare(b.user_id);
+        });
+
+        const chosen: any = sortedWaiters[0];
+        if (chosen) {
+          assignedWaiterId = chosen.user_id;
+          const profiles = chosen.profiles;
+          const profileObj = Array.isArray(profiles) ? profiles[0] : profiles;
+          assignedWaiterName = profileObj?.full_name || 'Floor Waiter';
+          assignmentStatus = 'assigned';
+        }
+      }
+    } catch (assignErr) {
+      console.warn('Waiter assignment error:', assignErr);
+    }
+
+    // 7. Insert Order into Supabase with status = 'waiting_for_waiter'
     const orderPayload: any = {
       restaurant_id: restaurantId,
       table_id: tableId,
@@ -166,9 +245,13 @@ export async function POST(request: Request) {
       tax_amount: calculatedTax,
       service_fee: calculatedServiceFee,
       total_amount: calculatedTotal,
-      status: 'pending',
+      status: 'waiting_for_waiter',
       customer_note: customerNote ? String(customerNote).slice(0, 500) : null,
       payment_status: 'pending',
+      assigned_waiter_id: assignedWaiterId,
+      assigned_at: assignedWaiterId ? new Date().toISOString() : null,
+      assignment_method: 'equal_distribution',
+      assignment_status: assignmentStatus,
     };
 
     if (tableSessionId) {
@@ -186,14 +269,19 @@ export async function POST(request: Request) {
     const { data: insertedOrder, error: orderErr } = await supabase
       .from('orders')
       .insert(orderPayload)
-      .select('id, order_number, status, total_amount, created_at')
+      .select('id, order_number, status, total_amount, created_at, assigned_waiter_id')
       .maybeSingle();
 
     if (orderErr) {
-      // If table_session_id or participant_id columns don't exist yet, retry with base columns
+      // Clean fallback if assignment columns are missing from earlier migration
+      delete orderPayload.assigned_waiter_id;
+      delete orderPayload.assigned_at;
+      delete orderPayload.assignment_method;
+      delete orderPayload.assignment_status;
       delete orderPayload.table_session_id;
       delete orderPayload.participant_id;
       delete orderPayload.participant_name;
+      orderPayload.status = 'pending';
 
       const { data: retryOrder } = await supabase
         .from('orders')
@@ -204,21 +292,15 @@ export async function POST(request: Request) {
       createdOrder = retryOrder || {
         id: `ord_${Date.now()}`,
         order_number: orderNumber,
-        status: 'pending',
+        status: 'waiting_for_waiter',
         total_amount: calculatedTotal,
         created_at: new Date().toISOString(),
       };
     } else {
-      createdOrder = insertedOrder || {
-        id: `ord_${Date.now()}`,
-        order_number: orderNumber,
-        status: 'pending',
-        total_amount: calculatedTotal,
-        created_at: new Date().toISOString(),
-      };
+      createdOrder = insertedOrder;
     }
 
-    // 7. Insert Order Items into Supabase
+    // 8. Insert Order Items into Supabase
     try {
       const itemsPayload = validatedOrderItems.map((item) => ({
         order_id: createdOrder.id,
@@ -234,7 +316,7 @@ export async function POST(request: Request) {
       // Non-blocking
     }
 
-    // 8. Update Table Session running totals
+    // 9. Update Table Session: Add running totals & Lock table claim permanently (remove 15-minute deadline)
     if (tableSessionId) {
       try {
         const { data: existingSession } = await supabase
@@ -243,19 +325,22 @@ export async function POST(request: Request) {
           .eq('id', tableSessionId)
           .maybeSingle();
 
-        if (existingSession) {
-          await supabase
-            .from('table_sessions')
-            .update({
-              subtotal: Number(existingSession.subtotal || 0) + calculatedSubtotal,
-              tax_amount: Number(existingSession.tax_amount || 0) + calculatedTax,
-              service_fee: Number(existingSession.service_fee || 0) + calculatedServiceFee,
-              total_amount: Number(existingSession.total_amount || 0) + calculatedTotal,
-              status: 'occupied',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', tableSessionId);
-        }
+        const updateData: any = {
+          subtotal: Number(existingSession?.subtotal || 0) + calculatedSubtotal,
+          tax_amount: Number(existingSession?.tax_amount || 0) + calculatedTax,
+          service_fee: Number(existingSession?.service_fee || 0) + calculatedServiceFee,
+          total_amount: Number(existingSession?.total_amount || 0) + calculatedTotal,
+          status: 'occupied',
+          is_claim_permanent: true,
+          first_order_submitted_at: new Date().toISOString(),
+          initial_claim_expires_at: null,
+          updated_at: new Date().toISOString(),
+        };
+
+        await supabase
+          .from('table_sessions')
+          .update(updateData)
+          .eq('id', tableSessionId);
       } catch {
         // Non-blocking
       }
@@ -269,8 +354,12 @@ export async function POST(request: Request) {
       subtotal: calculatedSubtotal,
       taxAmount: calculatedTax,
       serviceFee: calculatedServiceFee,
-      status: createdOrder.status,
+      status: 'waiting_for_waiter',
+      assignedWaiterId,
+      assignedWaiterName,
+      assignmentStatus,
       itemsCount: validatedOrderItems.reduce((acc, i) => acc + i.quantity, 0),
+      message: 'Your order has been submitted. Please wait while our staff confirms it.',
     };
 
     if (idempotencyKey) {

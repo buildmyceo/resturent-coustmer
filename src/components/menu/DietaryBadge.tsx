@@ -50,3 +50,4 @@ export function DietaryBadge({ type, showText = false }: { type: DietaryType; sh
     </div>
   );
 }
+

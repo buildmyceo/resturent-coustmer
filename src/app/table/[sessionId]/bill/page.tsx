@@ -252,3 +252,4 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
     </div>
   );
 }
+

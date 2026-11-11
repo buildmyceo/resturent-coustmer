@@ -115,3 +115,4 @@ export default function TableSessionLayout({ children, params }: TableLayoutProp
     </div>
   );
 }
+

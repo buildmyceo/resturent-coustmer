@@ -368,3 +368,4 @@ BEGIN
 
     RAISE NOTICE 'ZOVO Phase 5 commercial restaurant data seeded successfully!';
 END $$;
+

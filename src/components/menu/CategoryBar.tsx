@@ -46,3 +46,4 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
     </div>
   );
 }
+

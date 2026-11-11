@@ -95,6 +95,9 @@ export interface TableSession {
   discountAmount: number;
   totalAmount: number;
   totalPaid: number;
+  initialClaimExpiresAt?: string | null;
+  firstOrderSubmittedAt?: string | null;
+  isClaimPermanent?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -109,7 +112,19 @@ export interface SessionParticipant {
   lastActiveAt?: string;
 }
 
-export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled';
+export type OrderStatus =
+  | 'pending'
+  | 'waiting_for_waiter'
+  | 'waiter_accepted'
+  | 'sent_to_kitchen'
+  | 'accepted_by_kitchen'
+  | 'accepted'
+  | 'preparing'
+  | 'ready'
+  | 'served'
+  | 'completed'
+  | 'cancelled'
+  | 'rejected';
 export type OrderSource = 'Customer' | 'Staff';
 
 export interface OrderItem {
@@ -146,6 +161,13 @@ export interface Order {
   customerNote?: string;
   paymentMethod?: string;
   paymentStatus: 'paid' | 'pending';
+  assignedWaiterId?: string | null;
+  assignedWaiterName?: string | null;
+  assignedAt?: string | null;
+  assignmentMethod?: string;
+  assignmentStatus?: string;
+  rejectionReason?: string | null;
+  rejectedAt?: string | null;
 }
 
 export interface CartItemAddon {
@@ -260,3 +282,4 @@ export interface RestaurantProfile {
   status: 'active' | 'inactive' | 'suspended';
   settings?: RestaurantSettings;
 }
+

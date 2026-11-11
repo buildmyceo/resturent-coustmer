@@ -384,7 +384,7 @@ export async function fetchTableSessionOrdersDB(sessionId: string): Promise<Orde
   try {
     const { data: ordersData, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*), assigned_waiter:profiles!assigned_waiter_id(full_name)')
       .eq('table_session_id', sessionId)
       .order('created_at', { ascending: false });
 
@@ -412,6 +412,13 @@ export async function fetchTableSessionOrdersDB(sessionId: string): Promise<Orde
       customerNote: o.customer_note,
       paymentMethod: o.payment_method,
       paymentStatus: o.payment_status,
+      assignedWaiterId: o.assigned_waiter_id || null,
+      assignedWaiterName: o.assigned_waiter?.full_name || null,
+      assignedAt: o.assigned_at || null,
+      assignmentMethod: o.assignment_method || undefined,
+      assignmentStatus: o.assignment_status || undefined,
+      rejectionReason: o.rejection_reason || null,
+      rejectedAt: o.rejected_at || null,
       items: (o.order_items || []).map((i: any) => ({
         id: i.id,
         orderId: i.order_id,
@@ -513,3 +520,4 @@ export async function fetchInvoiceDB(invoiceIdOrSessionId: string): Promise<Invo
     return null;
   }
 }
+

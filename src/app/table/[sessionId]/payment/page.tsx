@@ -344,3 +344,4 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
     </div>
   );
 }
+

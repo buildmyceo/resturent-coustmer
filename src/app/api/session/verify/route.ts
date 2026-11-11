@@ -28,7 +28,6 @@ export async function POST(request: Request) {
     }
 
     if (!session) {
-      // Resilient fallback state
       return NextResponse.json({
         success: true,
         isExpired: false,
@@ -47,6 +46,8 @@ export async function POST(request: Request) {
           serviceFee: 0,
           totalAmount: 0,
           totalPaid: 0,
+          initialClaimExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          isClaimPermanent: false,
         },
         participant: {
           id: `part_${Date.now()}`,
@@ -65,9 +66,51 @@ export async function POST(request: Request) {
       });
     }
 
-    let participant: any = null;
     let isExpired = false;
 
+    // Check if session has placed any orders
+    let hasSubmittedOrders = session.is_claim_permanent === true;
+    if (!hasSubmittedOrders) {
+      try {
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('table_session_id', sessionId)
+          .neq('status', 'cancelled')
+          .limit(1);
+        if (ord && ord.length > 0) {
+          hasSubmittedOrders = true;
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    // 15-minute expiration applies ONLY before first order is submitted
+    if (!hasSubmittedOrders) {
+      const expiresAt = session.initial_claim_expires_at
+        ? new Date(session.initial_claim_expires_at).getTime()
+        : new Date(session.opened_at || session.created_at).getTime() + 15 * 60 * 1000;
+
+      if (Date.now() > expiresAt) {
+        isExpired = true;
+        // Release table
+        await supabase
+          .from('table_sessions')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', sessionId);
+
+        return NextResponse.json({
+          success: false,
+          isExpired: true,
+          error: 'Your initial 15-minute table claim has expired. Please scan the QR code again.',
+        });
+      }
+    } else {
+      isExpired = false; // Never expire active dining sessions
+    }
+
+    let participant: any = null;
     if (guestToken) {
       try {
         const { data: partData } = await supabase
@@ -79,11 +122,6 @@ export async function POST(request: Request) {
 
         if (partData) {
           participant = partData;
-          const lastActive = new Date(partData.last_active_at || partData.joined_at).getTime();
-          const now = Date.now();
-          if (now - lastActive > 15 * 60 * 1000) {
-            isExpired = true;
-          }
         }
       } catch {
         // Non-blocking
@@ -92,7 +130,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      isExpired,
+      isExpired: false,
       session: {
         id: session.id,
         restaurantId: session.restaurant_id,
@@ -100,7 +138,7 @@ export async function POST(request: Request) {
         restaurantSlug: session.restaurants?.slug || 'zovo-bistro',
         tableId: session.table_id,
         tableNumber: session.restaurant_tables?.table_number || '01',
-        tableName: session.restaurant_tables?.table_name || 'Table',
+        tableName: session.restaurant_tables?.table_name || 'Dining Table',
         status: session.status,
         guestCount: session.guest_count,
         subtotal: Number(session.subtotal || 0),
@@ -108,6 +146,8 @@ export async function POST(request: Request) {
         serviceFee: Number(session.service_fee || 0),
         totalAmount: Number(session.total_amount || 0),
         totalPaid: Number(session.total_paid || 0),
+        initialClaimExpiresAt: session.initial_claim_expires_at,
+        isClaimPermanent: hasSubmittedOrders,
       },
       participant: participant
         ? {

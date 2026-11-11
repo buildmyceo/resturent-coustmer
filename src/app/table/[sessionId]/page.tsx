@@ -349,3 +349,4 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     </div>
   );
 }
+

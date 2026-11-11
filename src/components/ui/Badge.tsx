@@ -29,3 +29,4 @@ export function Badge({ className = '', variant = 'default', size = 'sm', childr
     </span>
   );
 }
+

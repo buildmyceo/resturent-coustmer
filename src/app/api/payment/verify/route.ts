@@ -128,14 +128,18 @@ export async function POST(request: Request) {
       // Non-blocking
     }
 
-    // 5. Update table session to completed
+    // 5. Update table session - Strictly release table ONLY if full balance is settled
+    const isFullyPaid = newTotalPaid >= totalAmount;
+    const remainingBalance = Math.max(0, Number((totalAmount - newTotalPaid).toFixed(2)));
+
     try {
       await supabase
         .from('table_sessions')
         .update({
-          status: 'completed',
+          ...(isFullyPaid
+            ? { status: 'completed', closed_at: new Date().toISOString() }
+            : { status: 'occupied' }),
           total_paid: newTotalPaid,
-          closed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
@@ -145,12 +149,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Payment verified successfully.',
+      message: isFullyPaid ? 'Payment verified successfully. Table session closed.' : 'Partial payment recorded.',
       invoiceId: createdInvoiceId,
       invoiceNumber,
-      isSessionClosed: true,
+      isSessionClosed: isFullyPaid,
       totalPaid: newTotalPaid,
-      outstandingBalance: 0,
+      outstandingBalance: remainingBalance,
     });
   } catch (err: any) {
     console.error('API /api/payment/verify error:', err);

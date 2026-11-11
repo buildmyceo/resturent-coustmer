@@ -32,14 +32,34 @@ export async function POST(request: Request) {
       });
 
       if (!rpcErr && rpcData && rpcData.success) {
-        const response = NextResponse.json(rpcData);
-        response.cookies.set('zovo_guest_session_id', rpcData.session_id, {
+        const normalized = {
+          ...rpcData,
+          sessionId: rpcData.session_id || rpcData.sessionId,
+          participantId: rpcData.participant_id || rpcData.participantId,
+          guestToken: rpcData.guest_token || rpcData.guestToken,
+          guestName: rpcData.guest_name || rpcData.guestName,
+          isHost: rpcData.is_host ?? rpcData.isHost,
+          tableId: rpcData.table_id || rpcData.tableId,
+          tableNumber: rpcData.table_number || rpcData.tableNumber,
+          tableName: rpcData.table_name || rpcData.tableName,
+          restaurantId: rpcData.restaurant_id || rpcData.restaurantId,
+          restaurantName: rpcData.restaurant_name || rpcData.restaurantName,
+          restaurantSlug: rpcData.restaurant_slug || rpcData.restaurantSlug,
+          sessionStatus: rpcData.session_status || rpcData.sessionStatus,
+          initialClaimExpiresAt:
+            rpcData.initial_claim_expires_at ??
+            rpcData.initialClaimExpiresAt ??
+            (rpcData.is_claim_permanent ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString()),
+          isClaimPermanent: Boolean(rpcData.is_claim_permanent ?? rpcData.isClaimPermanent ?? false),
+        };
+        const response = NextResponse.json(normalized);
+        response.cookies.set('zovo_guest_session_id', normalized.sessionId, {
           path: '/',
           httpOnly: true,
           sameSite: 'lax',
           maxAge: 86400,
         });
-        response.cookies.set('zovo_guest_token', rpcData.guest_token, {
+        response.cookies.set('zovo_guest_token', normalized.guestToken, {
           path: '/',
           httpOnly: true,
           sameSite: 'lax',
@@ -80,6 +100,8 @@ export async function POST(request: Request) {
     // 3. Check for existing active session on table (DB or Cache)
     let sessionId: string | null = null;
     let isHost = false;
+    let initialClaimExpiresAt: string | null = null;
+    let isClaimPermanent = false;
 
     try {
       const { data: existingSession } = await supabase
@@ -90,14 +112,34 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (existingSession) {
-        sessionId = existingSession.id;
-        await supabase
-          .from('table_sessions')
-          .update({
-            guest_count: (existingSession.guest_count || 1) + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', sessionId);
+        // Enforce 15-minute expiration before first order
+        const isExpired =
+          !existingSession.is_claim_permanent &&
+          existingSession.initial_claim_expires_at &&
+          new Date(existingSession.initial_claim_expires_at).getTime() < Date.now();
+
+        if (isExpired) {
+          // Release table
+          await supabase
+            .from('table_sessions')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', existingSession.id);
+          // New session will be created below
+        } else {
+          sessionId = existingSession.id;
+          initialClaimExpiresAt =
+            existingSession.initial_claim_expires_at ||
+            (existingSession.is_claim_permanent ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString());
+          isClaimPermanent = Boolean(existingSession.is_claim_permanent);
+
+          await supabase
+            .from('table_sessions')
+            .update({
+              guest_count: (existingSession.guest_count || 1) + 1,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId);
+        }
       }
     } catch {
       // Fallback to cache if table_sessions is awaiting migration
@@ -105,12 +147,22 @@ export async function POST(request: Request) {
 
     if (!sessionId && activeSessionsCache.has(tableId)) {
       const cached = activeSessionsCache.get(tableId);
-      sessionId = cached.id;
-      cached.guestCount = (cached.guestCount || 1) + 1;
+      // Check cache 15-min expiration
+      if (!cached.isClaimPermanent && cached.initialClaimExpiresAt && new Date(cached.initialClaimExpiresAt).getTime() < Date.now()) {
+        activeSessionsCache.delete(tableId);
+      } else {
+        sessionId = cached.id;
+        initialClaimExpiresAt = cached.initialClaimExpiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        isClaimPermanent = Boolean(cached.isClaimPermanent);
+        cached.guestCount = (cached.guestCount || 1) + 1;
+        cached.initialClaimExpiresAt = initialClaimExpiresAt;
+      }
     }
 
     if (!sessionId) {
       isHost = true;
+      initialClaimExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      isClaimPermanent = false;
       sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
       try {
@@ -123,12 +175,16 @@ export async function POST(request: Request) {
             guest_count: 1,
             customer_name: safeGuestName,
             opened_at: new Date().toISOString(),
+            initial_claim_expires_at: initialClaimExpiresAt,
+            is_claim_permanent: false,
           })
-          .select('id')
-          .single();
+          .select('id, initial_claim_expires_at, is_claim_permanent')
+          .maybeSingle();
 
         if (newSession) {
           sessionId = newSession.id;
+          initialClaimExpiresAt = newSession.initial_claim_expires_at || initialClaimExpiresAt;
+          isClaimPermanent = newSession.is_claim_permanent ?? false;
         }
       } catch {
         // Fallback
@@ -140,6 +196,8 @@ export async function POST(request: Request) {
         restaurantId,
         guestCount: 1,
         status: 'occupied',
+        initialClaimExpiresAt,
+        isClaimPermanent: false,
       });
     }
 
@@ -164,7 +222,7 @@ export async function POST(request: Request) {
       // Non-blocking
     }
 
-    const response = NextResponse.json({
+    const payload = {
       success: true,
       sessionId,
       participantId,
@@ -178,15 +236,18 @@ export async function POST(request: Request) {
       restaurantName,
       restaurantSlug,
       sessionStatus: 'occupied',
-    });
+      initialClaimExpiresAt: initialClaimExpiresAt || (isClaimPermanent ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString()),
+      isClaimPermanent: Boolean(isClaimPermanent),
+    };
 
-    response.cookies.set('zovo_guest_session_id', sessionId || '', {
+    const response = NextResponse.json(payload, { status: 201 });
+    response.cookies.set('zovo_guest_session_id', String(sessionId || ''), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 86400,
     });
-    response.cookies.set('zovo_guest_token', issuedGuestToken, {
+    response.cookies.set('zovo_guest_token', String(issuedGuestToken || ''), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
@@ -197,7 +258,7 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('API /api/session/start-or-join error:', err);
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error while starting session.' },
+      { success: false, error: err?.message || 'Server error while starting/joining session.' },
       { status: 500 }
     );
   }

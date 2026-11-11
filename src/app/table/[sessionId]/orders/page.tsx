@@ -141,7 +141,11 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
               )}
 
               {/* Visual Progress Stepper */}
-              <OrderProgressStepper status={order.status} />
+              <OrderProgressStepper
+                status={order.status}
+                rejectionReason={order.rejectionReason}
+                assignedWaiterName={order.assignedWaiterName}
+              />
 
               {/* Itemized Dish List */}
               <div className="pt-2 border-t border-slate-50 space-y-2">
@@ -198,3 +202,4 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
     </div>
   );
 }
+

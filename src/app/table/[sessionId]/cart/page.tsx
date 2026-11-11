@@ -109,8 +109,8 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       }
 
       showToast(
-        'Order Placed! 👨‍🍳',
-        `Order #${data.orderNumber} has been sent directly to the kitchen display system.`,
+        'Order Submitted',
+        'Your order has been submitted. Please wait while our staff confirms it.',
         'success'
       );
 
@@ -337,3 +337,4 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     </div>
   );
 }
+

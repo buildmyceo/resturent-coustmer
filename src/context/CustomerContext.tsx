@@ -431,3 +431,4 @@ export function useCustomer(): CustomerContextType {
   }
   return context;
 }
+

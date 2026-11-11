@@ -97,3 +97,4 @@ export function DishCard({ dish, currency = 'USD', onOpenDetail, onQuickAdd, car
     </div>
   );
 }
+

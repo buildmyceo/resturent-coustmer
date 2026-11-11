@@ -1,15 +1,79 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
-import { Utensils, Users, Bell } from 'lucide-react';
+import { Utensils, Users, Bell, Clock, AlertTriangle } from 'lucide-react';
 
 export function CustomerHeader() {
-  const { restaurant, table, participant, setIsCallWaiterModalOpen } = useCustomer();
+  const { restaurant, table, session, participant, setIsCallWaiterModalOpen, orders } = useCustomer();
+
+  // 15-Minute Countdown Timer State
+  const [timeLeft, setTimeLeft] = useState<string | null>(null);
+  const [isWarning, setIsWarning] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+
+  const hasOrders = (orders && orders.length > 0) || session?.isClaimPermanent === true;
+
+  useEffect(() => {
+    // If order has already been placed, timer does NOT apply!
+    if (hasOrders || !session?.initialClaimExpiresAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const expiresTimestamp = new Date(session.initialClaimExpiresAt).getTime();
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diffMs = expiresTimestamp - now;
+
+      if (diffMs <= 0) {
+        setTimeLeft('00:00');
+        setIsExpired(true);
+        clearInterval(interval);
+      } else {
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        setTimeLeft(formatted);
+        setIsWarning(minutes < 3); // Under 3 mins left
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session?.initialClaimExpiresAt, hasOrders]);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs">
+      {/* 15-Minute Countdown Banner (Only shown before first order is placed) */}
+      {!hasOrders && timeLeft && (
+        <div
+          className={`px-4 py-1.5 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+            isExpired
+              ? 'bg-rose-600 text-white animate-pulse'
+              : isWarning
+              ? 'bg-amber-500 text-white animate-pulse'
+              : 'bg-blue-600 text-white'
+          }`}
+        >
+          {isExpired ? (
+            <>
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Initial 15-min table claim expired. Please scan table QR again to reserve.</span>
+            </>
+          ) : (
+            <>
+              <Clock className="w-3.5 h-3.5" />
+              <span>
+                Table reserved! Order within <strong className="font-mono text-sm underline">{timeLeft}</strong> to secure your table.
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Restaurant Identity */}
         <div className="flex items-center gap-3 min-w-0">
