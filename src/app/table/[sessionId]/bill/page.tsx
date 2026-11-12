@@ -3,6 +3,7 @@
 import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useCustomer } from '@/context/CustomerContext';
+import { getGuestSession } from '@/lib/guest-session';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import {
   Receipt,
@@ -32,7 +33,15 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
   const fetchBill = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/bill?sessionId=${sessionId}`);
+      const stored = getGuestSession();
+      const params = new URLSearchParams({ sessionId });
+      if (table?.id || stored?.tableId) {
+        params.set('tableId', table?.id || stored?.tableId || '');
+      }
+      if (restaurant?.id || stored?.restaurantId) {
+        params.set('restaurantId', restaurant?.id || stored?.restaurantId || '');
+      }
+      const res = await fetch(`/api/bill?${params.toString()}`);
       const data = await res.json();
       if (data.success && data.bill) {
         setBill(data.bill);
@@ -151,8 +160,21 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
           {bill.items.map((item: any, idx: number) => (
             <div key={`${item.id}-${idx}`} className="py-2.5 flex items-start justify-between text-xs">
               <div className="flex-1 pr-3">
-                <div className="font-semibold text-slate-900">
-                  {item.quantity}x {item.dishName}
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-900">
+                    {item.quantity}x {item.dishName}
+                  </span>
+                  {item.orderStatus && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      item.orderStatus === 'served' || item.orderStatus === 'completed'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                        : item.orderStatus === 'ready'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                    }`}>
+                      {item.orderStatus === 'served' || item.orderStatus === 'completed' ? 'Served' : item.orderStatus === 'ready' ? 'Ready' : 'In Kitchen'}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                   <span>Order #{item.orderNumber}</span>

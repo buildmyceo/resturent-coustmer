@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -86,6 +87,32 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
           <RefreshCw className={`w-4 h-4 ${isOrdersLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {/* Bill & Payment Prompt Card */}
+      {orders.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-3xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-blue-200" />
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-200">
+                Table Bill Generated
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-white mt-1">
+              {formatCurrency(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0), currency)} Total
+            </h3>
+            <p className="text-xs text-blue-100 mt-0.5">
+              Food is being prepared & served! You can review items and settle your bill anytime.
+            </p>
+          </div>
+          <Link href={`/table/${sessionId}/bill`} className="shrink-0">
+            <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md gap-2 w-full sm:w-auto">
+              <span>View & Pay Bill</span>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Orders List */}
       <div className="space-y-4">

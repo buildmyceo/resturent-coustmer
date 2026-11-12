@@ -3,65 +3,74 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { sessionId, paymentMethod } = body;
-
-    if (!sessionId) {
-      return NextResponse.json(
-        { success: false, error: 'sessionId is required.' },
-        { status: 400 }
-      );
-    }
+    const body = await request.json().catch(() => ({}));
+    const { sessionId, paymentMethod, tableId, restaurantId } = body;
 
     const supabase = await createServerSupabaseClient();
 
-    // 1. Fetch current session and outstanding balance from the database
-    let session: any = null;
-    try {
-      const { data } = await supabase
-        .from('table_sessions')
-        .select('*, restaurants(*)')
-        .eq('id', sessionId)
-        .maybeSingle();
+    // 1. Resolve table & restaurant
+    let realRest: any = null;
+    let realTable: any = null;
 
-      if (data) session = data;
-    } catch {
-      // Non-blocking
+    if (restaurantId && !restaurantId.startsWith('11111111')) {
+      const { data: r } = await supabase.from('restaurants').select('*').eq('id', restaurantId).maybeSingle();
+      if (r) realRest = r;
+    }
+    if (!realRest) {
+      const { data: defaultRests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false }).limit(1);
+      if (defaultRests && defaultRests.length > 0) realRest = defaultRests[0];
     }
 
-    // 2. Fetch all verified payments for this session
-    let totalPaid = 0;
-    try {
-      const { data: paymentsData } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('session_id', sessionId)
-        .eq('status', 'completed');
+    const resolvedRestId = realRest?.id || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const resolvedRestName = realRest?.name || 'bikaner';
+    const resolvedCurrency = realRest?.currency || 'INR';
 
-      for (const p of paymentsData || []) {
-        totalPaid += Number(p.amount);
+    if (tableId && !tableId.startsWith('44444444')) {
+      const { data: t } = await supabase.from('restaurant_tables').select('*').eq('id', tableId).maybeSingle();
+      if (t) realTable = t;
+    }
+    if (!realTable && realRest) {
+      const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', realRest.id).order('table_number', { ascending: true }).limit(1);
+      if (tList && tList.length > 0) realTable = tList[0];
+    }
+
+    const resolvedTableId = realTable?.id || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+
+    // 2. Fetch all unpaid table orders
+    let totalOutstanding = 0;
+    try {
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total_amount, payment_status, status')
+        .eq('table_id', resolvedTableId)
+        .neq('status', 'cancelled');
+
+      if (orders && orders.length > 0) {
+        for (const o of orders) {
+          if (o.payment_status !== 'paid') {
+            totalOutstanding += Number(o.total_amount || 0);
+          }
+        }
       }
     } catch {
-      // Non-blocking
+      // Fallback
     }
 
-    const totalAmount = Number(session?.total_amount || 131.54);
-    const effectiveTotalPaid = Math.max(Number(session?.total_paid || 0), totalPaid);
-    const outstandingBalance = Math.max(0, Number((totalAmount - effectiveTotalPaid).toFixed(2)));
-
-    // 3. Create Gateway Order Reference
+    // Fallback if 0: default to ₹1.00 minimum
+    const finalAmount = Math.max(0, Number(totalOutstanding.toFixed(2))) || 1.0;
     const gatewayOrderId = `order_zv_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
     return NextResponse.json({
       success: true,
       paymentIntent: {
         gatewayOrderId,
-        sessionId: session?.id || sessionId,
-        restaurantId: session?.restaurant_id || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
-        restaurantName: session?.restaurants?.name || 'bikaner',
-        currency: session?.restaurants?.currency || 'INR',
-        amount: outstandingBalance,
-        amountInSubunits: Math.round(outstandingBalance * 100),
+        sessionId: sessionId || `sess_${resolvedTableId}`,
+        tableId: resolvedTableId,
+        restaurantId: resolvedRestId,
+        restaurantName: resolvedRestName,
+        currency: resolvedCurrency,
+        amount: finalAmount,
+        amountInSubunits: Math.round(finalAmount * 100),
         paymentMethod: paymentMethod || 'razorpay',
         keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_zovo_demo',
       },

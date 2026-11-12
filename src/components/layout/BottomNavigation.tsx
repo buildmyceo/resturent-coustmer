@@ -4,15 +4,20 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCustomer } from '@/context/CustomerContext';
+import { getGuestSession } from '@/lib/guest-session';
 import { UtensilsCrossed, ShoppingBag, Clock, Receipt } from 'lucide-react';
 
 export function BottomNavigation() {
   const pathname = usePathname();
   const { session, cartTotals, orders } = useCustomer();
 
-  if (!session?.id) return null;
+  const pathParts = (pathname || '').split('/');
+  const routeSessionId = pathParts[1] === 'table' ? pathParts[2] : null;
+  const sessionId = session?.id || routeSessionId || getGuestSession()?.sessionId;
 
-  const sessionId = session.id;
+  if (!sessionId) return null;
+
+  const hasUnpaidOrders = orders.some((o) => o.paymentStatus !== 'paid');
 
   const navItems = [
     {
@@ -40,6 +45,7 @@ export function BottomNavigation() {
       href: `/table/${sessionId}/bill`,
       icon: Receipt,
       active: pathname === `/table/${sessionId}/bill` || pathname.includes('/payment'),
+      hasActive: hasUnpaidOrders,
     },
   ];
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCustomer } from '@/context/CustomerContext';
+import { getGuestSession } from '@/lib/guest-session';
 import { formatCurrency } from '@/lib/format';
 import {
   CreditCard,
@@ -48,10 +49,16 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
     async function loadIntent() {
       setIsLoading(true);
       try {
+        const stored = getGuestSession();
         const res = await fetch('/api/payment/create-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, paymentMethod: 'razorpay' }),
+          body: JSON.stringify({
+            sessionId,
+            paymentMethod: 'razorpay',
+            tableId: table?.id || stored?.tableId,
+            restaurantId: restaurant?.id || stored?.restaurantId,
+          }),
         });
 
         const data = await res.json();
@@ -68,14 +75,16 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
     }
 
     loadIntent();
-  }, [sessionId]);
+  }, [sessionId, table?.id, restaurant?.id]);
 
-  const currency = restaurant?.currency || 'USD';
+  const currency = restaurant?.currency || 'INR';
 
   // 2. Submit payment settlement to backend verification
   const handleProceedPayment = async () => {
     setIsProcessing(true);
     setErrorMessage(null);
+
+    const stored = getGuestSession();
 
     // Generate simulated/real gateway payment tokens
     const gatewayOrderId = `order_zv_${Date.now()}`;
@@ -88,6 +97,8 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
+          tableId: table?.id || stored?.tableId,
+          restaurantId: restaurant?.id || stored?.restaurantId,
           gatewayOrderId,
           gatewayPaymentId,
           gatewaySignature,

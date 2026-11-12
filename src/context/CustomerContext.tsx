@@ -257,10 +257,21 @@ export function CustomerProvider({
 
   // Fetch Table Orders
   const refreshOrders = useCallback(async () => {
-    if (!session?.id) return;
+    const stored = getGuestSession();
+    const effectiveSessionId = session?.id || stored?.sessionId;
+    const effectiveTableId = table?.id || stored?.tableId;
+    const effectiveRestId = restaurant?.id || stored?.restaurantId;
+
+    if (!effectiveSessionId && !effectiveTableId) return;
+
     setIsOrdersLoading(true);
     try {
-      const res = await fetch(`/api/orders/track?sessionId=${session.id}`);
+      const params = new URLSearchParams();
+      if (effectiveSessionId) params.set('sessionId', effectiveSessionId);
+      if (effectiveTableId) params.set('tableId', effectiveTableId);
+      if (effectiveRestId) params.set('restaurantId', effectiveRestId);
+
+      const res = await fetch(`/api/orders/track?${params.toString()}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
@@ -270,13 +281,11 @@ export function CustomerProvider({
     } finally {
       setIsOrdersLoading(false);
     }
-  }, [session]);
+  }, [session?.id, table?.id, restaurant?.id]);
 
   useEffect(() => {
-    if (session?.id) {
-      refreshOrders();
-    }
-  }, [session?.id, refreshOrders]);
+    refreshOrders();
+  }, [refreshOrders]);
 
   // Submit Call Waiter Service Request
   const submitServiceRequest = useCallback(

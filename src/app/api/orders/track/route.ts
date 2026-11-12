@@ -8,67 +8,69 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
     const orderId = searchParams.get('orderId');
-
-    if (!sessionId && !orderId) {
-      return NextResponse.json(
-        { success: false, error: 'sessionId or orderId parameter is required.' },
-        { status: 400 }
-      );
-    }
+    let tableId = searchParams.get('tableId');
+    let restaurantId = searchParams.get('restaurantId');
 
     const supabase = await createServerSupabaseClient();
 
     let ordersData: any[] = [];
-    try {
-      if (sessionId) {
+
+    // 1. If explicit orderId
+    if (orderId) {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('*, order_items(*)')
+          .eq('id', orderId)
+          .maybeSingle();
+        if (data) ordersData = [data];
+      } catch {}
+    }
+
+    // 2. Query by table_id (most reliable for physical table dining)
+    if (ordersData.length === 0) {
+      const targetTableId = tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+      try {
         const { data, error } = await supabase
           .from('orders')
           .select('*, order_items(*)')
-          .eq('table_session_id', sessionId)
+          .eq('table_id', targetTableId)
+          .neq('status', 'cancelled')
           .order('created_at', { ascending: false });
 
         if (!error && data && data.length > 0) {
           ordersData = data;
         }
-      } else if (orderId) {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*, order_items(*)')
-          .eq('id', orderId)
-          .order('created_at', { ascending: false });
-
-        if (!error && data) ordersData = data;
-      }
-    } catch {
-      // Non-blocking
+      } catch {}
     }
 
-    // Fallback: If table_session_id column does not exist yet or yielded 0 rows, query recent orders
+    // 3. Fallback: Query by restaurant_id
     if (ordersData.length === 0) {
+      const targetRestId = restaurantId || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
       try {
         const { data, error } = await supabase
           .from('orders')
           .select('*, order_items(*)')
+          .eq('restaurant_id', targetRestId)
+          .neq('status', 'cancelled')
           .order('created_at', { ascending: false })
           .limit(10);
 
         if (!error && data && data.length > 0) {
           ordersData = data;
         }
-      } catch {
-        // Non-blocking
-      }
+      } catch {}
     }
 
     const formattedOrders = (ordersData || []).map((o: any) => ({
       id: o.id,
       restaurantId: o.restaurant_id,
       tableId: o.table_id,
-      tableSessionId: o.table_session_id,
-      participantId: o.participant_id,
-      participantName: o.participant_name,
+      tableSessionId: sessionId || o.table_id,
+      participantId: o.participant_id || 'guest',
+      participantName: o.participant_name || 'Guest',
       orderNumber: o.order_number,
-      tableNumber: o.table_number || '01',
+      tableNumber: o.table_number || 'T-01',
       orderSource: o.order_source || 'Customer',
       subtotal: Number(o.subtotal || 0),
       taxAmount: Number(o.tax_amount || 0),
@@ -78,19 +80,19 @@ export async function GET(request: Request) {
       orderTime: o.created_at,
       createdAt: o.created_at,
       customerNote: o.customer_note,
-      paymentMethod: o.payment_method,
-      paymentStatus: o.payment_status,
+      paymentMethod: o.payment_method || 'Online',
+      paymentStatus: o.payment_status || 'pending',
       items: (o.order_items || []).map((i: any) => ({
         id: i.id,
         orderId: i.order_id,
         dishId: i.dish_id,
         dishName: i.dish_name,
-        quantity: i.quantity,
-        unitPrice: Number(i.unit_price),
+        quantity: i.quantity || 1,
+        unitPrice: Number(i.unit_price || 0),
         notes: i.notes,
         variantName: i.variant_name,
         addons: Array.isArray(i.addons) ? i.addons : [],
-        status: i.status || 'pending',
+        status: o.status,
       })),
     }));
 
@@ -101,7 +103,7 @@ export async function GET(request: Request) {
   } catch (err: any) {
     console.error('API /api/orders/track error:', err);
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error while tracking orders.' },
+      { success: false, error: err?.message || 'Server error while fetching table orders.' },
       { status: 500 }
     );
   }
