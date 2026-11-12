@@ -58,3 +58,4 @@ npx vercel --prod
 - **`eslint.config.mjs`**: ESLint 9 configuration compatible with Next.js 16 and React 19 rules.
 - **`next.config.ts`**: Turbopack & Webpack dual-build support and wildcard remote image patterns.
 - **Dynamic API Routes**: All GET API routes marked with `export const dynamic = 'force-dynamic'` to prevent stale cache hits on Serverless Functions.
+

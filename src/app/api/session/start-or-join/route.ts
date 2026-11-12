@@ -8,7 +8,7 @@ const activeSessionsCache = new Map<string, any>();
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { publicIdentifier, guestName } = body;
+    const { publicIdentifier, guestName, restaurantSlug, tableNumber, tableId: bodyTableId, restaurantId: bodyRestId } = body;
 
     const trimmedToken = (publicIdentifier || '').trim();
     const safeGuestName = (guestName || 'Guest').trim().slice(0, 50);
@@ -90,12 +90,35 @@ export async function POST(request: Request) {
       // Fallback
     }
 
-    const tableId = table?.id || '44444444-4444-4444-4444-444444440005';
-    const tableNumber = table?.table_number || 'Table 05';
-    const tableName = table?.table_name || 'Executive Dining';
-    const restaurantId = restaurant?.id || '11111111-1111-1111-1111-111111111111';
-    const restaurantName = restaurant?.name || 'Zovo Bistro & Lounge';
-    const restaurantSlug = restaurant?.slug || 'zovo-bistro';
+    // Direct lookup by slug / tableId / restaurantId if table_qr_codes did not match
+    if (!table || !restaurant) {
+      try {
+        if (bodyRestId) {
+          const { data: r } = await supabase.from('restaurants').select('*').eq('id', bodyRestId).maybeSingle();
+          if (r) restaurant = r;
+        } else if (restaurantSlug) {
+          const { data: rList } = await supabase.from('restaurants').select('*').or(`slug.ilike.${restaurantSlug},name.ilike.${restaurantSlug}`).limit(1);
+          if (rList && rList.length > 0) restaurant = rList[0];
+        }
+
+        if (bodyTableId) {
+          const { data: t } = await supabase.from('restaurant_tables').select('*').eq('id', bodyTableId).maybeSingle();
+          if (t) table = t;
+        } else if (restaurant && tableNumber) {
+          const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', restaurant.id).or(`table_number.ilike.${tableNumber},table_number.ilike.T-${tableNumber},table_number.ilike.Table ${tableNumber}`).limit(1);
+          if (tList && tList.length > 0) table = tList[0];
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    const tableId = table?.id || bodyTableId || '44444444-4444-4444-4444-444444440005';
+    const tableNum = table?.table_number || tableNumber || 'Table 01';
+    const tableName = table?.table_name || `Table ${tableNum}`;
+    const restaurantId = restaurant?.id || bodyRestId || '11111111-1111-1111-1111-111111111111';
+    const restaurantName = restaurant?.name || (restaurantSlug ? restaurantSlug.charAt(0).toUpperCase() + restaurantSlug.slice(1) : 'ZOVO Restaurant');
+    const restSlug = restaurant?.slug || restaurantSlug || 'restaurant';
 
     // 3. Check for existing active session on table (DB or Cache)
     let sessionId: string | null = null;
@@ -230,11 +253,11 @@ export async function POST(request: Request) {
       guestName: safeGuestName,
       isHost,
       tableId,
-      tableNumber,
+      tableNumber: tableNum,
       tableName,
       restaurantId,
       restaurantName,
-      restaurantSlug,
+      restaurantSlug: restSlug,
       sessionStatus: 'occupied',
       initialClaimExpiresAt: initialClaimExpiresAt || (isClaimPermanent ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString()),
       isClaimPermanent: Boolean(isClaimPermanent),
