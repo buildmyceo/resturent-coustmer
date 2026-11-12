@@ -11,6 +11,7 @@ export interface GuestSessionState {
   isHost: boolean;
   tableId: string;
   tableNumber: string;
+  tableName?: string;
   restaurantId: string;
   restaurantSlug: string;
   lastActiveTimestamp: number;

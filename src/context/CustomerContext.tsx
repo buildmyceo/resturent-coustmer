@@ -103,6 +103,33 @@ export function CustomerProvider({
   const [selectedDishModal, setSelectedDishModal] = useState<Dish | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Restore stored session on mount
+  useEffect(() => {
+    const stored = getGuestSession();
+    if (stored) {
+      if (stored.tableNumber && !table) {
+        setTable({
+          id: stored.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+          restaurantId: stored.restaurantId || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+          number: stored.tableNumber,
+          name: stored.tableName || `Table ${stored.tableNumber}`,
+          capacity: 4,
+          isActive: true,
+        });
+      }
+      if (stored.participantId && !participant) {
+        setParticipant({
+          id: stored.participantId,
+          sessionId: stored.sessionId,
+          name: stored.guestName || 'Guest',
+          guestToken: stored.guestToken || '',
+          isHost: stored.isHost || false,
+          joinedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }, []);
+
   // Toast Notification Manager
   const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;

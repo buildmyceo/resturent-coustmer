@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
 import { saveGuestSession, generateGuestToken } from '@/lib/guest-session';
 import { Utensils, Users, ArrowRight, Loader2, AlertCircle, Sparkles } from 'lucide-react';
@@ -123,6 +124,35 @@ export default function TableLandingPage({ params }: PageProps) {
         isActive: true,
       });
 
+      setRestaurant({
+        id: data.restaurantId,
+        name: data.restaurantName || resolvedTableData?.restaurantName || 'bikaner',
+        slug: data.restaurantSlug || resolvedTableData?.restaurantSlug || restaurantSlug,
+        description: resolvedTableData?.description || '',
+        logoUrl: resolvedTableData?.logoUrl || null,
+        coverImageUrl: resolvedTableData?.coverImageUrl || null,
+        restaurantType: 'Restaurant',
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        postalCode: '',
+        currency: resolvedTableData?.currency || 'INR',
+        timezone: 'Asia/Kolkata',
+        status: 'active',
+        settings: {
+          taxEnabled: true,
+          taxPercentage: 5,
+          serviceChargeEnabled: false,
+          serviceChargePercentage: 0,
+          currency: resolvedTableData?.currency || 'INR',
+          timezone: 'Asia/Kolkata',
+          receiptFooter: 'Thank you for dining with us!',
+        },
+      });
+
       setSession({
         id: data.sessionId,
         restaurantId: data.restaurantId,
@@ -200,8 +230,12 @@ export default function TableLandingPage({ params }: PageProps) {
       <div className="max-w-md w-full mx-auto my-auto pt-6 pb-8 space-y-6">
         {/* Welcome Card */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
-          <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-md shadow-blue-500/20 font-black text-2xl">
-            {resolvedTableData?.restaurantName?.charAt(0)?.toUpperCase() || 'Z'}
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-md shadow-blue-500/20 font-black text-2xl overflow-hidden relative">
+            {resolvedTableData?.logoUrl ? (
+              <Image src={resolvedTableData.logoUrl} alt={resolvedTableData.restaurantName} fill className="object-cover" />
+            ) : (
+              resolvedTableData?.restaurantName?.charAt(0)?.toUpperCase() || 'Z'
+            )}
           </div>
 
           <div>
@@ -299,3 +333,4 @@ export default function TableLandingPage({ params }: PageProps) {
     </div>
   );
 }
+

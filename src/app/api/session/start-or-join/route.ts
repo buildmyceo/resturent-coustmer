@@ -93,32 +93,43 @@ export async function POST(request: Request) {
     // Direct lookup by slug / tableId / restaurantId if table_qr_codes did not match
     if (!table || !restaurant) {
       try {
-        if (bodyRestId) {
+        if (bodyRestId && !bodyRestId.startsWith('11111111')) {
           const { data: r } = await supabase.from('restaurants').select('*').eq('id', bodyRestId).maybeSingle();
           if (r) restaurant = r;
-        } else if (restaurantSlug) {
-          const { data: rList } = await supabase.from('restaurants').select('*').or(`slug.ilike.${restaurantSlug},name.ilike.${restaurantSlug}`).limit(1);
+        }
+        if (!restaurant && restaurantSlug) {
+          const { data: rList } = await supabase.from('restaurants').select('*').or(`slug.ilike.${restaurantSlug},name.ilike.${restaurantSlug},slug.ilike.%${restaurantSlug}%,name.ilike.%${restaurantSlug}%`).limit(1);
           if (rList && rList.length > 0) restaurant = rList[0];
         }
+        if (!restaurant) {
+          const { data: defaultRests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false }).limit(1);
+          if (defaultRests && defaultRests.length > 0) restaurant = defaultRests[0];
+        }
 
-        if (bodyTableId) {
+        if (bodyTableId && !bodyTableId.startsWith('44444444')) {
           const { data: t } = await supabase.from('restaurant_tables').select('*').eq('id', bodyTableId).maybeSingle();
           if (t) table = t;
-        } else if (restaurant && tableNumber) {
-          const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', restaurant.id).or(`table_number.ilike.${tableNumber},table_number.ilike.T-${tableNumber},table_number.ilike.Table ${tableNumber}`).limit(1);
+        }
+        if (!table && restaurant && tableNumber) {
+          const cleanNum = tableNumber.replace(/^T-?0?/, '');
+          const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', restaurant.id).or(`table_number.ilike.${tableNumber},table_number.ilike.T-${tableNumber},table_number.ilike.Table ${tableNumber},table_number.ilike.%${cleanNum}%`).limit(1);
           if (tList && tList.length > 0) table = tList[0];
+        }
+        if (!table && restaurant) {
+          const { data: firstTables } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', restaurant.id).order('table_number', { ascending: true }).limit(1);
+          if (firstTables && firstTables.length > 0) table = firstTables[0];
         }
       } catch {
         // Fallback
       }
     }
 
-    const tableId = table?.id || bodyTableId || '44444444-4444-4444-4444-444444440005';
-    const tableNum = table?.table_number || tableNumber || 'Table 01';
+    const tableId = table?.id || bodyTableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+    const tableNum = table?.table_number || tableNumber || 'T-01';
     const tableName = table?.table_name || `Table ${tableNum}`;
-    const restaurantId = restaurant?.id || bodyRestId || '11111111-1111-1111-1111-111111111111';
-    const restaurantName = restaurant?.name || (restaurantSlug ? restaurantSlug.charAt(0).toUpperCase() + restaurantSlug.slice(1) : 'ZOVO Restaurant');
-    const restSlug = restaurant?.slug || restaurantSlug || 'restaurant';
+    const restaurantId = restaurant?.id || bodyRestId || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const restaurantName = restaurant?.name || (restaurantSlug ? restaurantSlug.charAt(0).toUpperCase() + restaurantSlug.slice(1) : 'bikaner');
+    const restSlug = restaurant?.slug || restaurantSlug || 'bikaner-w7bt';
 
     // 3. Check for existing active session on table (DB or Cache)
     let sessionId: string | null = null;

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 export default function CustomerLandingPage() {
   const router = useRouter();
   const [activeSession, setActiveSession] = useState<GuestSessionState | null>(null);
-  const [inputToken, setInputToken] = useState('zv_zovo-bistro_t01_e8a1d2f4');
+  const [inputToken, setInputToken] = useState('zv_bikanerw7bt_tT01');
 
   useEffect(() => {
     const session = getGuestSession();
@@ -23,14 +23,13 @@ export default function CustomerLandingPage() {
     e.preventDefault();
     const token = inputToken.trim();
     if (token) {
-      router.push(`/qr/${token}`);
+      router.push(`/bikaner-w7bt/T-01/${token}`);
     }
   };
 
   const sampleQRs = [
-    { label: 'Table 01 (Window Table)', token: 'zv_zovo-bistro_t01_e8a1d2f4' },
-    { label: 'Table 02 (Booth 2)', token: 'zv_zovo-bistro_t02_c9b4e5a7' },
-    { label: 'Table 05 (Shared Table)', token: 'zv_zovo-bistro_t05_a1e9f4c3' },
+    { label: 'Table T-01 (Table 1 - Main Dining)', token: 'zv_bikanerw7bt_tT01' },
+    { label: 'Table T-02 (Booth 2)', token: 'zv_bikanerw7bt_tT02' },
   ];
 
   return (

@@ -112,6 +112,35 @@ export default function QRScanResolverPage({ params }: PageProps) {
         isActive: true,
       });
 
+      setRestaurant({
+        id: data.restaurantId,
+        name: data.restaurantName || resolvedTableData?.restaurantName || 'bikaner',
+        slug: data.restaurantSlug || resolvedTableData?.restaurantSlug || 'bikaner-w7bt',
+        description: resolvedTableData?.description || '',
+        logoUrl: resolvedTableData?.logoUrl || null,
+        coverImageUrl: resolvedTableData?.coverImageUrl || null,
+        restaurantType: 'Restaurant',
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        postalCode: '',
+        currency: resolvedTableData?.currency || 'INR',
+        timezone: 'Asia/Kolkata',
+        status: 'active',
+        settings: {
+          taxEnabled: true,
+          taxPercentage: 5,
+          serviceChargeEnabled: false,
+          serviceChargePercentage: 0,
+          currency: resolvedTableData?.currency || 'INR',
+          timezone: 'Asia/Kolkata',
+          receiptFooter: 'Thank you for dining with us!',
+        },
+      });
+
       setSession({
         id: data.sessionId,
         restaurantId: data.restaurantId,

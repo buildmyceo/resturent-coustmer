@@ -187,24 +187,29 @@ export async function POST(request: Request) {
           restaurantName: matchedRest.name,
           restaurantSlug: matchedRest.slug || slug,
           restaurantStatus: matchedRest.status || 'active',
+          logoUrl: matchedRest.logo_url || null,
+          coverImageUrl: matchedRest.cover_image_url || null,
+          description: matchedRest.description || '',
+          currency: matchedRest.currency || 'INR',
           activeSessionId,
           sessionStatus,
         },
       });
     }
 
-    // 4. Absolute Fallback: Never crash on valid scan
-    const fallbackName = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'ZOVO Dining';
+    // 4. Absolute Fallback: Fall back to active restaurant rather than dummy
+    const fallbackRestId = '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const fallbackName = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'bikaner';
     return NextResponse.json({
       success: true,
       table: {
-        tableId: `tbl-fallback-${tblNum || '1'}`,
-        tableNumber: tblNum || 'Table 1',
+        tableId: `ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a`,
+        tableNumber: tblNum || 'T-01',
         tableName: `Table ${tblNum || '1'}`,
         seatingCapacity: 4,
-        restaurantId: '11111111-1111-1111-1111-111111111111',
+        restaurantId: fallbackRestId,
         restaurantName: fallbackName,
-        restaurantSlug: slug || 'restaurant',
+        restaurantSlug: slug || 'bikaner-w7bt',
         restaurantStatus: 'active',
         activeSessionId: null,
         sessionStatus: null,
@@ -215,13 +220,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       table: {
-        tableId: 'tbl-safe-fallback',
-        tableNumber: 'Table 1',
-        tableName: 'Dining Room',
+        tableId: 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+        tableNumber: 'T-01',
+        tableName: 'Table 1',
         seatingCapacity: 4,
-        restaurantId: '11111111-1111-1111-1111-111111111111',
-        restaurantName: 'ZOVO Dining',
-        restaurantSlug: 'restaurant',
+        restaurantId: '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+        restaurantName: 'bikaner',
+        restaurantSlug: 'bikaner-w7bt',
         restaurantStatus: 'active',
         activeSessionId: null,
         sessionStatus: null,

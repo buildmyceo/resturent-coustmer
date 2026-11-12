@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       const { data: newPayment } = await supabase
         .from('payments')
         .insert({
-          restaurant_id: session?.restaurant_id || '11111111-1111-1111-1111-111111111111',
+          restaurant_id: session?.restaurant_id || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
           session_id: sessionId,
           amount: paymentAmount > 0 ? paymentAmount : totalAmount,
           payment_method: paymentMethod,
@@ -95,10 +95,10 @@ export async function POST(request: Request) {
       const { data: invoiceData } = await supabase
         .from('invoices')
         .insert({
-          restaurant_id: session?.restaurant_id || '11111111-1111-1111-1111-111111111111',
+          restaurant_id: session?.restaurant_id || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
           session_id: sessionId,
           invoice_number: invoiceNumber,
-          table_number: session?.restaurant_tables?.table_number || 'Table 05',
+          table_number: session?.restaurant_tables?.table_number || 'T-01',
           customer_name: customerDetails?.name || session?.customer_name || 'Valued Guest',
           customer_email: customerDetails?.email || null,
           customer_phone: customerDetails?.phone || null,

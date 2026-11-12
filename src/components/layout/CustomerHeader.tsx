@@ -3,10 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
+import { getGuestSession } from '@/lib/guest-session';
 import { Utensils, Users, Bell, Clock, AlertTriangle } from 'lucide-react';
 
 export function CustomerHeader() {
   const { restaurant, table, session, participant, setIsCallWaiterModalOpen, orders } = useCustomer();
+  const [storedSession, setStoredSession] = useState<{ tableNumber?: string; restaurantSlug?: string } | null>(null);
+
+  useEffect(() => {
+    const s = getGuestSession();
+    if (s) queueMicrotask(() => setStoredSession(s));
+  }, []);
+
+  const displayName = restaurant?.name || (storedSession?.restaurantSlug ? storedSession.restaurantSlug.replace(/-.*$/, '') : 'bikaner');
+  const displayTable = table?.number || storedSession?.tableNumber || 'T-01';
 
   // 15-Minute Countdown Timer State
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
@@ -94,7 +104,7 @@ export function CustomerHeader() {
 
           <div className="min-w-0">
             <h1 className="font-bold text-slate-900 text-sm sm:text-base leading-tight truncate">
-              {restaurant?.name || 'Zovo Dining'}
+              {displayName}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
@@ -111,12 +121,10 @@ export function CustomerHeader() {
 
         {/* Table & Guest Identity */}
         <div className="flex items-center gap-2">
-          {table && (
-            <div className="bg-slate-100/90 border border-slate-200/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-              <Utensils className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-xs font-bold text-slate-900">{table.number}</span>
-            </div>
-          )}
+          <div className="bg-slate-100/90 border border-slate-200/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+            <Utensils className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-xs font-bold text-slate-900">{displayTable}</span>
+          </div>
 
           {participant && (
             <div

@@ -57,9 +57,9 @@ export async function POST(request: Request) {
       paymentIntent: {
         gatewayOrderId,
         sessionId: session?.id || sessionId,
-        restaurantId: session?.restaurant_id || '11111111-1111-1111-1111-111111111111',
-        restaurantName: session?.restaurants?.name || 'Zovo Bistro & Lounge',
-        currency: session?.restaurants?.currency || 'USD',
+        restaurantId: session?.restaurant_id || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+        restaurantName: session?.restaurants?.name || 'bikaner',
+        currency: session?.restaurants?.currency || 'INR',
         amount: outstandingBalance,
         amountInSubunits: Math.round(outstandingBalance * 100),
         paymentMethod: paymentMethod || 'razorpay',

@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useMemo, use } from 'react';
 import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
+import { getGuestSession } from '@/lib/guest-session';
+import { createClient } from '@/lib/supabase/client';
 import { Category, Dish, DietaryType } from '@/types';
 import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
@@ -20,6 +22,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
   const {
     restaurant,
     setRestaurant,
+    table,
+    setTable,
     cart,
     addToCart,
     setSelectedDishModal,
@@ -39,19 +43,59 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     async function loadMenu() {
       setIsLoading(true);
       try {
-        // Resolve restaurant ID from session if available, or fetch session details
         let targetRestId = restaurant?.id;
 
-        if (!targetRestId) {
+        // 1. Check guest session from localStorage / cookies
+        const stored = getGuestSession();
+        if ((!targetRestId || targetRestId.startsWith('11111111')) && stored?.restaurantId && !stored.restaurantId.startsWith('11111111')) {
+          targetRestId = stored.restaurantId;
+        }
+
+        // 2. Query /api/session/verify
+        if (!targetRestId || targetRestId.startsWith('11111111')) {
           const res = await fetch(`/api/session/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId }),
+            body: JSON.stringify({
+              sessionId,
+              restaurantId: stored?.restaurantId,
+              restaurantSlug: stored?.restaurantSlug,
+            }),
           });
           const data = await res.json();
-          if (data.success && data.session?.restaurantId) {
-            targetRestId = data.session.restaurantId;
+          if (data.success && data.session) {
+            if (data.session.restaurantId && !data.session.restaurantId.startsWith('11111111')) {
+              targetRestId = data.session.restaurantId;
+            }
+            if (data.session.tableNumber) {
+              setTable({
+                id: data.session.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+                restaurantId: targetRestId || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+                number: data.session.tableNumber,
+                name: data.session.tableName || `Table ${data.session.tableNumber}`,
+                capacity: 4,
+                isActive: true,
+              });
+            }
           }
+        }
+
+        // 3. Fallback directly to Supabase client if still missing
+        if (!targetRestId || targetRestId.startsWith('11111111')) {
+          const supabase = createClient();
+          const { data: defaultRests } = await supabase
+            .from('restaurants')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (defaultRests && defaultRests.length > 0) {
+            targetRestId = defaultRests[0].id;
+          }
+        }
+
+        // Default to known active restaurant ID if all else fails
+        if (!targetRestId || targetRestId.startsWith('11111111')) {
+          targetRestId = '07e9a4c7-edae-4bf0-8786-fc220c152d43';
         }
 
         if (targetRestId) {
@@ -61,6 +105,18 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           if (fetchedRest) setRestaurant(fetchedRest);
           setCategories(fetchedCats);
           setDishes(fetchedDishes);
+
+          // If table is still not set in context, set it from stored or default table
+          if (stored?.tableNumber && (!table || table.number !== stored.tableNumber)) {
+            setTable({
+              id: stored.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+              restaurantId: targetRestId,
+              number: stored.tableNumber,
+              name: stored.tableName || `Table ${stored.tableNumber}`,
+              capacity: 4,
+              isActive: true,
+            });
+          }
         }
       } catch (err) {
         console.warn('Error fetching menu from Supabase:', err);
@@ -70,7 +126,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     }
 
     loadMenu();
-  }, [sessionId, restaurant?.id, setRestaurant]);
+  }, [sessionId, restaurant?.id, setRestaurant, setTable]);
 
   // Cart quantity map by dishId
   const cartQuantityMap = useMemo(() => {
@@ -142,11 +198,16 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
       }
     }
 
-    // Include uncategorized dishes if any
-    const uncategorized = filteredDishes.filter((d) => !d.categoryId);
+    // Include uncategorized dishes or dishes whose category is not in the active categories list
+    const uncategorized = filteredDishes.filter(
+      (d) => !d.categoryId || !categories.some((c) => c.id === d.categoryId)
+    );
     if (uncategorized.length > 0) {
       groups.push({
-        category: { id: 'uncat', name: 'Chef Specials & Beverages' },
+        category: {
+          id: 'uncat',
+          name: categories.length === 0 ? 'All Dishes' : 'Chef Specials & Beverages',
+        },
         dishes: uncategorized,
       });
     }

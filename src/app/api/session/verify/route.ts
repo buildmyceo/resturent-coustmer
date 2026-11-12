@@ -28,17 +28,48 @@ export async function POST(request: Request) {
     }
 
     if (!session) {
+      // Find the active restaurant in Supabase rather than a hardcoded dummy
+      const { restaurantId: reqRestId, restaurantSlug: reqSlug } = body;
+      let realRest: any = null;
+
+      if (reqRestId && !reqRestId.startsWith('11111111')) {
+        const { data: r } = await supabase.from('restaurants').select('*').eq('id', reqRestId).maybeSingle();
+        if (r) realRest = r;
+      }
+      if (!realRest && reqSlug) {
+        const { data: rList } = await supabase.from('restaurants').select('*').or(`slug.ilike.${reqSlug},name.ilike.${reqSlug},slug.ilike.%${reqSlug}%,name.ilike.%${reqSlug}%`).limit(1);
+        if (rList && rList.length > 0) realRest = rList[0];
+      }
+      if (!realRest) {
+        const { data: defaultRests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false }).limit(1);
+        if (defaultRests && defaultRests.length > 0) realRest = defaultRests[0];
+      }
+
+      // Find table for this restaurant
+      let realTable: any = null;
+      if (realRest) {
+        const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', realRest.id).order('table_number', { ascending: true }).limit(1);
+        if (tList && tList.length > 0) realTable = tList[0];
+      }
+
+      const restId = realRest?.id || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+      const restName = realRest?.name || 'bikaner';
+      const restSlug = realRest?.slug || 'bikaner-w7bt';
+      const tableId = realTable?.id || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+      const tableNumber = realTable?.table_number || 'T-01';
+      const tableName = realTable?.table_name || 'Table 1';
+
       return NextResponse.json({
         success: true,
         isExpired: false,
         session: {
           id: sessionId,
-          restaurantId: '11111111-1111-1111-1111-111111111111',
-          restaurantName: 'Zovo Bistro & Lounge',
-          restaurantSlug: 'zovo-bistro',
-          tableId: '44444444-4444-4444-4444-444444440005',
-          tableNumber: 'Table 05',
-          tableName: 'Executive Dining',
+          restaurantId: restId,
+          restaurantName: restName,
+          restaurantSlug: restSlug,
+          tableId: tableId,
+          tableNumber: tableNumber,
+          tableName: tableName,
           status: 'occupied',
           guestCount: 1,
           subtotal: 0,
