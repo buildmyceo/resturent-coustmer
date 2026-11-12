@@ -2,13 +2,15 @@
 
 import React, { useEffect, useState, useMemo, use } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession } from '@/lib/guest-session';
 import { createClient } from '@/lib/supabase/client';
 import { Category, Dish, DietaryType } from '@/types';
 import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
-import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 
 interface MenuPageProps {
@@ -27,11 +29,21 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     cart,
     addToCart,
     setSelectedDishModal,
+    orders,
   } = useCustomer();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Check if previous table orders are fully settled and no active session
+  const isSessionSettled = useMemo(() => {
+    const stored = getGuestSession();
+    if (!stored && orders.length > 0 && orders.every((o) => o.paymentStatus === 'paid' || o.status === 'completed')) {
+      return true;
+    }
+    return false;
+  }, [orders]);
 
   // Filter & Search states
   const [activeCategoryId, setActiveCategoryId] = useState('all');
@@ -259,6 +271,31 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           </p>
         </div>
       </div>
+
+      {/* Settled Dining Session Notice */}
+      {isSessionSettled && (
+        <div className="mx-4 p-4 bg-emerald-50/95 border border-emerald-200/90 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                Table Bill Settled & Paid
+              </p>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                All dishes for this dining session have been paid. To order new food, please scan the table QR code.
+              </p>
+            </div>
+          </div>
+          <Link href="/" className="shrink-0 w-full sm:w-auto">
+            <Button size="sm" className="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white gap-2 text-xs shadow-xs">
+              <QrCode className="w-4 h-4" />
+              <span>Scan QR Code</span>
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* 2. Search & Dietary Filter Bar */}
       <div className="px-4 space-y-3">

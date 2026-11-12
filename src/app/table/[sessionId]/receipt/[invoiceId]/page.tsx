@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCustomer } from '@/context/CustomerContext';
+import { clearGuestSession } from '@/lib/guest-session';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import {
   FileText,
@@ -14,6 +16,9 @@ import {
   Loader2,
   Share2,
   Check,
+  QrCode,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -24,10 +29,16 @@ interface ReceiptPageProps {
 export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
   const resolvedParams = use(params);
   const { sessionId, invoiceId } = resolvedParams;
+  const router = useRouter();
 
-  const { restaurant } = useCustomer();
+  const { restaurant, clearSessionState } = useCustomer();
   const [receipt, setReceipt] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Clear guest table session and ordering cart on bill settlement
+  useEffect(() => {
+    clearSessionState();
+  }, [clearSessionState]);
 
   // Email state
   const [emailInput, setEmailInput] = useState('');
@@ -121,14 +132,37 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
 
   return (
     <div className="p-4 space-y-6 max-w-lg mx-auto">
+      {/* Session Invalidation Notice */}
+      <div className="no-print bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
+              Bill Paid • Dining Session Closed
+            </h4>
+            <p className="text-xs text-emerald-800 mt-0.5">
+              Active table ordering data has been cleared. To order more dishes, please scan the table QR code.
+            </p>
+          </div>
+        </div>
+        <Link href="/" className="shrink-0 w-full sm:w-auto">
+          <Button size="sm" className="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white gap-2 text-xs shadow-xs">
+            <QrCode className="w-4 h-4" />
+            <span>Scan QR Code</span>
+          </Button>
+        </Link>
+      </div>
+
       {/* Top Action Bar (hidden when printing) */}
       <div className="no-print flex items-center justify-between pb-3 border-b border-slate-100">
         <Link
-          href={`/table/${sessionId}`}
+          href="/"
           className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 font-semibold"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Return to Menu</span>
+          <QrCode className="w-4 h-4 text-slate-700" />
+          <span>Leave Table / Scan New QR</span>
         </Link>
 
         <div className="flex items-center gap-2">
@@ -305,6 +339,19 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
             {emailStatus.message}
           </div>
         )}
+      </div>
+
+      {/* Done & Start New Order via QR CTA */}
+      <div className="no-print pt-2 pb-10">
+        <Link href="/" className="block">
+          <Button
+            size="lg"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl gap-2.5 shadow-xl text-sm"
+          >
+            <QrCode className="w-5 h-5 text-emerald-400" />
+            <span>Finish Dining • Scan Table QR to Order More</span>
+          </Button>
+        </Link>
       </div>
     </div>
   );

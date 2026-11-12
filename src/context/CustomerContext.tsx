@@ -14,7 +14,7 @@ import {
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { customerAudio } from '@/lib/audio';
-import { touchGuestSession, isSessionExpired, getGuestSession } from '@/lib/guest-session';
+import { touchGuestSession, isSessionExpired, getGuestSession, clearGuestSession } from '@/lib/guest-session';
 
 export interface ToastMessage {
   id: string;
@@ -47,6 +47,7 @@ interface CustomerContextType {
   updateCartQuantity: (cartItemId: string, newQuantity: number) => void;
   removeFromCart: (cartItemId: string) => void;
   clearCart: () => void;
+  clearSessionState: () => void;
   cartTotals: {
     subtotal: number;
     taxAmount: number;
@@ -239,6 +240,21 @@ export function CustomerProvider({
 
   const clearCart = useCallback(() => {
     setCart([]);
+  }, []);
+
+  const clearSessionState = useCallback(() => {
+    clearGuestSession();
+    setCart([]);
+    setOrders([]);
+    setSession(null);
+    setParticipant(null);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('zovo_cart');
+        localStorage.removeItem('zovo_guest_session');
+        sessionStorage.clear();
+      } catch {}
+    }
   }, []);
 
   // Server-matching Cart Totals Calculation
@@ -437,6 +453,7 @@ export function CustomerProvider({
         updateCartQuantity,
         removeFromCart,
         clearCart,
+        clearSessionState,
         cartTotals,
         orders,
         refreshOrders,

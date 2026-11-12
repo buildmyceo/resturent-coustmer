@@ -12,6 +12,7 @@ export async function POST(request: Request) {
       gatewayPaymentId,
       paymentMethod = 'online',
       customerDetails,
+      upiUtr,
     } = body;
 
     const supabase = await createServerSupabaseClient();
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     try {
       const { data: orders } = await supabase
         .from('orders')
-        .select('id, total_amount, payment_status')
+        .select('id, total_amount, payment_status, customer_note')
         .eq('table_id', resolvedTableId)
         .neq('status', 'cancelled');
 
@@ -42,14 +43,24 @@ export async function POST(request: Request) {
 
     if (paidAmount <= 0) paidAmount = 1.0;
 
-    // 3. Mark all pending orders for this table as PAID in Supabase
+    // 3. Format structured customer contact info
+    const resolvedUtr = upiUtr || (gatewayPaymentId?.startsWith('upi_utr_') ? gatewayPaymentId.replace('upi_utr_', '') : undefined);
+    const noteParts: string[] = [];
+    if (customerDetails?.name) noteParts.push(`Customer: ${customerDetails.name}`);
+    if (customerDetails?.phone) noteParts.push(`Phone: ${customerDetails.phone}`);
+    if (customerDetails?.email) noteParts.push(`Email: ${customerDetails.email}`);
+    if (resolvedUtr) noteParts.push(`UTR: ${resolvedUtr}`);
+    const customerNoteString = noteParts.length > 0 ? noteParts.join(' | ') : 'Customer: Valued Guest';
+
+    // 4. Mark all pending orders for this table as PAID in Supabase and save customer details
     try {
       await supabase
         .from('orders')
         .update({
           payment_status: 'paid',
-          payment_method: paymentMethod,
+          payment_method: paymentMethod.toUpperCase(),
           status: 'completed',
+          customer_note: customerNoteString,
           updated_at: new Date().toISOString(),
         })
         .eq('table_id', resolvedTableId)
