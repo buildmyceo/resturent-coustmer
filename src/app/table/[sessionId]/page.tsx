@@ -107,9 +107,9 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           setDishes(fetchedDishes);
 
           // If table is still not set in context, set it from stored or default table
-          if (stored?.tableNumber && (!table || table.number !== stored.tableNumber)) {
+          if (stored?.tableNumber && stored.tableNumber !== 'Table 05' && (!table || table.number !== stored.tableNumber)) {
             setTable({
-              id: stored.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+              id: stored.tableId && !stored.tableId.startsWith('44444444') ? stored.tableId : 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
               restaurantId: targetRestId,
               number: stored.tableNumber,
               name: stored.tableName || `Table ${stored.tableNumber}`,

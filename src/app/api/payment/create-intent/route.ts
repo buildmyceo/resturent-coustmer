@@ -60,6 +60,12 @@ export async function POST(request: Request) {
     const finalAmount = Math.max(0, Number(totalOutstanding.toFixed(2))) || 1.0;
     const gatewayOrderId = `order_zv_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Dynamic UPI deep link generation for zero-fee instant settlement
+    const cleanPhone = (realRest?.phone || '').replace(/[^0-9]/g, '').slice(-10);
+    const upiVpa = cleanPhone ? `${cleanPhone}@upi` : 'bikaner@icici';
+    const upiPayeeName = resolvedRestName;
+    const upiDeepLink = `upi://pay?pa=${encodeURIComponent(upiVpa)}&pn=${encodeURIComponent(upiPayeeName)}&am=${finalAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Table_${realTable?.table_number || '1'}_Bill`)}`;
+
     return NextResponse.json({
       success: true,
       paymentIntent: {
@@ -73,6 +79,9 @@ export async function POST(request: Request) {
         amountInSubunits: Math.round(finalAmount * 100),
         paymentMethod: paymentMethod || 'razorpay',
         keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_zovo_demo',
+        upiId: upiVpa,
+        upiPayeeName,
+        upiDeepLink,
       },
     });
   } catch (err: any) {

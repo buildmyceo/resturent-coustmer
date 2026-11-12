@@ -61,6 +61,17 @@ export function getGuestSession(): GuestSessionState | null {
     if (!raw) return null;
 
     const session: GuestSessionState = JSON.parse(raw);
+
+    // Automatically purge legacy mock sessions so they never override real restaurant/table
+    if (
+      session.restaurantId?.startsWith('11111111') ||
+      session.restaurantSlug === 'zovo-bistro' ||
+      session.tableNumber === 'Table 05'
+    ) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
     const now = Date.now();
 
     // Check 15-minute inactivity policy
