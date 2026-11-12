@@ -15,7 +15,7 @@ export default function CustomerLandingPage() {
   useEffect(() => {
     const session = getGuestSession();
     if (session && session.sessionId) {
-      setActiveSession(session);
+      queueMicrotask(() => setActiveSession(session));
     }
   }, []);
 

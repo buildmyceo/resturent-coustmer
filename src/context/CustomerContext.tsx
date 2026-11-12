@@ -243,7 +243,7 @@ export function CustomerProvider({
     } finally {
       setIsOrdersLoading(false);
     }
-  }, [session?.id]);
+  }, [session]);
 
   useEffect(() => {
     if (session?.id) {

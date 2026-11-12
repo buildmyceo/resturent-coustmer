@@ -45,7 +45,9 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
   };
 
   useEffect(() => {
-    fetchBill();
+    queueMicrotask(() => {
+      fetchBill();
+    });
   }, [sessionId]);
 
   const currency = bill?.restaurantCurrency || restaurant?.currency || 'USD';

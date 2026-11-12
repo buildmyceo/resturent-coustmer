@@ -18,7 +18,7 @@ export function CustomerHeader() {
   useEffect(() => {
     // If order has already been placed, timer does NOT apply!
     if (hasOrders || !session?.initialClaimExpiresAt) {
-      setTimeLeft(null);
+      queueMicrotask(() => setTimeLeft(null));
       return;
     }
 
