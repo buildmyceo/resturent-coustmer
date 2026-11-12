@@ -60,10 +60,33 @@ export async function POST(request: Request) {
     const finalAmount = Math.max(0, Number(totalOutstanding.toFixed(2))) || 1.0;
     const gatewayOrderId = `order_zv_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Read saved payment settings from Supabase if configured by restaurant owner
+    let configuredUpi = '';
+    let configuredPayee = '';
+    let acceptedMethods = { upi: true, cash: true, razorpay: false, card: true };
+
+    try {
+      const { data: s } = await supabase
+        .from('restaurant_settings')
+        .select('receipt_footer')
+        .eq('restaurant_id', resolvedRestId)
+        .maybeSingle();
+
+      if (s?.receipt_footer) {
+        const match = s.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
+        if (match) {
+          const cfg = JSON.parse(match[1]);
+          if (cfg.upiId) configuredUpi = cfg.upiId;
+          if (cfg.upiPayeeName) configuredPayee = cfg.upiPayeeName;
+          if (cfg.acceptedMethods) acceptedMethods = cfg.acceptedMethods;
+        }
+      }
+    } catch {}
+
     // Dynamic UPI deep link generation for zero-fee instant settlement
     const cleanPhone = (realRest?.phone || '').replace(/[^0-9]/g, '').slice(-10);
-    const upiVpa = cleanPhone ? `${cleanPhone}@upi` : 'bikaner@icici';
-    const upiPayeeName = resolvedRestName;
+    const upiVpa = configuredUpi || (cleanPhone ? `${cleanPhone}@upi` : 'bikaner@icici');
+    const upiPayeeName = configuredPayee || resolvedRestName;
     const upiDeepLink = `upi://pay?pa=${encodeURIComponent(upiVpa)}&pn=${encodeURIComponent(upiPayeeName)}&am=${finalAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Table_${realTable?.table_number || '1'}_Bill`)}`;
 
     return NextResponse.json({
@@ -82,6 +105,7 @@ export async function POST(request: Request) {
         upiId: upiVpa,
         upiPayeeName,
         upiDeepLink,
+        acceptedMethods,
       },
     });
   } catch (err: any) {

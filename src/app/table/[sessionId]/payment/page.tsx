@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession } from '@/lib/guest-session';
 import { formatCurrency } from '@/lib/format';
@@ -49,6 +50,31 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
   const [upiDeepLink, setUpiDeepLink] = useState<string>('');
   const [upiUtr, setUpiUtr] = useState<string>('');
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
+  const [upiQrSvg, setUpiQrSvg] = useState<string>('');
+
+  // Render on-screen UPI QR code whenever payment link is generated
+  useEffect(() => {
+    if (!upiDeepLink) return;
+    let isMounted = true;
+    QRCode.toString(
+      upiDeepLink,
+      {
+        type: 'svg',
+        margin: 1,
+        width: 170,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#0f172a', light: '#ffffff' },
+      },
+      (err, svg) => {
+        if (!err && svg && isMounted) {
+          setUpiQrSvg(svg);
+        }
+      }
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [upiDeepLink]);
 
   // Customer contact details for digital receipt delivery
   const [customerName, setCustomerName] = useState(participant?.name || '');
@@ -298,13 +324,29 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
                 </span>
               </div>
 
+              {/* Dynamic On-Screen UPI QR Code */}
+              {upiQrSvg && (
+                <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 text-center space-y-1.5 shadow-xs">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Scan to Pay via any UPI App or Camera
+                  </span>
+                  <div
+                    className="flex justify-center items-center py-1 mx-auto"
+                    dangerouslySetInnerHTML={{ __html: upiQrSvg }}
+                  />
+                  <div className="text-xs font-bold text-emerald-800">
+                    Amount Due: {formatCurrency(outstandingBalance, currency)}
+                  </div>
+                </div>
+              )}
+
               {/* Direct UPI Intent Button (Opens GPay, PhonePe, Paytm, BHIM on Mobile) */}
               {upiDeepLink ? (
                 <a
                   href={upiDeepLink}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all active:scale-[0.98]"
                 >
-                  <span>Open GPay / PhonePe / Paytm</span>
+                  <span>Open GPay / PhonePe / Paytm App</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : null}
@@ -404,12 +446,27 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
             </div>
             <div
               className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                paymentMethod === 'cash' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                paymentMethod === 'cash' ? 'border-amber-600 bg-amber-600' : 'border-slate-300'
               }`}
             >
               {paymentMethod === 'cash' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
             </div>
           </label>
+
+          {/* Expanded Cash Details */}
+          {paymentMethod === 'cash' && (
+            <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-2 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-amber-900">
+                  Pay Cash at Table
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                A waiter will visit your table to collect {formatCurrency(outstandingBalance, currency)} and hand you your printed receipt.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -465,9 +522,15 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
           size="lg"
           isLoading={isProcessing}
           disabled={outstandingBalance <= 0}
-          className="w-full shadow-lg shadow-blue-500/20 py-4 font-bold text-base gap-2"
+          className="w-full shadow-lg shadow-emerald-500/20 py-4 font-bold text-base gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
         >
-          <span>Complete Payment • {formatCurrency(outstandingBalance, currency)}</span>
+          {paymentMethod === 'cash' ? (
+            <span>Request Waiter & Pay Cash • {formatCurrency(outstandingBalance, currency)}</span>
+          ) : paymentMethod === 'upi' ? (
+            <span>Confirm & Settle via UPI • {formatCurrency(outstandingBalance, currency)}</span>
+          ) : (
+            <span>Complete Payment • {formatCurrency(outstandingBalance, currency)}</span>
+          )}
         </Button>
       </div>
     </div>
