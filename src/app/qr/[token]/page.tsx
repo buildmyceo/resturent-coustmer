@@ -142,7 +142,7 @@ export default function QRScanResolverPage({ params }: PageProps) {
             enabled: true,
             latitude: 25.618193,
             longitude: 85.039305,
-            radiusMeters: 200,
+            radiusMeters: 50,
             address: 'sagunamore',
           },
         },

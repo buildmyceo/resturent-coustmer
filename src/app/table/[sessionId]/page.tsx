@@ -327,7 +327,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-slate-500">Permitted dining circle:</span>
                 <span className="font-bold text-slate-800 font-mono">
-                  within {restaurant?.settings?.geofence?.radiusMeters || 200}m
+                  within {Math.min(200, Math.max(10, restaurant?.settings?.geofence?.radiusMeters || 50))}m
                 </span>
               </div>
             </div>

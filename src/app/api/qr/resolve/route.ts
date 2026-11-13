@@ -195,7 +195,7 @@ export async function POST(request: Request) {
         enabled: true,
         latitude: 25.618193,
         longitude: 85.039305,
-        radiusMeters: 200,
+        radiusMeters: 50,
         address: matchedRest.address || 'sagunamore, patna',
       };
       try {
@@ -218,7 +218,7 @@ export async function POST(request: Request) {
                   : parsed.enabled !== false,
               latitude: parsed.latitude || 25.618193,
               longitude: parsed.longitude || 85.039305,
-              radiusMeters: parsed.radiusMeters || 200,
+              radiusMeters: Math.min(200, Math.max(10, parsed.radiusMeters || 50)),
             };
           }
         }

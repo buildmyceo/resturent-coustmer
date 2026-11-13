@@ -131,8 +131,9 @@ export async function POST(request: Request) {
                   geofence.longitude
                 );
 
-                // Allow 30m GPS accuracy/indoor drift buffer
-                const allowedRadius = Number(geofence.radiusMeters) + 30;
+                // Clamp radius between 10m and 200m (default: 50m) + 30m GPS accuracy/indoor drift buffer
+                const configuredRadius = Math.min(200, Math.max(10, Number(geofence.radiusMeters) || 50));
+                const allowedRadius = configuredRadius + 30;
                 if (distance > allowedRadius) {
                   return NextResponse.json(
                     {
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
                       error:
                         'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
                       distance: Math.round(distance),
-                      allowedRadius: geofence.radiusMeters,
+                      allowedRadius: configuredRadius,
                     },
                     { status: 403 }
                   );

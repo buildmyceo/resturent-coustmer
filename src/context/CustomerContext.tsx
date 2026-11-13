@@ -156,7 +156,7 @@ export function CustomerProvider({
         );
         setDistanceToRestaurant(dist);
 
-        const allowedRadius = geo?.radiusMeters || 200;
+        const allowedRadius = Math.min(200, Math.max(10, geo?.radiusMeters || 50));
         if (dist <= allowedRadius) {
           setIsInsideGeofence(true);
           setLocationStatus('inside');

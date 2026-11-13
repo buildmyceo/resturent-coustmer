@@ -365,3 +365,4 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
     </div>
   );
 }
+
