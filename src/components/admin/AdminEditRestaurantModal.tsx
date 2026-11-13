@@ -7,15 +7,13 @@ import {
   Globe,
   Phone,
   Mail,
-  Instagram,
-  Facebook,
-  Twitter,
   MapPin,
   LocateFixed,
   Save,
   CheckCircle2,
   Lock,
 } from 'lucide-react';
+import { FacebookIcon, InstagramIcon, TwitterIcon, WhatsAppIcon } from '@/components/ui/SocialIcons';
 import { Button } from '@/components/ui/Button';
 
 interface AdminEditRestaurantModalProps {
@@ -298,7 +296,7 @@ export function AdminEditRestaurantModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                      <Instagram className="w-3 h-3 text-pink-600" />
+                      <InstagramIcon className="w-3 h-3 text-pink-600" />
                       <span>Instagram URL</span>
                     </label>
                     <input
@@ -312,7 +310,7 @@ export function AdminEditRestaurantModal({
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                      <Facebook className="w-3 h-3 text-blue-600" />
+                      <FacebookIcon className="w-3 h-3 text-blue-600" />
                       <span>Facebook URL</span>
                     </label>
                     <input
@@ -328,7 +326,7 @@ export function AdminEditRestaurantModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-emerald-600" />
+                      <WhatsAppIcon className="w-3 h-3 text-emerald-600" />
                       <span>WhatsApp Number / Link</span>
                     </label>
                     <input
@@ -342,7 +340,7 @@ export function AdminEditRestaurantModal({
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                      <Twitter className="w-3 h-3 text-sky-500" />
+                      <TwitterIcon className="w-3 h-3 text-sky-500" />
                       <span>Twitter / X</span>
                     </label>
                     <input

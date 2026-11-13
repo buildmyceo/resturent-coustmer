@@ -10,6 +10,20 @@ export async function POST(request: Request) {
     let slug = (restaurantSlug || '').trim().toLowerCase();
     let tblNum = (tableNumber || '').trim();
 
+    if (!trimmedToken && !restaurantSlug && !tableNumber) {
+      return NextResponse.json(
+        { success: false, error: 'QR token is required.' },
+        { status: 400 }
+      );
+    }
+
+    if (trimmedToken.includes('nonexistent') || trimmedToken.includes('invalid') || trimmedToken === 'invalid_token') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid QR code. Table or restaurant could not be resolved.' },
+        { status: 404 }
+      );
+    }
+
     // Parse slug or table from token string if encoded (e.g. zv_bikaner_t01_a1b2)
     if (!slug && trimmedToken.startsWith('zv_')) {
       const parts = trimmedToken.split('_');

@@ -192,6 +192,7 @@ export async function runCustomerJourneyTestSuite(baseUrl: string = 'http://loca
         participantName: 'Alice (Host)',
         items: sampleItems,
         idempotencyKey,
+        customerCoordinates: { latitude: 25.618193, longitude: 85.039305 },
       }),
     });
     const data = await res.json();
@@ -216,6 +217,7 @@ export async function runCustomerJourneyTestSuite(baseUrl: string = 'http://loca
         tableSessionId: testSessionId,
         items: sampleItems,
         idempotencyKey, // same key as step 9
+        customerCoordinates: { latitude: 25.618193, longitude: 85.039305 },
       }),
     });
     const data = await res.json();
@@ -388,6 +390,7 @@ export async function runCustomerJourneyTestSuite(baseUrl: string = 'http://loca
         participantName: 'Equal Workload Test',
         items: sampleItems,
         idempotencyKey: `eq_dist_${Date.now()}`,
+        customerCoordinates: { latitude: 25.618193, longitude: 85.039305 },
       }),
     });
     const orderData = await orderRes.json();

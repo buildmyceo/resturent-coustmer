@@ -12,9 +12,6 @@ import {
   Phone,
   Mail,
   Globe,
-  Instagram,
-  Facebook,
-  Twitter,
   MapPin,
   Clock,
   Compass,
@@ -24,6 +21,7 @@ import {
   ExternalLink,
   MessageCircle,
 } from 'lucide-react';
+import { FacebookIcon, InstagramIcon, TwitterIcon, WhatsAppIcon } from '@/components/ui/SocialIcons';
 import { Button } from '@/components/ui/Button';
 import { getGuestSession, clearGuestSession, GuestSessionState } from '@/lib/guest-session';
 import { calculateDistanceMeters, formatDistance } from '@/lib/geofence';
@@ -373,7 +371,7 @@ export default function CustomerPortalLandingPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-2.5 rounded-xl bg-pink-50/60 hover:bg-pink-100/60 border border-pink-100 text-pink-700 text-xs font-semibold transition-colors"
                     >
-                      <Instagram className="w-4 h-4 text-pink-600" />
+                      <InstagramIcon className="w-4 h-4 text-pink-600" />
                       <span className="truncate">Instagram</span>
                     </a>
                   )}
@@ -385,7 +383,7 @@ export default function CustomerPortalLandingPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/60 hover:bg-blue-100/60 border border-blue-100 text-blue-700 text-xs font-semibold transition-colors"
                     >
-                      <Facebook className="w-4 h-4 text-blue-600" />
+                      <FacebookIcon className="w-4 h-4 text-blue-600" />
                       <span className="truncate">Facebook</span>
                     </a>
                   )}
@@ -397,7 +395,7 @@ export default function CustomerPortalLandingPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/60 hover:bg-emerald-100/60 border border-emerald-100 text-emerald-700 text-xs font-semibold transition-colors"
                     >
-                      <MessageCircle className="w-4 h-4 text-emerald-600" />
+                      <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                       <span className="truncate">WhatsApp</span>
                     </a>
                   )}
@@ -409,7 +407,7 @@ export default function CustomerPortalLandingPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-2.5 rounded-xl bg-sky-50/60 hover:bg-sky-100/60 border border-sky-100 text-sky-700 text-xs font-semibold transition-colors"
                     >
-                      <Twitter className="w-4 h-4 text-sky-500" />
+                      <TwitterIcon className="w-4 h-4 text-sky-500" />
                       <span className="truncate">Twitter / X</span>
                     </a>
                   )}

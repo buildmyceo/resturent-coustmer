@@ -144,3 +144,9 @@ class SoundSynthesizer {
 
 export const customerAudio = new SoundSynthesizer();
 
+export const playTap = () => customerAudio.playTap();
+export const playOrderPlaced = () => customerAudio.playOrderPlaced();
+export const playFoodReady = () => customerAudio.playFoodReady();
+export const playServiceAlert = () => customerAudio.playServiceAlert();
+
+
