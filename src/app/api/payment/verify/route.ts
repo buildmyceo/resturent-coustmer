@@ -43,16 +43,18 @@ export async function POST(request: Request) {
 
     if (paidAmount <= 0) paidAmount = 1.0;
 
-    // 3. Format structured customer contact info
+    // 3. Format structured customer contact info & review
     const resolvedUtr = upiUtr || (gatewayPaymentId?.startsWith('upi_utr_') ? gatewayPaymentId.replace('upi_utr_', '') : undefined);
     const noteParts: string[] = [];
     if (customerDetails?.name) noteParts.push(`Customer: ${customerDetails.name}`);
     if (customerDetails?.phone) noteParts.push(`Phone: ${customerDetails.phone}`);
     if (customerDetails?.email) noteParts.push(`Email: ${customerDetails.email}`);
+    if (customerDetails?.rating) noteParts.push(`Rating: ${customerDetails.rating}★`);
+    if (customerDetails?.review) noteParts.push(`Review: ${customerDetails.review}`);
     if (resolvedUtr) noteParts.push(`UTR: ${resolvedUtr}`);
     const customerNoteString = noteParts.length > 0 ? noteParts.join(' | ') : 'Customer: Valued Guest';
 
-    // 4. Mark all pending orders for this table as PAID in Supabase and save customer details
+    // 4. Mark all pending orders for this table as PAID in Supabase and save customer details & review
     try {
       await supabase
         .from('orders')
@@ -67,6 +69,22 @@ export async function POST(request: Request) {
         .neq('status', 'cancelled');
     } catch (orderUpdateErr) {
       console.warn('Could not update order payment_status in orders table:', orderUpdateErr);
+    }
+
+    // 5. Close table session in table_sessions to free up the table
+    try {
+      if (sessionId) {
+        await supabase
+          .from('table_sessions')
+          .update({
+            status: 'completed',
+            closed_at: new Date().toISOString(),
+            customer_name: customerDetails?.name || undefined,
+          })
+          .eq('id', sessionId);
+      }
+    } catch {
+      // Non-blocking
     }
 
     // 4. Record payment in payments table if exists

@@ -8,6 +8,7 @@ import { formatCurrency, formatDateTime } from '@/lib/format';
 import {
   Receipt,
   CreditCard,
+  Banknote,
   CheckCircle2,
   Users,
   ShieldCheck,
@@ -141,9 +142,9 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
             </div>
           </div>
           <Link href={`/table/${sessionId}/payment`}>
-            <Button size="lg" className="shadow-md gap-2">
-              <CreditCard className="w-4 h-4" />
-              <span>Pay Bill</span>
+            <Button size="lg" className="shadow-md gap-2 bg-emerald-600 hover:bg-emerald-700">
+              <Banknote className="w-4 h-4" />
+              <span>Pay Bill / Pay to Waiter</span>
             </Button>
           </Link>
         </div>
@@ -258,8 +259,8 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
               </Button>
             </Link>
             <Link href={`/table/${sessionId}/payment`} className="flex-1">
-              <Button size="lg" className="w-full gap-2 shadow-md">
-                <CreditCard className="w-4 h-4" />
+              <Button size="lg" className="w-full gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700">
+                <Banknote className="w-4 h-4" />
                 <span>Pay {formatCurrency(bill.outstandingBalance, currency)}</span>
               </Button>
             </Link>
