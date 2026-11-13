@@ -102,12 +102,13 @@ export async function POST(request: Request) {
           if (match && match[1]) {
             try {
               const geofence = JSON.parse(match[1]);
-              if (
-                geofence.enabled &&
+              const hasCoordinates =
                 typeof geofence.latitude === 'number' &&
                 typeof geofence.longitude === 'number' &&
-                geofence.radiusMeters
-              ) {
+                Boolean(geofence.radiusMeters);
+              const isEnforced = hasCoordinates || geofence.enabled !== false;
+
+              if (hasCoordinates && isEnforced) {
                 if (
                   !customerCoordinates ||
                   typeof customerCoordinates.latitude !== 'number' ||

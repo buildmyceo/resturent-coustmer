@@ -150,6 +150,13 @@ export default function TableLandingPage({ params }: PageProps) {
           currency: resolvedTableData?.currency || 'INR',
           timezone: 'Asia/Kolkata',
           receiptFooter: 'Thank you for dining with us!',
+          geofence: (resolvedTableData as any)?.geofence || {
+            enabled: true,
+            latitude: 25.618193,
+            longitude: 85.039305,
+            radiusMeters: 200,
+            address: 'sagunamore',
+          },
         },
       });
 

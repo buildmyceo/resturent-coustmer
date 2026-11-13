@@ -176,6 +176,40 @@ export async function POST(request: Request) {
       const finalTableName = matchedTable?.table_name || `Table ${finalTableNumber}`;
       const finalTableId = matchedTable?.id || `tbl-${matchedRest.id}-${finalTableNumber}`;
 
+      // Fetch geofence configuration from restaurant_settings
+      let geofence = {
+        enabled: true,
+        latitude: 25.618193,
+        longitude: 85.039305,
+        radiusMeters: 200,
+        address: matchedRest.address || 'sagunamore, patna',
+      };
+      try {
+        const { data: sData } = await supabase
+          .from('restaurant_settings')
+          .select('receipt_footer')
+          .eq('restaurant_id', matchedRest.id)
+          .maybeSingle();
+
+        if (sData?.receipt_footer) {
+          const match = sData.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
+          if (match && match[1]) {
+            const parsed = JSON.parse(match[1]);
+            geofence = {
+              ...geofence,
+              ...parsed,
+              enabled:
+                typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number'
+                  ? true
+                  : parsed.enabled !== false,
+              latitude: parsed.latitude || 25.618193,
+              longitude: parsed.longitude || 85.039305,
+              radiusMeters: parsed.radiusMeters || 200,
+            };
+          }
+        }
+      } catch {}
+
       return NextResponse.json({
         success: true,
         table: {
@@ -193,6 +227,7 @@ export async function POST(request: Request) {
           currency: matchedRest.currency || 'INR',
           activeSessionId,
           sessionStatus,
+          geofence,
         },
       });
     }

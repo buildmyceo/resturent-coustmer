@@ -55,11 +55,16 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
   const currency = restaurant?.currency || 'USD';
 
+  const geo = restaurant?.settings?.geofence;
+  const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
+  const isGeofenceConfigured = Boolean(geo && (geo.enabled !== false || hasCoordinates));
+  const isOrderBlockedByGeofence = isGeofenceConfigured && isInsideGeofence !== true;
+
   // Handle final order submission
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !restaurant?.id || !table?.id) return;
 
-    if (isInsideGeofence === false) {
+    if (isOrderBlockedByGeofence) {
       showToast(
         'Location Restriction',
         'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
@@ -325,7 +330,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       </div>
 
       {/* Geofence Boundary Warning */}
-      {isInsideGeofence === false && (
+      {isOrderBlockedByGeofence && (
         <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs">
           <div className="flex items-center gap-2 text-rose-800 font-bold">
             <MapPinOff className="w-4 h-4 text-rose-600" />
@@ -348,13 +353,13 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         <Button
           onClick={() => setIsConfirmModalOpen(true)}
           size="lg"
-          disabled={isInsideGeofence === false}
+          disabled={isOrderBlockedByGeofence}
           className="w-full shadow-lg shadow-blue-500/20 justify-between py-4"
         >
           <div className="flex items-center gap-2">
             <Utensils className="w-5 h-5" />
             <span className="font-extrabold tracking-wide">
-              {isInsideGeofence === false ? 'Outside Ordering Area' : 'Review & Place Order'}
+              {isOrderBlockedByGeofence ? 'Outside Ordering Area' : 'Review & Place Order'}
             </span>
           </div>
           <span className="font-extrabold text-base">

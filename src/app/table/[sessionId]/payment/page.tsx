@@ -311,7 +311,7 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
             ))}
           </div>
           <p className="text-[11px] text-slate-500">Thank you for rating us {rating} out of 5 stars!</p>
-          {review && <p className="text-xs italic text-slate-600 mt-1">"{review}"</p>}
+          {review && <p className="text-xs italic text-slate-600 mt-1">&ldquo;{review}&rdquo;</p>}
         </div>
 
         {/* Refresh notice & CTA */}

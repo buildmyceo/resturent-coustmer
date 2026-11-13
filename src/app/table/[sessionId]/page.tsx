@@ -277,6 +277,19 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
         </div>
       </div>
 
+      {/* Location Checking Indicator */}
+      {locationStatus === 'checking' && (
+        <div className="mx-4 px-3.5 py-2.5 bg-blue-50 border border-blue-200/80 rounded-xl flex items-center justify-between text-xs text-blue-800 shadow-xs animate-pulse">
+          <div className="flex items-center gap-2 font-medium">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            <span>Verifying location for restaurant ordering circle...</span>
+          </div>
+          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
+            GPS Check
+          </span>
+        </div>
+      )}
+
       {/* Location Geofence Boundary Alert */}
       {isInsideGeofence === false && (
         <div className="mx-4 p-5 bg-gradient-to-br from-rose-50 to-amber-50 border-2 border-rose-300 rounded-3xl space-y-4 shadow-lg animate-in fade-in">
@@ -296,6 +309,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
               </p>
             </div>
           </div>
+
+          {locationStatus === 'denied' && (
+            <div className="bg-white/90 p-3 rounded-2xl border border-rose-200 text-xs text-rose-800">
+              <span className="font-bold">Location Permission Required:</span> Please enable location/GPS in your browser settings so we can verify you are at the restaurant dining area.
+            </div>
+          )}
 
           {distanceToRestaurant !== null && (
             <div className="bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-rose-200/80 text-xs text-slate-600 space-y-1">

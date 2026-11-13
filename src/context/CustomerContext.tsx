@@ -117,8 +117,16 @@ export function CustomerProvider({
   const [isInsideGeofence, setIsInsideGeofence] = useState<boolean | null>(null);
 
   const checkCustomerLocation = useCallback(async () => {
+    // If restaurant details haven't loaded yet, remain in checking state; do not prematurely bypass geofence
+    if (!restaurant) {
+      return;
+    }
+
     const geo = restaurant?.settings?.geofence;
-    if (!geo || !geo.enabled) {
+    const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
+    const isEnforced = Boolean(geo && (geo.enabled !== false || hasCoordinates));
+
+    if (!isEnforced) {
       setIsInsideGeofence(true);
       setLocationStatus('disabled');
       return;
@@ -138,15 +146,17 @@ export function CustomerProvider({
         const userLon = pos.coords.longitude;
         setCustomerLocation({ latitude: userLat, longitude: userLon });
 
+        const restaurantLat = geo?.latitude || 25.618193;
+        const restaurantLon = geo?.longitude || 85.039305;
         const dist = calculateDistanceMeters(
           userLat,
           userLon,
-          geo.latitude || 25.6171,
-          geo.longitude || 85.0435
+          restaurantLat,
+          restaurantLon
         );
         setDistanceToRestaurant(dist);
 
-        const allowedRadius = geo.radiusMeters || 200;
+        const allowedRadius = geo?.radiusMeters || 200;
         if (dist <= allowedRadius) {
           setIsInsideGeofence(true);
           setLocationStatus('inside');
@@ -162,7 +172,7 @@ export function CustomerProvider({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );
-  }, [restaurant?.settings?.geofence]);
+  }, [restaurant]);
 
   useEffect(() => {
     checkCustomerLocation();
@@ -225,7 +235,11 @@ export function CustomerProvider({
       customerAudio.playTap();
 
       // Enforce Restaurant Location Geofence
-      if (isInsideGeofence === false) {
+      const geo = restaurant?.settings?.geofence;
+      const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
+      const isGeofenceConfigured = Boolean(geo && (geo.enabled !== false || hasCoordinates));
+
+      if (isGeofenceConfigured && isInsideGeofence !== true) {
         showToast(
           'Location Restriction',
           'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
