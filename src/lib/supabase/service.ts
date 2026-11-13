@@ -294,6 +294,22 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
 
     let restaurant: RestaurantProfile | null = null;
     if (r) {
+      let geofence = {
+        enabled: true,
+        latitude: 25.6171,
+        longitude: 85.0435,
+        radiusMeters: 200,
+        address: r.address || 'sagunamore, patna',
+      };
+      if (s?.receipt_footer) {
+        const match = s.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
+        if (match && match[1]) {
+          try {
+            geofence = { ...geofence, ...JSON.parse(match[1]) };
+          } catch {}
+        }
+      }
+
       restaurant = {
         id: r.id,
         name: r.name,
@@ -321,6 +337,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
           timezone: s?.timezone || r.timezone || 'America/Los_Angeles',
           receiptFooter: s?.receipt_footer || 'Thank you for dining with us!',
           openingHours: s?.opening_hours || undefined,
+          geofence,
         },
       };
     }

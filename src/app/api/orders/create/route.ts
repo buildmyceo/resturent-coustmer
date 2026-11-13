@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { calculateDistanceMeters } from '@/lib/geofence';
 
 // In-memory idempotency cache for duplicate submission prevention
 const idempotencyStore = new Map<string, { timestamp: number; result: any }>();
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
       items,
       customerNote,
       idempotencyKey,
+      customerCoordinates,
     } = body;
 
     // 1. Check Idempotency Key
@@ -86,13 +88,68 @@ export async function POST(request: Request) {
     try {
       const { data: settingsData } = await supabase
         .from('restaurant_settings')
-        .select('tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled')
+        .select('tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer')
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
       if (settingsData) {
         taxRate = settingsData.tax_enabled !== false ? Number(settingsData.tax_percentage ?? 8.5) : 0;
         serviceFeeRate = settingsData.service_charge_enabled !== false ? Number(settingsData.service_charge_percentage ?? 10.0) : 0;
+
+        // Server-Side Geofence Validation
+        if (settingsData.receipt_footer) {
+          const match = settingsData.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
+          if (match && match[1]) {
+            try {
+              const geofence = JSON.parse(match[1]);
+              if (
+                geofence.enabled &&
+                typeof geofence.latitude === 'number' &&
+                typeof geofence.longitude === 'number' &&
+                geofence.radiusMeters
+              ) {
+                if (
+                  !customerCoordinates ||
+                  typeof customerCoordinates.latitude !== 'number' ||
+                  typeof customerCoordinates.longitude !== 'number'
+                ) {
+                  return NextResponse.json(
+                    {
+                      success: false,
+                      error:
+                        'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
+                    },
+                    { status: 403 }
+                  );
+                }
+
+                const distance = calculateDistanceMeters(
+                  customerCoordinates.latitude,
+                  customerCoordinates.longitude,
+                  geofence.latitude,
+                  geofence.longitude
+                );
+
+                // Allow 30m GPS accuracy/indoor drift buffer
+                const allowedRadius = Number(geofence.radiusMeters) + 30;
+                if (distance > allowedRadius) {
+                  return NextResponse.json(
+                    {
+                      success: false,
+                      error:
+                        'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
+                      distance: Math.round(distance),
+                      allowedRadius: geofence.radiusMeters,
+                    },
+                    { status: 403 }
+                  );
+                }
+              }
+            } catch {
+              // Ignore geofence parse error
+            }
+          }
+        }
       }
     } catch {
       // Default to 8.5% and 10%

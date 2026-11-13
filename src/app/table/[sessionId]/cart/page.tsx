@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   MessageSquare,
   ArrowLeft,
+  MapPinOff,
+  QrCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -43,6 +45,8 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     participant,
     showToast,
     refreshOrders,
+    isInsideGeofence,
+    customerLocation,
   } = useCustomer();
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -54,6 +58,15 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   // Handle final order submission
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !restaurant?.id || !table?.id) return;
+
+    if (isInsideGeofence === false) {
+      showToast(
+        'Location Restriction',
+        'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
+        'error'
+      );
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -82,6 +95,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           })),
           customerNote: orderCustomerNote.trim() || undefined,
           idempotencyKey,
+          customerCoordinates: customerLocation || undefined,
         }),
       });
 
@@ -310,16 +324,38 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         <span>Prices validated against verified restaurant database records</span>
       </div>
 
+      {/* Geofence Boundary Warning */}
+      {isInsideGeofence === false && (
+        <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-rose-800 font-bold">
+            <MapPinOff className="w-4 h-4 text-rose-600" />
+            <span>Outside Restaurant Ordering Area</span>
+          </div>
+          <p className="text-rose-900 font-medium">
+            Visit restaurant to order food, or scan QR code if you are in a different restaurant.
+          </p>
+          <Link href="/" className="inline-block pt-1">
+            <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white text-xs gap-1.5 shadow-xs">
+              <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Scan QR Code</span>
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {/* Place Order CTA Button */}
       <div>
         <Button
           onClick={() => setIsConfirmModalOpen(true)}
           size="lg"
+          disabled={isInsideGeofence === false}
           className="w-full shadow-lg shadow-blue-500/20 justify-between py-4"
         >
           <div className="flex items-center gap-2">
             <Utensils className="w-5 h-5" />
-            <span className="font-extrabold tracking-wide">Review & Place Order</span>
+            <span className="font-extrabold tracking-wide">
+              {isInsideGeofence === false ? 'Outside Ordering Area' : 'Review & Place Order'}
+            </span>
           </div>
           <span className="font-extrabold text-base">
             {formatCurrency(cartTotals.totalAmount, currency)}

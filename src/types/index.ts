@@ -251,6 +251,14 @@ export interface Invoice {
   createdAt: string;
 }
 
+export interface GeofenceSettings {
+  enabled: boolean;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  address?: string;
+}
+
 export interface RestaurantSettings {
   taxEnabled: boolean;
   taxPercentage: number;
@@ -260,6 +268,7 @@ export interface RestaurantSettings {
   timezone: string;
   receiptFooter: string;
   openingHours?: Record<string, { open: string; close: string; closed: boolean }>;
+  geofence?: GeofenceSettings;
 }
 
 export interface RestaurantProfile {

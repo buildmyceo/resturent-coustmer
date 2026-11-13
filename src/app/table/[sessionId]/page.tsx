@@ -9,9 +9,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Category, Dish, DietaryType } from '@/types';
 import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
-import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode } from 'lucide-react';
+import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
+import { formatDistance } from '@/lib/geofence';
 
 interface MenuPageProps {
   params: Promise<{ sessionId: string }>;
@@ -30,6 +31,10 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     addToCart,
     setSelectedDishModal,
     orders,
+    isInsideGeofence,
+    distanceToRestaurant,
+    locationStatus,
+    checkCustomerLocation,
   } = useCustomer();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -271,6 +276,78 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           </p>
         </div>
       </div>
+
+      {/* Location Geofence Boundary Alert */}
+      {isInsideGeofence === false && (
+        <div className="mx-4 p-5 bg-gradient-to-br from-rose-50 to-amber-50 border-2 border-rose-300 rounded-3xl space-y-4 shadow-lg animate-in fade-in">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <MapPinOff className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-200 inline-block">
+                Location Verification
+              </span>
+              <h3 className="text-base font-black text-slate-900 leading-tight">
+                Outside Restaurant Ordering Area
+              </h3>
+              <p className="text-xs font-semibold text-rose-900 leading-relaxed pt-0.5">
+                Visit restaurant to order food, or scan QR code if you are in a different restaurant.
+              </p>
+            </div>
+          </div>
+
+          {distanceToRestaurant !== null && (
+            <div className="bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-rose-200/80 text-xs text-slate-600 space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-500">Your current distance:</span>
+                <span className="font-bold text-rose-700 font-mono">
+                  {formatDistance(distanceToRestaurant)} away
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-500">Permitted dining circle:</span>
+                <span className="font-bold text-slate-800 font-mono">
+                  within {restaurant?.settings?.geofence?.radiusMeters || 200}m
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <Link href="/" className="flex-1">
+              <Button size="md" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold gap-2 py-3 rounded-xl shadow-xs">
+                <QrCode className="w-4 h-4 text-emerald-400" />
+                <span>Scan QR Code (Different Restaurant)</span>
+              </Button>
+            </Link>
+
+            <Button
+              variant="outline"
+              size="md"
+              onClick={checkCustomerLocation}
+              isLoading={locationStatus === 'checking'}
+              className="border-rose-300 text-rose-800 hover:bg-rose-100/60 text-xs font-semibold gap-1.5 py-3 rounded-xl"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Re-check Location</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Verified Location Badge */}
+      {isInsideGeofence === true && restaurant?.settings?.geofence?.enabled && (
+        <div className="mx-4 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs text-emerald-800 shadow-xs">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>✓ Verified Inside Restaurant ({distanceToRestaurant !== null ? formatDistance(distanceToRestaurant) : 'On premises'})</span>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+            Ordering Active
+          </span>
+        </div>
+      )}
 
       {/* Settled Dining Session Notice */}
       {isSessionSettled && (

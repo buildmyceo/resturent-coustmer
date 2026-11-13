@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { customerAudio } from '@/lib/audio';
 import { touchGuestSession, isSessionExpired, getGuestSession, clearGuestSession } from '@/lib/guest-session';
+import { calculateDistanceMeters } from '@/lib/geofence';
 
 export interface ToastMessage {
   id: string;
@@ -70,6 +71,11 @@ interface CustomerContextType {
   showToast: (title: string, description?: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
   isSessionActive: boolean;
+  customerLocation: { latitude: number; longitude: number } | null;
+  isInsideGeofence: boolean | null;
+  distanceToRestaurant: number | null;
+  locationStatus: 'checking' | 'inside' | 'outside' | 'denied' | 'unsupported' | 'disabled';
+  checkCustomerLocation: () => Promise<void>;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
@@ -103,6 +109,64 @@ export function CustomerProvider({
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [selectedDishModal, setSelectedDishModal] = useState<Dish | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Geofence & Location Enforcement State
+  const [customerLocation, setCustomerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [distanceToRestaurant, setDistanceToRestaurant] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'denied' | 'unsupported' | 'disabled'>('checking');
+  const [isInsideGeofence, setIsInsideGeofence] = useState<boolean | null>(null);
+
+  const checkCustomerLocation = useCallback(async () => {
+    const geo = restaurant?.settings?.geofence;
+    if (!geo || !geo.enabled) {
+      setIsInsideGeofence(true);
+      setLocationStatus('disabled');
+      return;
+    }
+
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setLocationStatus('unsupported');
+      setIsInsideGeofence(false);
+      return;
+    }
+
+    setLocationStatus('checking');
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userLat = pos.coords.latitude;
+        const userLon = pos.coords.longitude;
+        setCustomerLocation({ latitude: userLat, longitude: userLon });
+
+        const dist = calculateDistanceMeters(
+          userLat,
+          userLon,
+          geo.latitude || 25.6171,
+          geo.longitude || 85.0435
+        );
+        setDistanceToRestaurant(dist);
+
+        const allowedRadius = geo.radiusMeters || 200;
+        if (dist <= allowedRadius) {
+          setIsInsideGeofence(true);
+          setLocationStatus('inside');
+        } else {
+          setIsInsideGeofence(false);
+          setLocationStatus('outside');
+        }
+      },
+      (err) => {
+        console.warn('Geolocation error:', err.message);
+        setLocationStatus('denied');
+        setIsInsideGeofence(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  }, [restaurant?.settings?.geofence]);
+
+  useEffect(() => {
+    checkCustomerLocation();
+  }, [checkCustomerLocation]);
 
   // Restore stored session on mount
   useEffect(() => {
@@ -159,6 +223,16 @@ export function CustomerProvider({
     ) => {
       touchGuestSession();
       customerAudio.playTap();
+
+      // Enforce Restaurant Location Geofence
+      if (isInsideGeofence === false) {
+        showToast(
+          'Location Restriction',
+          'Visit restaurant to order food, or scan QR code if you are in a different restaurant.',
+          'error'
+        );
+        return;
+      }
 
       const quantity = Math.max(1, options?.quantity || 1);
       const variantId = options?.variantId;
@@ -470,6 +544,11 @@ export function CustomerProvider({
         showToast,
         dismissToast,
         isSessionActive,
+        customerLocation,
+        isInsideGeofence,
+        distanceToRestaurant,
+        locationStatus,
+        checkCustomerLocation,
       }}
     >
       {children}
