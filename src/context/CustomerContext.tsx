@@ -443,6 +443,14 @@ export function CustomerProvider({
       config: { broadcast: { self: false } },
     });
 
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refreshOrders();
+      }, 300);
+    };
+
     // 1. Listen for instant broadcast order updates from Kitchen or Staff
     channel.on(
       'broadcast',
@@ -465,7 +473,7 @@ export function CustomerProvider({
             showToast('Order Cancelled', `Order #${orderData.order_number || ''} was cancelled.`, 'error');
           }
         }
-        refreshOrders();
+        debouncedRefresh();
       }
     );
 
@@ -489,36 +497,55 @@ export function CustomerProvider({
     channel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'orders' },
-      () => refreshOrders()
+      () => debouncedRefresh()
     );
 
     channel.subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [restaurant?.id, table?.id, supabase, refreshOrders, showToast]);
 
-  // Periodic background polling (every 3.5s) to guarantee zero manual reload needed
+  // Adaptive background heartbeat (30s when tab is active; paused completely when screen/tab is hidden)
   useEffect(() => {
     const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;
     const activeTableId = table?.id || getGuestSession()?.tableId;
     if (!activeRestId && !activeTableId) return;
 
-    const interval = setInterval(async () => {
-      await refreshOrders();
-    }, 3500);
+    let timer: NodeJS.Timeout | null = null;
 
-    // Refresh immediately when returning to tab
+    const startTimer = () => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          refreshOrders();
+        }
+      }, 30000);
+    };
+
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        // Immediate sync upon returning to tab
         refreshOrders();
+        startTimer();
+      } else {
+        // Stop polling completely while customer has screen locked or switched app
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
       }
     };
+
+    if (document.visibilityState === 'visible') {
+      startTimer();
+    }
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      clearInterval(interval);
+      if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [restaurant?.id, table?.id, refreshOrders]);
