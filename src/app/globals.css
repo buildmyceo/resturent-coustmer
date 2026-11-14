@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-black: #09090b;
+  --color-primary: #0f172a;
+  --color-accent: #d97706;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --primary: #0f172a;
+  --primary-hover: #1e293b;
+  --color-brand-black: #09090b;
+  --color-primary: #0f172a;
+  --color-accent: #d97706;
 }
 
 body {
@@ -59,3 +68,86 @@ body {
   }
 }
 
+/* ==========================================================================
+   Ceova Micro-Interaction & Animation Engine
+   ========================================================================== */
+
+@keyframes ceovaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ceovaScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ceovaSlideInBottom {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ceovaSlideInTop {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+               scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+  }
+}
+
+.animate-in {
+  animation-name: enter;
+  animation-duration: var(--tw-duration, 150ms);
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+  --tw-enter-opacity: 1;
+  --tw-enter-scale: 1;
+  --tw-enter-translate-x: 0;
+  --tw-enter-translate-y: 0;
+}
+
+.fade-in { --tw-enter-opacity: 0; }
+.zoom-in-95 { --tw-enter-scale: 0.95; }
+.zoom-in-75 { --tw-enter-scale: 0.75; }
+.zoom-in-50 { --tw-enter-scale: 0.5; }
+.slide-in-from-bottom { --tw-enter-translate-y: 100%; }
+.slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
+.slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
+.slide-in-from-top-2 { --tw-enter-translate-y: -0.5rem; }
+
+.duration-75 { --tw-duration: 75ms; animation-duration: 75ms; }
+.duration-100 { --tw-duration: 100ms; animation-duration: 100ms; }
+.duration-150 { --tw-duration: 150ms; animation-duration: 150ms; }
+.duration-200 { --tw-duration: 200ms; animation-duration: 200ms; }
+.duration-300 { --tw-duration: 300ms; animation-duration: 300ms; }
+.duration-500 { --tw-duration: 500ms; animation-duration: 500ms; }
+.duration-700 { --tw-duration: 700ms; animation-duration: 700ms; }
+.duration-1000 { --tw-duration: 1000ms; animation-duration: 1000ms; }
+
+/* Direct Ceova Animation Utilities */
+.ceova-fade-in { animation: ceovaFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ceova-scale-in { animation: ceovaScaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ceova-slide-in-bottom { animation: ceovaSlideInBottom 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ceova-slide-in-top { animation: ceovaSlideInTop 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Aspect Ratio & Typography Utilities */
+.aspect-logo { aspect-ratio: 1 / 1; }
+.aspect-banner { aspect-ratio: 3 / 1; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .ceova-fade-in,
+  .ceova-scale-in,
+  .ceova-slide-in-bottom,
+  .ceova-slide-in-top {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
