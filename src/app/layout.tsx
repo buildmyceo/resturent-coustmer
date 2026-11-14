@@ -5,7 +5,7 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { CallWaiterModal } from '@/components/service/CallWaiterModal';
 
 export const metadata: Metadata = {
-  title: 'Ceova Restaurant | QR Menu & Online Dining Experience',
+  title: 'Ceova Restaurant | Contactless QR Dining Experience',
   description: 'Instant contactless restaurant digital menu, table ordering, live order tracking, and digital payments powered by Ceova Restaurant.',
   manifest: '/manifest.json',
   appleWebApp: {
@@ -43,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-blue-500/20 selection:text-blue-700">
+      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-amber-500/20 selection:text-amber-900">
         <CustomerProvider>
           {children}
           <ToastContainer />
