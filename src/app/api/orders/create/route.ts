@@ -421,6 +421,30 @@ export async function POST(request: Request) {
       message: 'Your order has been submitted. Please wait while our staff confirms it.',
     };
 
+    // Broadcast instant alert to connected waiter terminals
+    try {
+      const rtChannel = supabase.channel(`staff_realtime:${restaurantId}`, {
+        config: { broadcast: { self: true } },
+      });
+      await rtChannel.subscribe();
+      await rtChannel.send({
+        type: 'broadcast',
+        event: 'new_order',
+        payload: {
+          id: createdOrder.id,
+          order_number: createdOrder.order_number,
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          status: 'pending',
+          total_amount: createdOrder.total_amount,
+          created_at: new Date().toISOString(),
+        },
+      });
+      supabase.removeChannel(rtChannel);
+    } catch {
+      // Non-blocking
+    }
+
     if (idempotencyKey) {
       idempotencyStore.set(idempotencyKey, {
         timestamp: Date.now(),

@@ -34,7 +34,9 @@ export async function POST(request: Request) {
 
     const supabase = await createServerSupabaseClient();
     let requestId = `req_${Date.now()}`;
+    let insertedSuccessfully = false;
 
+    // 1. Try real service_requests table
     try {
       const { data, error } = await supabase
         .from('service_requests')
@@ -50,11 +52,69 @@ export async function POST(request: Request) {
         .select('id, request_type, status, created_at')
         .maybeSingle();
 
-      if (data) {
+      if (!error && data) {
         requestId = data.id;
+        insertedSuccessfully = true;
       }
     } catch {
-      // Non-blocking fallback
+      // Continue to fallback
+    }
+
+    // 2. Resilient fallback: store call in orders table if service_requests table is missing
+    if (!insertedSuccessfully) {
+      try {
+        const orderCallNum = `CALL-${Math.floor(1000 + Math.random() * 9000)}`;
+        const notePayload = `CALL_WAITER: ${requestType} | ${notes || 'Customer requested assistance at table'}`;
+
+        const { data: ordData, error: ordErr } = await supabase
+          .from('orders')
+          .insert({
+            restaurant_id: restaurantId,
+            table_id: tableId,
+            order_number: orderCallNum,
+            order_source: 'Customer',
+            subtotal: 0,
+            tax_amount: 0,
+            service_fee: 0,
+            total_amount: 0,
+            status: 'pending',
+            customer_note: notePayload,
+            payment_status: 'pending',
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (!ordErr && ordData) {
+          requestId = ordData.id;
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback call waiter store error:', fallbackErr);
+      }
+    }
+
+    // 3. Send real-time broadcast alert to connected waiters
+    try {
+      const rtChannel = supabase.channel(`staff_realtime:${restaurantId}`, {
+        config: { broadcast: { self: true } },
+      });
+      await rtChannel.subscribe();
+      await rtChannel.send({
+        type: 'broadcast',
+        event: 'call_waiter',
+        payload: {
+          id: requestId,
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          request_type: requestType,
+          notes: notes ? String(notes).slice(0, 500) : 'Customer called for waiter',
+          requested_by_name: requestedByName || 'Guest',
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        },
+      });
+      supabase.removeChannel(rtChannel);
+    } catch (broadcastErr) {
+      // Non-blocking broadcast
     }
 
     // Record cooldown timestamp
