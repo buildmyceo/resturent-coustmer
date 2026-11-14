@@ -96,8 +96,13 @@ export function CustomerHeader() {
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white font-black text-lg">
-                Z
+              <div className="w-full h-full bg-black flex items-center justify-center p-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/ceova-logo.png"
+                  alt="Ceova"
+                  className="w-full h-full object-contain"
+                />
               </div>
             )}
           </div>

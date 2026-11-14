@@ -5,8 +5,12 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { CallWaiterModal } from '@/components/service/CallWaiterModal';
 
 export const metadata: Metadata = {
-  title: 'ZOVO | QR Menu & Online Dining Experience',
+  title: 'Ceova Restaurant | Digital Dining & Contactless Ordering',
   description: 'Instant contactless restaurant digital menu, table ordering, live order tracking, and digital payments.',
+  icons: {
+    icon: '/ceova-logo.png',
+    apple: '/ceova-logo.png',
+  },
 };
 
 export const viewport: Viewport = {

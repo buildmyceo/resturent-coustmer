@@ -165,8 +165,8 @@ export async function POST(request: Request) {
       session: {
         id: session.id,
         restaurantId: session.restaurant_id,
-        restaurantName: session.restaurants?.name || 'Zovo Bistro',
-        restaurantSlug: session.restaurants?.slug || 'zovo-bistro',
+        restaurantName: session.restaurants?.name || 'Ceova Restaurant',
+        restaurantSlug: session.restaurants?.slug || 'ceova-restaurant',
         tableId: session.table_id,
         tableNumber: session.restaurant_tables?.table_number || '01',
         tableName: session.restaurant_tables?.table_name || 'Dining Table',

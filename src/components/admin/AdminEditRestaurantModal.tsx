@@ -281,7 +281,7 @@ export function AdminEditRestaurantModal({
                     type="url"
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="https://bikaner.zovo.com"
+                    placeholder="https://bikaner.ceova.com"
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>

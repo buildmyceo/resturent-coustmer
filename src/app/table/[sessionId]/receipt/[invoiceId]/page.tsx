@@ -182,8 +182,9 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xl space-y-6 print:border-0 print:shadow-none print:p-0">
         {/* Receipt Header */}
         <div className="text-center space-y-1.5 pb-5 border-b border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto font-black text-xl mb-2">
-            Z
+          <div className="w-12 h-12 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto mb-2 p-1 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ceova-logo.png" alt="Ceova" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
             {receipt.restaurantName}
@@ -303,7 +304,7 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
         {/* Receipt Footer Message */}
         <div className="text-center pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
           <p>{restaurant?.settings?.receiptFooter || 'Thank you for dining with us!'}</p>
-          <p className="text-[10px]">ZOVO Restaurant SaaS Platform</p>
+          <p className="text-[10px]">Ceova Restaurant SaaS Platform</p>
         </div>
       </div>
 

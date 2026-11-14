@@ -225,8 +225,9 @@ export default function QRScanResolverPage({ params }: PageProps) {
       <div className="max-w-md w-full mx-auto my-auto pt-6 pb-8 space-y-6">
         {/* Welcome Card */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
-          <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-md shadow-blue-500/20 font-black text-2xl">
-            Z
+          <div className="w-16 h-16 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto shadow-md font-black text-2xl overflow-hidden p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ceova-logo.png" alt="Ceova" className="w-full h-full object-contain" />
           </div>
 
           <div>
@@ -317,8 +318,8 @@ export default function QRScanResolverPage({ params }: PageProps) {
         </div>
 
         <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-          <span>Powered by ZOVO Restaurant Cloud Platform</span>
+          <Sparkles className="w-3.5 h-3.5 text-slate-500" />
+          <span>Powered by Ceova Restaurant Platform</span>
         </div>
       </div>
     </div>

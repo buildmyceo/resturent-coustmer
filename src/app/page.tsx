@@ -298,8 +298,14 @@ export default function CustomerPortalLandingPage() {
             {/* Restaurant Profile Card */}
             <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-5 relative overflow-hidden">
               <div className="flex items-start gap-3.5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 font-black text-2xl shadow-md shadow-blue-500/20">
-                  {restaurant.name ? restaurant.name.charAt(0).toUpperCase() : 'R'}
+                <div className="w-14 h-14 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center shrink-0 font-black text-2xl shadow-md p-1.5 overflow-hidden">
+                  {restaurant.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={restaurant.logoUrl} alt={restaurant.name} className="w-full h-full object-contain" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src="/ceova-logo.png" alt="Ceova" className="w-full h-full object-contain" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">

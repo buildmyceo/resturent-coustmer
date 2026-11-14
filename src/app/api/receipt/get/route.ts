@@ -145,7 +145,7 @@ export async function GET(request: Request) {
       receipt: {
         id: invoice.id,
         invoiceNumber: invoice.invoice_number,
-        restaurantName: invoice.restaurants?.name || 'Zovo Restaurant',
+        restaurantName: invoice.restaurants?.name || 'Ceova Restaurant',
         restaurantAddress: invoice.restaurants?.address || 'Dining Room',
         restaurantPhone: invoice.restaurants?.phone,
         restaurantEmail: invoice.restaurants?.email,

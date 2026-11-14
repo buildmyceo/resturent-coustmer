@@ -1,0 +1,16 @@
+{
+  "name": "Ceova Restaurant – Customer Dining",
+  "short_name": "Ceova Dining",
+  "description": "Contactless dining, interactive digital menu, and table ordering platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/ceova-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
