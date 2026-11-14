@@ -421,12 +421,26 @@ export async function POST(request: Request) {
       message: 'Your order has been submitted. Please wait while our staff confirms it.',
     };
 
-    // Broadcast instant alert to connected waiter terminals
+    // Broadcast instant alert to all connected portals (Staff, Admin, Kitchen)
     try {
-      const rtChannel = supabase.channel(`staff_realtime:${restaurantId}`, {
+      const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
       });
       await rtChannel.subscribe();
+      await rtChannel.send({
+        type: 'broadcast',
+        event: 'ORDER_CREATED',
+        payload: {
+          id: createdOrder.id,
+          order_number: createdOrder.order_number,
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          status: 'pending',
+          total_amount: createdOrder.total_amount,
+          created_at: new Date().toISOString(),
+        },
+      });
+      // Also send new_order event for backward compatibility
       await rtChannel.send({
         type: 'broadcast',
         event: 'new_order',

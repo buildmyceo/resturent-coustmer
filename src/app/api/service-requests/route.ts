@@ -92,12 +92,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Send real-time broadcast alert to connected waiters
+    // 3. Send real-time broadcast alert to all connected portals (Staff, Admin)
     try {
-      const rtChannel = supabase.channel(`staff_realtime:${restaurantId}`, {
+      const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
       });
       await rtChannel.subscribe();
+      await rtChannel.send({
+        type: 'broadcast',
+        event: 'SERVICE_REQUEST',
+        payload: {
+          id: requestId,
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          request_type: requestType,
+          notes: notes ? String(notes).slice(0, 500) : 'Customer called for waiter',
+          requested_by_name: requestedByName || 'Guest',
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        },
+      });
+      // Also send call_waiter event for backward compatibility
       await rtChannel.send({
         type: 'broadcast',
         event: 'call_waiter',

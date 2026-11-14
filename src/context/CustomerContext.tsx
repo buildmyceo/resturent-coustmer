@@ -431,87 +431,65 @@ export function CustomerProvider({
     [restaurant, table, session, participant, showToast]
   );
 
+  // Active orders state reference for transition sound/toast detection
+  const previousOrdersRef = React.useRef<Order[]>([]);
+
   // Supabase Realtime Subscriptions for Live Order Tracking and Table Session Status
   useEffect(() => {
-    if (!session?.id) return;
+    const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;
+    if (!activeRestId) return;
 
-    const channelName = `customer-session-${session.id}-${Date.now()}`;
-    const channel = supabase.channel(channelName);
+    const channel = supabase.channel(`restaurant:${activeRestId}`, {
+      config: { broadcast: { self: false } },
+    });
 
-    // 1. Listen for Order status changes (Preparing, Ready, Served, Cancelled)
+    // 1. Listen for instant broadcast order updates from Kitchen or Staff
     channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'orders',
-        filter: `table_session_id=eq.${session.id}`,
-      },
+      'broadcast',
+      { event: 'ORDER_UPDATED' },
       (payload: any) => {
-        if (payload.eventType === 'UPDATE') {
-          const newStatus = payload.new?.status;
-          const oldStatus = payload.old?.status;
-
-          if (newStatus === 'ready' && oldStatus !== 'ready') {
+        const orderData = payload?.payload;
+        if (orderData) {
+          const newStatus = orderData.status;
+          if (newStatus === 'ready') {
             customerAudio.playFoodReady();
             showToast(
               'Your Food is Ready! 🍽️',
-              `Order #${payload.new?.order_number} has been prepared by the kitchen and is on its way to your table!`,
+              `Order #${orderData.order_number || ''} has been prepared and is on its way!`,
               'success'
             );
-          } else if (newStatus === 'served' && oldStatus !== 'served') {
+          } else if (newStatus === 'served') {
             customerAudio.playTap();
-            showToast(
-              'Food Served ✨',
-              `Order #${payload.new?.order_number} has been served. Enjoy your meal!`,
-              'info'
-            );
-          } else if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
-            showToast(
-              'Order Cancelled',
-              `Order #${payload.new?.order_number} was cancelled by restaurant management.`,
-              'error'
-            );
+            showToast('Food Served ✨', `Order #${orderData.order_number || ''} has been served. Enjoy!`, 'info');
+          } else if (newStatus === 'cancelled') {
+            showToast('Order Cancelled', `Order #${orderData.order_number || ''} was cancelled.`, 'error');
           }
         }
         refreshOrders();
       }
     );
 
-    // 2. Listen for Table Session changes (Totals, Payment status, Closure)
+    // 2. Listen for service request updates
     channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'table_sessions',
-        filter: `id=eq.${session.id}`,
-      },
+      'broadcast',
+      { event: 'SERVICE_REQUEST_UPDATED' },
       (payload: any) => {
-        if (payload.new) {
-          setSession((prev) => (prev ? { ...prev, ...payload.new } : payload.new));
-          if (payload.new.status === 'completed') {
-            showToast('Session Completed', 'Your table bill has been settled. Thank you for dining with us!', 'success');
+        const reqData = payload?.payload;
+        const currentTableId = table?.id || getGuestSession()?.tableId;
+        if (!reqData || !currentTableId || reqData.table_id === currentTableId) {
+          if (reqData?.status === 'acknowledged') {
+            customerAudio.playServiceAlert();
+            showToast('Waiter Coming 🔔', 'A waiter acknowledged your request and is heading to your table!', 'info');
           }
         }
       }
     );
 
-    // 3. Listen for Service Request acknowledgments
+    // 3. Fallback: Listen for postgres changes if enabled in DB
     channel.on(
       'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'service_requests',
-        filter: `session_id=eq.${session.id}`,
-      },
-      (payload: any) => {
-        if (payload.new?.status === 'acknowledged') {
-          customerAudio.playServiceAlert();
-          showToast('Waiter Coming', 'A staff member acknowledged your request and is heading to your table.', 'info');
-        }
-      }
+      { event: '*', schema: 'public', table: 'orders' },
+      () => refreshOrders()
     );
 
     channel.subscribe();
@@ -519,7 +497,31 @@ export function CustomerProvider({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session?.id, supabase, refreshOrders, showToast]);
+  }, [restaurant?.id, table?.id, supabase, refreshOrders, showToast]);
+
+  // Periodic background polling (every 3.5s) to guarantee zero manual reload needed
+  useEffect(() => {
+    const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;
+    const activeTableId = table?.id || getGuestSession()?.tableId;
+    if (!activeRestId && !activeTableId) return;
+
+    const interval = setInterval(async () => {
+      await refreshOrders();
+    }, 3500);
+
+    // Refresh immediately when returning to tab
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshOrders();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [restaurant?.id, table?.id, refreshOrders]);
 
   const isSessionActive = useMemo(() => {
     return !!session && session.status !== 'completed' && session.status !== 'cancelled';
