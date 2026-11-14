@@ -5,11 +5,25 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { CallWaiterModal } from '@/components/service/CallWaiterModal';
 
 export const metadata: Metadata = {
-  title: 'Ceova Restaurant | Digital Dining & Contactless Ordering',
-  description: 'Instant contactless restaurant digital menu, table ordering, live order tracking, and digital payments.',
+  title: 'Ceova Restaurant | QR Menu & Online Dining Experience',
+  description: 'Instant contactless restaurant digital menu, table ordering, live order tracking, and digital payments powered by Ceova Restaurant.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Ceova',
+  },
   icons: {
-    icon: '/ceova-logo.png',
-    apple: '/ceova-logo.png',
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
   },
 };
 
@@ -19,7 +33,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#ffffff',
+  themeColor: '#0f172a',
 };
 
 export default function RootLayout({
