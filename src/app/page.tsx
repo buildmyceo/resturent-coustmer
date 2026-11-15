@@ -438,11 +438,13 @@ export default function CustomerPortalLandingPage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="w-full max-w-xl mx-auto px-4 pb-8 pt-4 text-center space-y-2 z-10">
-        <p className="text-[11px] text-slate-400 font-medium">
-          Ceova Hospitality SaaS • Premium Contactless Dining
-        </p>
-      </footer>
+      {restaurant?.landingPage?.footerText && (
+        <footer className="w-full max-w-xl mx-auto px-4 pb-8 pt-4 text-center space-y-2 z-10">
+          <p className="text-[11px] text-slate-400 font-medium">
+            {restaurant.landingPage.footerText}
+          </p>
+        </footer>
+      )}
 
       {/* FLOATING SCAN BUTTON IN BOTTOM CORNER */}
       <BottomCornerScanButton

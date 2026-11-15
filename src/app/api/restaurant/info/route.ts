@@ -134,7 +134,7 @@ export async function GET(request: Request) {
         youtube: '',
       },
       ctaText: 'Scan Table QR to Order',
-      footerText: 'Powered by Ceova Restaurant OS',
+      footerText: '',
     };
 
     if (settingsObj?.receipt_footer) {
