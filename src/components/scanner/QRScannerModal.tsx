@@ -2,8 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Camera, RefreshCw, Sparkles, ArrowRight, CheckCircle2, AlertCircle, FlipHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { X, Camera, RefreshCw, CheckCircle2, AlertCircle, FlipHorizontal } from 'lucide-react';
 import { playTap } from '@/lib/audio';
 import jsQR from 'jsqr';
 
@@ -13,13 +12,11 @@ interface QRScannerModalProps {
   restaurantSlug?: string;
 }
 
-export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt' }: QRScannerModalProps) {
+export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'barista-pum1' }: QRScannerModalProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'camera' | 'manual'>('camera');
-  const [manualToken, setManualToken] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -49,8 +46,7 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Camera access is not supported by your browser. Please enter the table code manually.');
-        setActiveTab('manual');
+        setCameraError('Camera access is not supported by your browser. Please allow camera permissions.');
         return;
       }
 
@@ -68,24 +64,23 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
-        await videoRef.current.play();
+        await videoRef.current.play().catch(() => {});
         setIsScanning(true);
         requestAnimationFrame(scanVideoFrame);
       }
     } catch (err: any) {
-      console.warn('Camera stream error:', err);
-      setCameraError(
-        err?.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Please allow camera access or type the table code below.'
-          : 'Unable to start camera. Please enter table code manually.'
-      );
-      setActiveTab('manual');
+      console.warn('Camera start error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraError('Camera permission was denied. Please allow camera access in your browser settings to scan the QR code.');
+      } else {
+        setCameraError('Unable to open camera. Please ensure another app is not using it.');
+      }
     }
   };
 
-  // Frame processing loop using jsQR
+  // Continuous frame scanner via requestAnimationFrame
   const scanVideoFrame = () => {
-    if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
+    if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -102,75 +97,50 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
       });
 
       if (code && code.data) {
-        handleCodeDetected(code.data);
-        return; // Stop scanning loop on detection
+        handleQRDetected(code.data);
+        return; // stop scanning after detect
       }
     }
 
     animFrameRef.current = requestAnimationFrame(scanVideoFrame);
   };
 
-  // Parse and navigate upon detecting a QR code
-  const handleCodeDetected = (rawCode: string) => {
+  // Parse detected QR data and navigate
+  const handleQRDetected = (rawText: string) => {
     stopCamera();
     playTap();
-    setScannedResult(rawCode);
 
-    let cleanToken = rawCode.trim();
+    let cleanToken = rawText.trim();
 
-    // If it's a full URL, extract the token or path
+    // If it's a full URL e.g. https://domain.com/barista-pum1/T-01/zv_barista-pum1_tt01_1693d7f6
     try {
       if (cleanToken.startsWith('http://') || cleanToken.startsWith('https://')) {
-        const url = new URL(cleanToken);
-        const pathSegments = url.pathname.split('/').filter(Boolean);
-        // e.g. /qr/TOKEN -> TOKEN
-        // e.g. /bikaner-w7bt/T-01/TOKEN -> redirect to full path
-        if (pathSegments.includes('qr') && pathSegments.length >= 2) {
-          cleanToken = pathSegments[pathSegments.indexOf('qr') + 1];
-        } else if (pathSegments.length >= 3) {
-          // Direct table route /slug/table/token
-          setTimeout(() => {
-            onClose();
-            router.push(url.pathname);
-          }, 400);
-          return;
-        }
+        const parsed = new URL(cleanToken);
+        // Direct relative redirect if on same domain or path
+        onClose();
+        router.push(parsed.pathname);
+        return;
       }
     } catch {
       // Non-blocking
     }
 
+    setScannedResult(cleanToken);
+
     setTimeout(() => {
       onClose();
-      // Navigate to table resolver
-      if (cleanToken.startsWith('zv_') && cleanToken.includes('_t')) {
-        // e.g. zv_bikanerw7bt_tT01
-        router.push(`/qr/${cleanToken}`);
-      } else {
-        router.push(`/qr/${cleanToken}`);
-      }
+      router.push(`/qr/${cleanToken}`);
     }, 400);
-  };
-
-  // Handle manual token submit
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualToken.trim()) return;
-    playTap();
-    onClose();
-    router.push(`/qr/${manualToken.trim()}`);
   };
 
   useEffect(() => {
     if (isOpen) {
-      if (activeTab === 'camera') {
-        startCamera(facingMode);
-      }
+      startCamera(facingMode);
     } else {
       stopCamera();
     }
     return () => stopCamera();
-  }, [isOpen, activeTab, facingMode]);
+  }, [isOpen, facingMode]);
 
   if (!isOpen) return null;
 
@@ -179,13 +149,13 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
       <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Camera className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">Scan Table QR</h3>
-              <p className="text-[11px] text-slate-400">Point at table code or enter token</p>
+              <p className="text-[11px] text-slate-400">Point your camera at the table QR code</p>
             </div>
           </div>
           <button
@@ -199,135 +169,79 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="grid grid-cols-2 gap-1 p-2 bg-slate-100/70 border-b border-slate-100">
-          <button
-            onClick={() => {
-              setActiveTab('camera');
-              startCamera(facingMode);
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === 'camera'
-                ? 'bg-white text-blue-600 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Camera Scanner
-          </button>
-          <button
-            onClick={() => {
-              stopCamera();
-              setActiveTab('manual');
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === 'manual'
-                ? 'bg-white text-blue-600 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Enter Code
-          </button>
-        </div>
+        {/* Camera Viewfinder Body */}
+        <div className="p-5 space-y-3">
+          <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-900 flex items-center justify-center shadow-inner">
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+            />
+            <canvas ref={canvasRef} className="hidden" />
 
-        {/* Content Body */}
-        <div className="p-5 overflow-y-auto space-y-4">
-          {activeTab === 'camera' ? (
-            <div className="space-y-3">
-              {/* Camera Viewfinder */}
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-900 flex items-center justify-center shadow-inner">
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted
-                />
-                <canvas ref={canvasRef} className="hidden" />
+            {/* Viewfinder Overlay */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="w-48 h-48 border-2 border-blue-400/80 rounded-2xl relative shadow-2xl">
+                {/* Viewfinder Corners */}
+                <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
+                <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
 
-                {/* Viewfinder Overlay */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-48 h-48 border-2 border-blue-400/80 rounded-2xl relative shadow-2xl">
-                    {/* Viewfinder Corners */}
-                    <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
-                    <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
-                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
-                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
-
-                    {/* Animated Scanning Beam */}
-                    {isScanning && (
-                      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-lg shadow-blue-400 animate-pulse" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Camera Flip Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
-                    setFacingMode(nextMode);
-                    startCamera(nextMode);
-                  }}
-                  className="absolute bottom-3 right-3 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 backdrop-blur-xs transition-colors"
-                  title="Flip camera"
-                >
-                  <FlipHorizontal className="w-4 h-4" />
-                </button>
-
-                {/* Scanned Badge */}
-                {scannedResult && (
-                  <div className="absolute inset-0 bg-emerald-600/90 backdrop-blur-xs flex flex-col items-center justify-center text-white p-4 text-center">
-                    <CheckCircle2 className="w-10 h-10 mb-2 animate-bounce" />
-                    <span className="font-bold text-sm">Table Code Detected!</span>
-                    <span className="text-xs opacity-90 font-mono mt-1 truncate max-w-[200px]">
-                      {scannedResult}
-                    </span>
-                  </div>
-                )}
-
-                {/* Camera Error / Fallback */}
-                {cameraError && (
-                  <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-6 text-center text-white">
-                    <AlertCircle className="w-8 h-8 text-amber-400 mb-2" />
-                    <p className="text-xs text-slate-300 mb-3">{cameraError}</p>
-                    <button
-                      onClick={() => setActiveTab('manual')}
-                      className="text-xs font-bold bg-blue-600 px-4 py-2 rounded-xl"
-                    >
-                      Type Table Code Instead
-                    </button>
-                  </div>
+                {/* Animated Scanning Beam */}
+                {isScanning && (
+                  <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-lg shadow-blue-400 animate-pulse" />
                 )}
               </div>
-
-              <p className="text-[11px] text-center text-slate-500">
-                Hold your camera steady over the QR code on your dining table.
-              </p>
             </div>
-          ) : (
-            <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Table Code or Token
-                </label>
-                <input
-                  type="text"
-                  value={manualToken}
-                  onChange={(e) => setManualToken(e.target.value)}
-                  placeholder="e.g. zv_bikanerw7bt_tT01 or T-01"
-                  autoFocus
-                  className="w-full text-xs font-mono p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50 focus:bg-white transition-all text-slate-900"
-                />
-              </div>
 
-              <Button type="submit" size="lg" className="w-full gap-2">
-                <span>Open Restaurant Menu</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </form>
-          )}
+            {/* Camera Flip Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+                setFacingMode(nextMode);
+                startCamera(nextMode);
+              }}
+              className="absolute bottom-3 right-3 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 backdrop-blur-xs transition-colors"
+              title="Flip camera"
+            >
+              <FlipHorizontal className="w-4 h-4" />
+            </button>
+
+            {/* Scanned Badge */}
+            {scannedResult && (
+              <div className="absolute inset-0 bg-emerald-600/90 backdrop-blur-xs flex flex-col items-center justify-center text-white p-4 text-center">
+                <CheckCircle2 className="w-10 h-10 mb-2 animate-bounce" />
+                <span className="font-bold text-sm">Table Code Detected!</span>
+                <span className="text-xs opacity-90 font-mono mt-1 truncate max-w-[200px]">
+                  {scannedResult}
+                </span>
+              </div>
+            )}
+
+            {/* Camera Error */}
+            {cameraError && (
+              <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-6 text-center text-white space-y-2">
+                <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
+                <p className="text-xs text-slate-300 leading-relaxed max-w-[240px]">{cameraError}</p>
+                <button
+                  onClick={() => startCamera(facingMode)}
+                  className="mt-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl flex items-center gap-1.5 mx-auto"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Try Again</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] text-center text-slate-500">
+            Hold your smartphone camera steady over the QR code on your dining table.
+          </p>
         </div>
       </div>
     </div>
   );
 }
-
