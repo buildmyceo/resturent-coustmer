@@ -27,7 +27,6 @@ import { getGuestSession, clearGuestSession, GuestSessionState } from '@/lib/gue
 import { calculateDistanceMeters, formatDistance } from '@/lib/geofence';
 import { QRScannerModal } from '@/components/scanner/QRScannerModal';
 import { BottomCornerScanButton } from '@/components/layout/BottomCornerScanButton';
-import { AdminEditRestaurantModal } from '@/components/admin/AdminEditRestaurantModal';
 import { playTap } from '@/lib/audio';
 
 export default function CustomerPortalLandingPage() {
@@ -42,13 +41,10 @@ export default function CustomerPortalLandingPage() {
 
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [isAdminEditOpen, setIsAdminEditOpen] = useState(false);
 
   // Geofence & Location State
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied' | 'simulated'>('prompt');
-  const [simulationMode, setSimulationMode] = useState<'auto' | 'inside' | 'outside'>('auto');
-  const [showLocationMenu, setShowLocationMenu] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
 
   // 1. Load active guest session on mount
   useEffect(() => {
@@ -79,8 +75,6 @@ export default function CustomerPortalLandingPage() {
 
   // 3. User Geolocation Watcher
   useEffect(() => {
-    if (simulationMode !== 'auto') return;
-
     if (!navigator.geolocation) {
       setLocationStatus('denied');
       return;
@@ -100,7 +94,7 @@ export default function CustomerPortalLandingPage() {
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, [simulationMode]);
+  }, []);
 
   // 4. Calculate Distance & Geofence Status
   const { distanceMeters, isWithinGeofence } = useMemo(() => {
@@ -110,15 +104,7 @@ export default function CustomerPortalLandingPage() {
 
     const { latitude: restLat, longitude: restLon, radiusMeters, enabled } = restaurant.geofence;
 
-    // Manual simulation overrides for testing
-    if (simulationMode === 'inside') {
-      return { distanceMeters: 45, isWithinGeofence: true };
-    }
-    if (simulationMode === 'outside') {
-      return { distanceMeters: 3800, isWithinGeofence: false };
-    }
-
-    // Auto GPS mode
+    // Real device GPS mode
     if (!userCoords || !restLat || !restLon || enabled === false) {
       // Default to false (out of geofence) if GPS not available or geofence disabled
       return { distanceMeters: null, isWithinGeofence: false };
@@ -133,7 +119,7 @@ export default function CustomerPortalLandingPage() {
 
     const within = dist <= (radiusMeters || 500);
     return { distanceMeters: dist, isWithinGeofence: within };
-  }, [restaurant, userCoords, simulationMode]);
+  }, [restaurant, userCoords]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-rose-500 selection:text-white relative overflow-x-hidden font-sans">
@@ -191,96 +177,14 @@ export default function CustomerPortalLandingPage() {
           )}
         </div>
 
-        {/* Right Controls: Geofence Pill & Admin Settings */}
+        {/* Right Controls: Geofence Indicator */}
         <div className="flex items-center gap-2">
-          {/* Geofence Status Pill with Simulation Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setShowLocationMenu(!showLocationMenu)}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all shadow-xs ${
-                isWithinGeofence
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-white text-slate-600 border-slate-200'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isWithinGeofence ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
-                }`}
-              />
-              <span>
-                {isWithinGeofence
-                  ? `In Restaurant (${distanceMeters ? formatDistance(distanceMeters) : 'At Venue'})`
-                  : distanceMeters
-                  ? `Out of Range (${formatDistance(distanceMeters)})`
-                  : 'Out of Range'}
-              </span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {/* Location Switcher Menu */}
-            {showLocationMenu && (
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white p-2 shadow-2xl border border-slate-100 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-                  Geofence Mode
-                </div>
-                <button
-                  onClick={() => {
-                    setSimulationMode('auto');
-                    setShowLocationMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl transition-colors flex items-center justify-between ${
-                    simulationMode === 'auto'
-                      ? 'bg-blue-50 text-blue-600 font-bold'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span>Auto (Device GPS)</span>
-                  {simulationMode === 'auto' && <span className="text-[10px]">●</span>}
-                </button>
-                <button
-                  onClick={() => {
-                    setSimulationMode('inside');
-                    setShowLocationMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl transition-colors flex items-center justify-between ${
-                    simulationMode === 'inside'
-                      ? 'bg-emerald-50 text-emerald-700 font-bold'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span>Simulate: Inside Restaurant</span>
-                  {simulationMode === 'inside' && <span className="text-[10px]">●</span>}
-                </button>
-                <button
-                  onClick={() => {
-                    setSimulationMode('outside');
-                    setShowLocationMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl transition-colors flex items-center justify-between ${
-                    simulationMode === 'outside'
-                      ? 'bg-amber-50 text-amber-700 font-bold'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span>Simulate: Out of Range</span>
-                  {simulationMode === 'outside' && <span className="text-[10px]">●</span>}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Admin Edit Trigger */}
-          <button
-            onClick={() => {
-              playTap();
-              setIsAdminEditOpen(true);
-            }}
-            title="Restaurant Admin: Edit info, social profiles, & geofence"
-            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center transition-colors shadow-2xs"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
+          {isWithinGeofence && (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all shadow-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>In Restaurant</span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -576,14 +480,6 @@ export default function CustomerPortalLandingPage() {
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         restaurantSlug={restaurant?.slug || 'bikaner-w7bt'}
-      />
-
-      {/* ADMIN RESTAURANT PROFILE & GEOFENCE EDIT MODAL */}
-      <AdminEditRestaurantModal
-        isOpen={isAdminEditOpen}
-        onClose={() => setIsAdminEditOpen(false)}
-        restaurant={restaurant}
-        onSaveSuccess={(updated) => setRestaurant(updated)}
       />
     </div>
   );
