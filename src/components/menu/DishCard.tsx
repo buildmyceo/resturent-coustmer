@@ -50,8 +50,8 @@ export function DishCard({
       onClick={() => onOpenDetail(dish)}
       className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 p-2.5 flex flex-col justify-between transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs relative"
     >
-      {/* Top Media / Food Presentation Container */}
-      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2">
+      {/* Top Media / Food Presentation Container in 3:4 Aspect Ratio */}
+      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2 shadow-inner">
         <Image
           src={hasPhoto ? dish.image : '/placeholder-dish.jpg'}
           alt={dish.name}
