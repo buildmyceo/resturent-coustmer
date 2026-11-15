@@ -51,14 +51,21 @@ export function DishCard({
       className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 p-2.5 flex flex-col justify-between transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs relative"
     >
       {/* Top Media / Food Presentation Container in 3:4 Aspect Ratio */}
-      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2 shadow-inner">
-        <Image
-          src={hasPhoto ? dish.image : '/placeholder-dish.jpg'}
-          alt={dish.name}
-          fill
-          sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2">
+        {hasPhoto ? (
+          <Image
+            src={dish.image}
+            alt={dish.name}
+            fill
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center text-slate-300">
+            <UtensilsCrossed className="w-8 h-8 stroke-[1.5]" />
+            <span className="text-[9px] font-medium text-slate-400 mt-1">Freshly Made</span>
+          </div>
+        )}
 
         {/* Dietary Icon Floating Top-Left */}
         <div className="absolute top-1.5 left-1.5">
