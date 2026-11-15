@@ -114,8 +114,22 @@ export function clearGuestSession(): void {
 
   try {
     localStorage.removeItem(STORAGE_KEY);
-    document.cookie = 'zovo_guest_session_id=; path=/; max-age=0';
-    document.cookie = 'zovo_guest_token=; path=/; max-age=0';
+    localStorage.removeItem('zovo_cart');
+    localStorage.removeItem('zovo_orders');
+    localStorage.removeItem('zovo_guest_session');
+
+    // Remove any additional temporary keys
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('zovo_') || key.startsWith('table_') || key.startsWith('cart_')) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    sessionStorage.clear();
+
+    // Expire cookies
+    document.cookie = 'zovo_guest_session_id=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'zovo_guest_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   } catch {
     // ignore
   }
