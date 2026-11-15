@@ -90,45 +90,31 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
           <X className="w-4 h-4" />
         </button>
 
-        {/* Hero Image if available */}
-        {dish.image && dish.image.trim() !== '' ? (
-          <div className="relative h-60 w-full shrink-0 bg-slate-100">
-            <Image
-              src={dish.image}
-              alt={dish.name}
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+        {/* Hero Image */}
+        <div className="relative h-60 w-full shrink-0 bg-slate-100">
+          <Image
+            src={dish.image && dish.image.trim() !== '' ? dish.image : '/placeholder-dish.jpg'}
+            alt={dish.name}
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
 
-            {/* Floating Pill Details */}
-            <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
-              <div className="flex items-center gap-2">
-                <div className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg">
-                  <DietaryBadge type={dish.dietaryType} showText />
-                </div>
-                {dish.prepTime > 0 && (
-                  <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{dish.prepTime} mins</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="pt-6 px-5 pb-2 flex items-center justify-between border-b border-slate-100">
+          {/* Floating Pill Details */}
+          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
             <div className="flex items-center gap-2">
-              <DietaryBadge type={dish.dietaryType} showText />
+              <div className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg">
+                <DietaryBadge type={dish.dietaryType} showText />
+              </div>
               {dish.prepTime > 0 && (
-                <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {dish.prepTime} mins
-                </span>
+                <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{dish.prepTime} mins</span>
+                </div>
               )}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Scrollable Customization Content */}
         <div className="p-5 overflow-y-auto space-y-6 flex-1">

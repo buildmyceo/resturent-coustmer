@@ -207,16 +207,14 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex flex-col justify-between space-y-3"
           >
             <div className="flex items-start gap-3.5">
-              {item.dishImage && item.dishImage.trim() !== '' && (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                  <Image
-                    src={item.dishImage}
-                    alt={item.dishName}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              )}
+              <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                <Image
+                  src={item.dishImage && item.dishImage.trim() !== '' ? item.dishImage : '/placeholder-dish.jpg'}
+                  alt={item.dishName}
+                  fill
+                  className="object-cover"
+                />
+              </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">

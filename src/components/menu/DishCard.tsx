@@ -52,20 +52,13 @@ export function DishCard({
     >
       {/* Top Media / Food Presentation Container */}
       <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2">
-        {hasPhoto ? (
-          <Image
-            src={dish.image}
-            alt={dish.name}
-            fill
-            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center text-slate-300">
-            <UtensilsCrossed className="w-8 h-8 stroke-[1.5]" />
-            <span className="text-[9px] font-medium text-slate-400 mt-1">Freshly Made</span>
-          </div>
-        )}
+        <Image
+          src={hasPhoto ? dish.image : '/placeholder-dish.jpg'}
+          alt={dish.name}
+          fill
+          sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-300"
+        />
 
         {/* Dietary Icon Floating Top-Left */}
         <div className="absolute top-1.5 left-1.5">
