@@ -402,6 +402,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         allergens: Array.isArray(d.allergens) ? d.allergens : [],
         isAvailable: d.is_available,
         isArchived: d.is_archived,
+        isSignature: Boolean(meta.isSignature),
         spiceLevel: meta.spiceLevel || undefined,
         sweetnessLevel: meta.sweetnessLevel || undefined,
         temperature: meta.temperature || undefined,

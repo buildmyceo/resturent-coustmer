@@ -199,12 +199,9 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     return result;
   }, [dishes, activeCategoryId, searchQuery, dietaryFilter, priceSort]);
 
-  // Popular / Chef's Recommendation dishes (top 4 based on ordersCount)
+  // Chef's Signature Highlights: Only render dishes explicitly marked as signature by admin
   const popularDishes = useMemo(() => {
-    return [...dishes]
-      .filter((d) => d.isAvailable && !d.isArchived)
-      .sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0))
-      .slice(0, 3);
+    return dishes.filter((d) => d.isAvailable && !d.isArchived && d.isSignature === true);
   }, [dishes]);
 
   // Group filtered dishes by Category

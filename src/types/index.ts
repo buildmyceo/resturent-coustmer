@@ -41,6 +41,7 @@ export interface Dish {
   allergens: string[];
   isAvailable: boolean;
   isArchived: boolean;
+  isSignature?: boolean; // Admin explicitly marks dish as Chef's Signature Highlight
   variants?: DishVariant[];
   addons?: DishAddon[];
   // Optional Taste & Preparation Preferences
