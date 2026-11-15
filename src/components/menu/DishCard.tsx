@@ -50,8 +50,8 @@ export function DishCard({
       onClick={() => onOpenDetail(dish)}
       className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 p-2.5 flex flex-col justify-between transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs relative"
     >
-      {/* Top Media / Food Presentation Container in 3:4 Aspect Ratio */}
-      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2">
+      {/* Top Media / Food Presentation Container (Balanced Compact Landscape 4:3 Ratio) */}
+      <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center mb-2">
         {hasPhoto ? (
           <Image
             src={dish.image}
@@ -62,8 +62,8 @@ export function DishCard({
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-slate-300">
-            <UtensilsCrossed className="w-8 h-8 stroke-[1.5]" />
-            <span className="text-[9px] font-medium text-slate-400 mt-1">Freshly Made</span>
+            <UtensilsCrossed className="w-6 h-6 stroke-[1.5]" />
+            <span className="text-[9px] font-medium text-slate-400 mt-1">Fresh Food</span>
           </div>
         )}
 

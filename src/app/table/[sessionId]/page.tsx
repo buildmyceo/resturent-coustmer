@@ -257,8 +257,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* 1. Restaurant Hero Cover Image */}
-      <div className="relative h-44 sm:h-56 w-full bg-slate-900 overflow-hidden sm:rounded-b-3xl">
+      {/* 1. Restaurant Hero Cover Image (16:9 Landscape Aspect Ratio) */}
+      <div className="relative aspect-[16/9] max-h-56 w-full bg-slate-900 overflow-hidden sm:rounded-b-3xl">
         <Image
           src={
             restaurant?.coverImageUrl ||
@@ -267,26 +267,28 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           alt={restaurant?.name || 'Restaurant Cover'}
           fill
           priority
-          className="object-cover opacity-80"
+          className="object-cover opacity-85"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent" />
 
-        <div className="absolute bottom-4 left-4 right-4 text-white">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-300 bg-blue-950/60 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-blue-400/30">
+        <div className="absolute bottom-3 left-3.5 right-3.5 text-white">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 bg-blue-950/70 backdrop-blur-md px-2 py-0.5 rounded-full border border-blue-400/30">
               {restaurant?.restaurantType || 'Fine Dining & Lounge'}
             </span>
-            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+            <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 bg-slate-900/40 backdrop-blur-xs px-2 py-0.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Kitchen Open
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+          <h2 className="text-lg sm:text-2xl font-black text-white leading-tight drop-shadow-xs">
             {restaurant?.name}
           </h2>
-          <p className="text-xs text-slate-300 line-clamp-1 mt-0.5 max-w-xl">
-            {restaurant?.description}
-          </p>
+          {restaurant?.description && (
+            <p className="text-[11px] sm:text-xs text-slate-200 line-clamp-1 mt-0.5 max-w-xl drop-shadow-xs">
+              {restaurant?.description}
+            </p>
+          )}
         </div>
       </div>
 
