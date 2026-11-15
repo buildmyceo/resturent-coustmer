@@ -165,6 +165,9 @@ export async function GET(request: Request) {
             socialLinks = { ...socialLinks, ...parsedLanding.socialLinks };
           }
           if (parsedLanding.helplineNumber) helpline = parsedLanding.helplineNumber;
+          if (landingPage.footerText && landingPage.footerText.includes('Powered by Ceova')) {
+            landingPage.footerText = '';
+          }
         } catch {}
       }
 
