@@ -73,5 +73,28 @@ export function verifyTableSignatureSync(
     }
   }
 
+  // Also support existing legacy and structured QR tokens (e.g. zv_barista-pum1_t01 or zv_t01_xxxx)
+  const lowerCode = uniqueCode.toLowerCase().trim();
+  if (lowerCode.startsWith('zv_')) {
+    const parts = lowerCode.split('_');
+    for (const part of parts) {
+      const partAlpha = part.replace(/[^a-z0-9]/g, '');
+      const partDigits = part.replace(/\D/g, '');
+      if (
+        partAlpha === alphaNum ||
+        partAlpha === 't' + alphaNum ||
+        partAlpha === 't' + digitsOnly ||
+        (digitsOnly && partDigits === digitsOnly)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // Support direct table identifier as token if authenticated QR is used
+  if (lowerCode === alphaNum || (digitsOnly && lowerCode === digitsOnly)) {
+    return true;
+  }
+
   return false;
 }
