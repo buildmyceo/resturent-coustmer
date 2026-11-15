@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { FacebookIcon, InstagramIcon, TwitterIcon, WhatsAppIcon } from '@/components/ui/SocialIcons';
 import { Button } from '@/components/ui/Button';
+import BlinkitLoader from '@/components/ui/BlinkitLoader';
 import { getGuestSession, clearGuestSession, GuestSessionState } from '@/lib/guest-session';
 import { calculateDistanceMeters, formatDistance } from '@/lib/geofence';
 import { QRScannerModal } from '@/components/scanner/QRScannerModal';
@@ -425,9 +426,11 @@ export default function CustomerPortalLandingPage() {
           </div>
         ) : (
           /* Loading fallback */
-          <div className="py-12 text-center text-slate-400 text-sm">
-            Loading restaurant menu...
-          </div>
+          <BlinkitLoader
+            fullScreen={false}
+            className="py-12"
+            subtitle="Loading restaurant menu & culinary selections..."
+          />
         )}
       </main>
 
