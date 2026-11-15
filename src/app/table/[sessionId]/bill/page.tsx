@@ -27,9 +27,9 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
   const resolvedParams = use(params);
   const sessionId = resolvedParams.sessionId;
 
-  const { restaurant, table } = useCustomer();
+  const { restaurant, table, orders } = useCustomer();
   const [bill, setBill] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(orders.length > 0 ? true : false);
 
   const fetchBill = async () => {
     setIsLoading(true);

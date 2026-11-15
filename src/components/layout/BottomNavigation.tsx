@@ -58,6 +58,7 @@ export function BottomNavigation() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={`relative flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all duration-150 select-none ${
                 item.active ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-900 font-medium'
               }`}
