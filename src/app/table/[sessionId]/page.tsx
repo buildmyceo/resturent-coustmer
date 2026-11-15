@@ -599,32 +599,34 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
         )}
       </div>
 
-      {/* Blinkit Style Sticky Bottom Floating View Cart Bar */}
+      {/* Modern Compact Floating View Cart Pill */}
       {cartTotals.itemCount > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 z-40 max-w-md mx-auto animate-in slide-in-from-bottom-5 duration-200">
-          <Link
-            href={`/table/${sessionId}/cart`}
-            className="flex items-center justify-between bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-2xl shadow-xl shadow-emerald-950/20 active:scale-[0.99] transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm">
-                {cartTotals.itemCount}
-              </div>
-              <div>
-                <div className="text-[11px] font-medium text-emerald-100">
-                  {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'} added
+        <div className="fixed bottom-20 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">
+          <div className="w-full max-w-sm pointer-events-auto animate-in slide-in-from-bottom-3 duration-200">
+            <Link
+              href={`/table/${sessionId}/cart`}
+              className="flex items-center justify-between bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-full shadow-lg shadow-emerald-950/25 active:scale-[0.98] transition-all cursor-pointer border border-emerald-600/40"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs">
+                  {cartTotals.itemCount}
                 </div>
-                <div className="text-sm font-black font-mono">
-                  {formatCurrency(cartTotals.subtotal, restaurant?.currency)}
+                <div className="leading-tight">
+                  <span className="text-[10px] text-emerald-100 font-medium block">
+                    {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'}
+                  </span>
+                  <span className="text-xs font-black font-mono">
+                    {formatCurrency(cartTotals.subtotal, restaurant?.currency)}
+                  </span>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-1.5 font-extrabold text-sm tracking-wide pr-1">
-              <span>View Cart</span>
-              <ArrowRight className="w-4 h-4 stroke-[3]" />
-            </div>
-          </Link>
+              <div className="flex items-center gap-1 font-bold text-xs tracking-wide">
+                <span>View Cart</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </div>
+            </Link>
+          </div>
         </div>
       )}
 
