@@ -174,12 +174,6 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
 
   if (!isOpen) return null;
 
-  const quickTables = [
-    { label: 'Table T-01 (Main Dining)', token: 'zv_bikanerw7bt_tT01' },
-    { label: 'Table T-02 (Booth 2)', token: 'zv_bikanerw7bt_tT02' },
-    { label: 'Table T-03 (Patio Table)', token: 'zv_bikanerw7bt_tT03' },
-  ];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
@@ -331,35 +325,6 @@ export function QRScannerModal({ isOpen, onClose, restaurantSlug = 'bikaner-w7bt
               </Button>
             </form>
           )}
-
-          {/* Quick Demo Table Links */}
-          <div className="pt-3 border-t border-slate-100">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-blue-500" />
-              <span>Sample Dining Tables</span>
-            </div>
-            <div className="space-y-1.5">
-              {quickTables.map((t) => (
-                <button
-                  key={t.token}
-                  onClick={() => {
-                    stopCamera();
-                    playTap();
-                    onClose();
-                    router.push(`/qr/${t.token}`);
-                  }}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-blue-50/60 border border-slate-100 text-left text-xs transition-colors group"
-                >
-                  <span className="font-medium text-slate-700 group-hover:text-blue-600">
-                    {t.label}
-                  </span>
-                  <span className="text-[10px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                    Open Table
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -142,19 +142,53 @@ export default function CustomerPortalLandingPage() {
 
       {/* TOP NAVIGATION BAR */}
       <header className="w-full max-w-xl mx-auto px-4 pt-4 sm:pt-6 flex items-center justify-between z-20">
-        {/* Brand Mark */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 text-white flex items-center justify-center font-black text-sm shadow-md shadow-rose-500/20">
-            C
-          </div>
-          <div>
-            <span className="font-black text-sm tracking-tight text-slate-900 block leading-none">
-              CEOVA
-            </span>
-            <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold">
-              Dining SaaS
-            </span>
-          </div>
+        {/* Restaurant Brand or User Profile */}
+        <div className="flex items-center gap-2.5">
+          {activeSession ? (
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                {(activeSession.guestName || 'G').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 block leading-tight">
+                  {activeSession.guestName || 'Valued Guest'}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-semibold block leading-tight">
+                  {activeSession.tableNumber ? `Seated at ${activeSession.tableNumber}` : 'Dining Guest'}
+                </span>
+              </div>
+            </div>
+          ) : restaurant?.logoUrl ? (
+            <div className="flex items-center gap-2.5">
+              <img
+                src={restaurant.logoUrl}
+                alt={restaurant.name || 'Restaurant Logo'}
+                className="w-9 h-9 rounded-xl object-cover border border-slate-200/80 shadow-xs"
+              />
+              <div>
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 block leading-tight">
+                  {restaurant?.name || 'Restaurant Dining'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold block leading-tight">
+                  {restaurant?.restaurantType || 'Guest Portal'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                {(restaurant?.name || 'R').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 block leading-tight">
+                  {restaurant?.name || 'Restaurant Dining'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold block leading-tight">
+                  {restaurant?.restaurantType || 'Guest Portal'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Controls: Geofence Pill & Admin Settings */}
@@ -436,27 +470,6 @@ export default function CustomerPortalLandingPage() {
                 <p className="text-[11px] text-center text-slate-400 mt-2">
                   Scan the QR code placed on your table to browse the menu.
                 </p>
-              </div>
-
-              {/* Quick Sample Tables */}
-              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Quick Select Table
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => router.push('/qr/zv_bikanerw7bt_tT01')}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs font-medium text-slate-700 text-left transition-colors"
-                  >
-                    Table T-01 (Dining)
-                  </button>
-                  <button
-                    onClick={() => router.push('/qr/zv_bikanerw7bt_tT02')}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs font-medium text-slate-700 text-left transition-colors"
-                  >
-                    Table T-02 (Booth)
-                  </button>
-                </div>
               </div>
             </div>
           </div>

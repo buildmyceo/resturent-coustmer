@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { verifyTableSignatureSync } from '@/lib/qr/signature';
 
 export async function POST(request: Request) {
   try {
@@ -17,14 +18,30 @@ export async function POST(request: Request) {
       );
     }
 
-    if (trimmedToken.includes('nonexistent') || trimmedToken.includes('invalid') || trimmedToken === 'invalid_token') {
+    if (
+      trimmedToken.includes('nonexistent') ||
+      trimmedToken.includes('invalid') ||
+      trimmedToken === 'invalid_token'
+    ) {
       return NextResponse.json(
         { success: false, error: 'Invalid QR code. Table or restaurant could not be resolved.' },
         { status: 404 }
       );
     }
 
-    // Parse slug or table from token string if encoded (e.g. zv_bikaner_t01_a1b2)
+    // Direct URL spoofing prevention: If direct dummy token is passed or table does not match cryptographic signature
+    if (trimmedToken.startsWith('direct_')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Direct URL access without scanning is disabled for security. Please scan the official QR code placed on your table.',
+        },
+        { status: 403 }
+      );
+    }
+
+    // Parse slug or table from token string if encoded (e.g. zv_barista-pum1_tt01_1693d7f6)
     if (!slug && trimmedToken.startsWith('zv_')) {
       const parts = trimmedToken.split('_');
       if (parts.length >= 3) {
@@ -92,12 +109,38 @@ export async function POST(request: Request) {
           });
         }
       } catch {
-        // Fall through to resilient lookup
+        // Fall through
       }
     }
 
-    // 3. Resilient Direct Lookup by (restaurantSlug, tableNumber)
-    // Public users have SELECT access on active restaurants and tables in Supabase
+    // 3. Cryptographic Table Security Verification
+    // A user can NOT change the URL table number unless their uniqueCode matches the cryptographic signature
+    if (tblNum && slug) {
+      const cleanTableNum = tblNum.toLowerCase().replace(/^table\s*/i, '').trim();
+      const isSignatureValid = verifyTableSignatureSync(slug, cleanTableNum, trimmedToken);
+
+      // If user provided a token that fails cryptographic validation for this table, reject immediately!
+      if (!isSignatureValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Security verification failed: This table QR code is invalid or does not match this table. Please scan the QR code located on your table.',
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid QR code. Please scan the official QR code located on your table.',
+        },
+        { status: 404 }
+      );
+    }
+
+    // 4. Resilient Direct Lookup for validated table and restaurant
     let matchedRest: any = null;
 
     if (slug) {
@@ -112,7 +155,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // If still no restaurant, get the most recent or active restaurant
     if (!matchedRest) {
       const { data: defaultRests } = await supabase
         .from('restaurants')
@@ -130,7 +172,7 @@ export async function POST(request: Request) {
       const cleanDigits = tblNum.replace(/\D/g, '');
 
       if (tblNum) {
-        let tableQuery = supabase
+        const tableQuery = supabase
           .from('restaurant_tables')
           .select('*')
           .eq('restaurant_id', matchedRest.id);
@@ -149,20 +191,6 @@ export async function POST(request: Request) {
         const { data: tables } = await tableQuery.or(filterClauses.join(',')).limit(1);
         if (tables && tables.length > 0) {
           matchedTable = tables[0];
-        }
-      }
-
-      // If specific table wasn't matched, get the first table for this restaurant
-      if (!matchedTable) {
-        const { data: firstTables } = await supabase
-          .from('restaurant_tables')
-          .select('*')
-          .eq('restaurant_id', matchedRest.id)
-          .order('table_number', { ascending: true })
-          .limit(1);
-
-        if (firstTables && firstTables.length > 0) {
-          matchedTable = firstTables[0];
         }
       }
 
@@ -186,7 +214,7 @@ export async function POST(request: Request) {
         } catch {}
       }
 
-      const finalTableNumber = matchedTable?.table_number || tblNum || '1';
+      const finalTableNumber = matchedTable?.table_number || tblNum;
       const finalTableName = matchedTable?.table_name || `Table ${finalTableNumber}`;
       const finalTableId = matchedTable?.id || `tbl-${matchedRest.id}-${finalTableNumber}`;
 
@@ -246,40 +274,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Absolute Fallback: Fall back to active restaurant rather than dummy
-    const fallbackRestId = '07e9a4c7-edae-4bf0-8786-fc220c152d43';
-    const fallbackName = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'bikaner';
-    return NextResponse.json({
-      success: true,
-      table: {
-        tableId: `ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a`,
-        tableNumber: tblNum || 'T-01',
-        tableName: `Table ${tblNum || '1'}`,
-        seatingCapacity: 4,
-        restaurantId: fallbackRestId,
-        restaurantName: fallbackName,
-        restaurantSlug: slug || 'bikaner-w7bt',
-        restaurantStatus: 'active',
-        activeSessionId: null,
-        sessionStatus: null,
-      },
-    });
+    return NextResponse.json(
+      { success: false, error: 'Restaurant or table could not be found.' },
+      { status: 404 }
+    );
   } catch (err: any) {
     console.error('API /api/qr/resolve error:', err);
-    return NextResponse.json({
-      success: true,
-      table: {
-        tableId: 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
-        tableNumber: 'T-01',
-        tableName: 'Table 1',
-        seatingCapacity: 4,
-        restaurantId: '07e9a4c7-edae-4bf0-8786-fc220c152d43',
-        restaurantName: 'bikaner',
-        restaurantSlug: 'bikaner-w7bt',
-        restaurantStatus: 'active',
-        activeSessionId: null,
-        sessionStatus: null,
-      },
-    });
+    return NextResponse.json(
+      { success: false, error: 'Internal server error while resolving table.' },
+      { status: 500 }
+    );
   }
 }
