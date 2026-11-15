@@ -539,25 +539,25 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
               <section key={group.category.id} className="space-y-3.5 scroll-mt-24">
                 {/* Category Header with Banner Image */}
                 {hasCatImage ? (
-                  <div className="relative h-28 sm:h-36 w-full rounded-2xl overflow-hidden shadow-xs border border-slate-100 group">
+                  <div className="relative h-24 sm:h-28 md:h-32 w-full rounded-2xl overflow-hidden shadow-xs border border-slate-100 group">
                     <img
                       src={catImage}
                       alt={group.category.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between text-white">
+                    <div className="absolute bottom-2.5 left-3.5 right-3.5 flex items-end justify-between text-white">
                       <div>
-                        <h3 className="font-black text-xl tracking-tight text-white drop-shadow-sm">
+                        <h3 className="font-black text-lg sm:text-xl tracking-tight text-white drop-shadow-sm leading-tight">
                           {group.category.name}
                         </h3>
                         {(group.category as any)?.description && (
-                          <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
+                          <p className="text-[11px] sm:text-xs text-white/80 line-clamp-1 mt-0.5">
                             {(group.category as any).description}
                           </p>
                         )}
                       </div>
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white shrink-0">
+                      <span className="text-[11px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white shrink-0">
                         {group.dishes.length} {group.dishes.length === 1 ? 'item' : 'items'}
                       </span>
                     </div>
