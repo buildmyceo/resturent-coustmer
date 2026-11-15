@@ -34,6 +34,8 @@ interface CustomerContextType {
   setSession: (session: TableSession | null) => void;
   participant: SessionParticipant | null;
   setParticipant: (participant: SessionParticipant | null) => void;
+  menuDishes: Dish[];
+  setMenuDishes: (dishes: Dish[]) => void;
   cart: CartItem[];
   addToCart: (
     dish: Dish,
@@ -103,6 +105,7 @@ export function CustomerProvider({
   const [table, setTable] = useState<RestaurantTable | null>(initialTable || null);
   const [session, setSession] = useState<TableSession | null>(initialSession || null);
   const [participant, setParticipant] = useState<SessionParticipant | null>(initialParticipant || null);
+  const [menuDishes, setMenuDishes] = useState<Dish[]>([]);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -629,6 +632,8 @@ export function CustomerProvider({
         setSession,
         participant,
         setParticipant,
+        menuDishes,
+        setMenuDishes,
         cart,
         addToCart,
         updateCartQuantity,

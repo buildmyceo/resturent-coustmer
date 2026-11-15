@@ -28,6 +28,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     setRestaurant,
     table,
     setTable,
+    setMenuDishes,
     cart,
     addToCart,
     setSelectedDishModal,
@@ -127,6 +128,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           if (fetchedRest) setRestaurant(fetchedRest);
           setCategories(fetchedCats);
           setDishes(fetchedDishes);
+          setMenuDishes(fetchedDishes);
 
           // If table is still not set in context, set it from stored or default table
           if (stored?.tableNumber && stored.tableNumber !== 'Table 05' && (!table || table.number !== stored.tableNumber)) {

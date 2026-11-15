@@ -319,7 +319,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
               longitude: parsed.longitude || 85.039305,
               radiusMeters: Math.min(200, Math.max(10, parsed.radiusMeters || 50)),
             };
-          } catch {}
+          } catch { }
         }
 
         const couponMatch = s.receipt_footer.match(/<!--ZOVO_COUPONS_CONFIG:([\s\S]*?)-->/);
@@ -329,7 +329,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             if (Array.isArray(parsedCoupons)) {
               coupons = parsedCoupons;
             }
-          } catch {}
+          } catch { }
         }
 
         const extrasMatch = s.receipt_footer.match(/<!--ZOVO_DISH_EXTRAS_CONFIG:([\s\S]*?)-->/);
@@ -339,7 +339,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             if (parsedExtras && typeof parsedExtras === 'object') {
               dishMetaMap = parsedExtras;
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -403,6 +403,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         isAvailable: d.is_available,
         isArchived: d.is_archived,
         isSignature: Boolean(meta.isSignature),
+        featuredInCart: Boolean(meta.featuredInCart),
         spiceLevel: meta.spiceLevel || undefined,
         sweetnessLevel: meta.sweetnessLevel || undefined,
         temperature: meta.temperature || undefined,

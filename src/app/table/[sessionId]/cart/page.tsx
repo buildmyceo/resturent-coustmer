@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, useMemo, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -10,6 +10,8 @@ import { formatCurrency } from '@/lib/format';
 import { OrderConfirmModal } from '@/components/cart/OrderConfirmModal';
 import { customerAudio } from '@/lib/audio';
 import confetti from 'canvas-confetti';
+import { Dish } from '@/types';
+import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import {
   ShoppingBag,
   Plus,
@@ -26,6 +28,8 @@ import {
   Check,
   X,
   TicketPercent,
+  Sparkles,
+  Flame,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -42,6 +46,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     restaurant,
     table,
     cart,
+    addToCart,
     cartTotals,
     updateCartQuantity,
     removeFromCart,
@@ -54,6 +59,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     appliedCoupon,
     setAppliedCoupon,
     couponDiscountAmount,
+    menuDishes,
   } = useCustomer();
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -61,6 +67,45 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   const [orderCustomerNote, setOrderCustomerNote] = useState('');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [fallbackDishes, setFallbackDishes] = useState<Dish[]>([]);
+
+  // If menuDishes was not yet populated from context (e.g. direct nav or refresh), fetch once
+  useEffect(() => {
+    if (menuDishes && menuDishes.length > 0) return;
+    if (!restaurant?.id) return;
+
+    fetchRestaurantAndMenuDB(restaurant.id)
+      .then(({ dishes }) => {
+        if (dishes && dishes.length > 0) {
+          setFallbackDishes(dishes);
+        }
+      })
+      .catch(() => {});
+  }, [menuDishes, restaurant?.id]);
+
+  const allAvailableDishes = menuDishes && menuDishes.length > 0 ? menuDishes : fallbackDishes;
+
+  // Filter recommendations:
+  // 1. Must be active, in stock, not already in cart
+  // 2. Admin featuredInCart items first
+  // 3. Followed by top-selling / popular items
+  const recommendedDishes = useMemo(() => {
+    if (!allAvailableDishes || allAvailableDishes.length === 0) return [];
+    const cartDishIds = new Set(cart.map((item) => item.dishId));
+
+    const eligible = allAvailableDishes.filter(
+      (d) => d.isAvailable && !d.isArchived && !cartDishIds.has(d.id)
+    );
+
+    // Prioritize admin-picked dishes
+    const adminPicked = eligible.filter((d) => Boolean(d.featuredInCart));
+    // Popular / highest ordered
+    const popular = eligible
+      .filter((d) => !d.featuredInCart)
+      .sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0));
+
+    return [...adminPicked, ...popular].slice(0, 6);
+  }, [allAvailableDishes, cart]);
 
   const currency = restaurant?.currency || 'USD';
 
@@ -348,6 +393,85 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           </div>
         ))}
       </div>
+
+      {/* Recommended / Most Selling / Chef Promoted in Cart */}
+      {recommendedDishes.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-bold text-slate-800">You Might Also Like</span>
+            </div>
+            <span className="text-[10px] font-semibold text-slate-400">Frequently ordered together</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {recommendedDishes.map((dish) => {
+              const hasPhoto = Boolean(dish.image && dish.image.trim() !== '');
+              return (
+                <div
+                  key={dish.id}
+                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all gap-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative w-12 h-12 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
+                      {hasPhoto ? (
+                        <Image
+                          src={dish.image}
+                          alt={dish.name}
+                          fill
+                          className="object-cover"
+                          sizes="48px"
+                        />
+                      ) : (
+                        <Utensils className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1">
+                        <DietaryBadge type={dish.dietaryType} />
+                        <h4 className="text-xs font-bold text-slate-900 truncate">{dish.name}</h4>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-slate-800">
+                          {formatCurrency(dish.price, currency)}
+                        </span>
+                        {dish.originalPrice && dish.originalPrice > dish.price && (
+                          <span className="text-[10px] text-slate-400 line-through">
+                            {formatCurrency(dish.originalPrice, currency)}
+                          </span>
+                        )}
+                        {dish.featuredInCart && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                            Chef Pick
+                          </span>
+                        )}
+                        {!dish.featuredInCart && (dish.ordersCount || 0) > 0 && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-100 text-orange-800 flex items-center gap-0.5">
+                            <Flame className="w-2.5 h-2.5" /> Top
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      addToCart(dish);
+                      showToast('Added to Cart', `${dish.name} was added`, 'success');
+                      customerAudio.playTap();
+                    }}
+                    className="h-7 px-3 text-xs font-bold bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-400 shadow-2xs shrink-0 cursor-pointer"
+                  >
+                    + Add
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Promo Code / Coupon Section */}
       <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">

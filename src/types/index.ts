@@ -42,6 +42,7 @@ export interface Dish {
   isAvailable: boolean;
   isArchived: boolean;
   isSignature?: boolean; // Admin explicitly marks dish as Chef's Signature Highlight
+  featuredInCart?: boolean; // Admin explicitly promotes this dish inside Customer Cart recommendations
   variants?: DishVariant[];
   addons?: DishAddon[];
   // Optional Taste & Preparation Preferences
