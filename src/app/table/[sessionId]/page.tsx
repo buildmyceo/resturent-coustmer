@@ -539,15 +539,15 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
             return (
               <section key={group.category.id} className="space-y-3.5 scroll-mt-24">
-                {/* Category Header with Banner Image */}
+                {/* Category Header with Banner Image (Consistent 16:9 Landscape Aspect Ratio matching Admin) */}
                 {hasCatImage ? (
-                  <div className="relative h-24 sm:h-28 md:h-32 w-full rounded-2xl overflow-hidden shadow-xs border border-slate-100 group">
+                  <div className="relative aspect-[16/9] max-h-48 sm:max-h-56 w-full rounded-2xl overflow-hidden shadow-xs border border-slate-100 group">
                     <img
                       src={catImage}
                       alt={group.category.name}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/25 to-transparent" />
                     <div className="absolute bottom-2.5 left-3.5 right-3.5 flex items-end justify-between text-white">
                       <div>
                         <h3 className="font-black text-lg sm:text-xl tracking-tight text-white drop-shadow-sm leading-tight">
