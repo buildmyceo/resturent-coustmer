@@ -11,6 +11,7 @@ import {
   Order,
   ServiceRequest,
   ServiceRequestType,
+  Coupon,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { customerAudio } from '@/lib/audio';
@@ -56,6 +57,9 @@ interface CustomerContextType {
     totalAmount: number;
     itemCount: number;
   };
+  appliedCoupon: Coupon | null;
+  setAppliedCoupon: (coupon: Coupon | null) => void;
+  couponDiscountAmount: number;
   orders: Order[];
   refreshOrders: () => Promise<void>;
   isOrdersLoading: boolean;
@@ -101,6 +105,7 @@ export function CustomerProvider({
   const [participant, setParticipant] = useState<SessionParticipant | null>(initialParticipant || null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [activeServiceRequests, setActiveServiceRequests] = useState<ServiceRequest[]>([]);
@@ -284,6 +289,7 @@ export function CustomerProvider({
           const newItem: CartItem = {
             cartItemId,
             dishId: dish.id,
+            categoryId: dish.categoryId,
             dishName: dish.name,
             dishImage: dish.image,
             dietaryType: dish.dietaryType,
@@ -350,19 +356,72 @@ export function CustomerProvider({
     }
   }, []);
 
-  // Server-matching Cart Totals Calculation
-  const cartTotals = useMemo(() => {
+  // Server-matching Cart Totals Calculation with Coupon Discounts
+  const { cartTotals, couponDiscountAmount } = useMemo(() => {
     const subtotal = Number(cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2));
     const taxRate = restaurant?.settings?.taxEnabled ? Number(restaurant?.settings?.taxPercentage ?? 8.5) : 0;
     const serviceFeeRate = restaurant?.settings?.serviceChargeEnabled ? Number(restaurant?.settings?.serviceChargePercentage ?? 10.0) : 0;
 
-    const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
-    const serviceFee = Number(((subtotal * serviceFeeRate) / 100).toFixed(2));
-    const totalAmount = Number((subtotal + taxAmount + serviceFee).toFixed(2));
+    // Calculate coupon discount
+    let discount = 0;
+    if (appliedCoupon && appliedCoupon.isActive) {
+      // Check minimum order amount requirement
+      if (!appliedCoupon.minOrderAmount || subtotal >= appliedCoupon.minOrderAmount) {
+        if (appliedCoupon.appliesTo === 'category' && appliedCoupon.targetCategoryId) {
+          // Calculate sum only on items matching target category
+          const eligibleItemsSubtotal = cart
+            .filter((item) => item.categoryId === appliedCoupon.targetCategoryId)
+            .reduce((sum, item) => sum + item.totalPrice, 0);
+
+          if (eligibleItemsSubtotal > 0) {
+            if (appliedCoupon.discountType === 'percentage') {
+              discount = (eligibleItemsSubtotal * appliedCoupon.discountValue) / 100;
+            } else {
+              discount = Math.min(appliedCoupon.discountValue, eligibleItemsSubtotal);
+            }
+          }
+        } else if (appliedCoupon.appliesTo === 'dishes' && Array.isArray(appliedCoupon.targetDishIds) && appliedCoupon.targetDishIds.length > 0) {
+          // Calculate sum only on selected dishes
+          const eligibleItemsSubtotal = cart
+            .filter((item) => appliedCoupon.targetDishIds?.includes(item.dishId))
+            .reduce((sum, item) => sum + item.totalPrice, 0);
+
+          if (eligibleItemsSubtotal > 0) {
+            if (appliedCoupon.discountType === 'percentage') {
+              discount = (eligibleItemsSubtotal * appliedCoupon.discountValue) / 100;
+            } else {
+              discount = Math.min(appliedCoupon.discountValue, eligibleItemsSubtotal);
+            }
+          }
+        } else {
+          // Applies to all items
+          if (appliedCoupon.discountType === 'percentage') {
+            discount = (subtotal * appliedCoupon.discountValue) / 100;
+          } else {
+            discount = Math.min(appliedCoupon.discountValue, subtotal);
+          }
+        }
+
+        // Cap discount if maxDiscountAmount is configured
+        if (appliedCoupon.maxDiscountAmount && discount > appliedCoupon.maxDiscountAmount) {
+          discount = appliedCoupon.maxDiscountAmount;
+        }
+      }
+    }
+
+    const calculatedDiscount = Number(Math.min(discount, subtotal).toFixed(2));
+    const discountedSubtotal = Math.max(0, subtotal - calculatedDiscount);
+
+    const taxAmount = Number(((discountedSubtotal * taxRate) / 100).toFixed(2));
+    const serviceFee = Number(((discountedSubtotal * serviceFeeRate) / 100).toFixed(2));
+    const totalAmount = Number((discountedSubtotal + taxAmount + serviceFee).toFixed(2));
     const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-    return { subtotal, taxAmount, serviceFee, totalAmount, itemCount };
-  }, [cart, restaurant]);
+    return {
+      cartTotals: { subtotal, taxAmount, serviceFee, totalAmount, itemCount },
+      couponDiscountAmount: calculatedDiscount,
+    };
+  }, [cart, restaurant, appliedCoupon]);
 
   // Fetch Table Orders
   const refreshOrders = useCallback(async () => {
@@ -577,6 +636,9 @@ export function CustomerProvider({
         clearCart,
         clearSessionState,
         cartTotals,
+        appliedCoupon,
+        setAppliedCoupon,
+        couponDiscountAmount,
         orders,
         refreshOrders,
         isOrdersLoading,

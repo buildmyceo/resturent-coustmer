@@ -180,6 +180,7 @@ export interface CartItemAddon {
 export interface CartItem {
   cartItemId: string; // unique string for identical dishes with different variants/notes
   dishId: string;
+  categoryId?: string;
   dishName: string;
   dishImage: string;
   dietaryType: DietaryType;
@@ -270,6 +271,26 @@ export interface RestaurantSettings {
   receiptFooter: string;
   openingHours?: Record<string, { open: string; close: string; closed: boolean }>;
   geofence?: GeofenceSettings;
+  coupons?: Coupon[];
+}
+
+export interface Coupon {
+  id: string;
+  restaurantId?: string;
+  code: string;
+  title: string;
+  description?: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  appliesTo: 'all' | 'category' | 'dishes';
+  targetCategoryId?: string;
+  targetCategoryName?: string;
+  targetDishIds?: string[];
+  minOrderAmount?: number;
+  maxDiscountAmount?: number;
+  isActive: boolean;
+  validUntil?: string;
+  createdAt?: string;
 }
 
 export interface RestaurantProfile {

@@ -22,6 +22,10 @@ import {
   ArrowLeft,
   MapPinOff,
   QrCode,
+  Tag,
+  Check,
+  X,
+  TicketPercent,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -47,11 +51,16 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     refreshOrders,
     isInsideGeofence,
     customerLocation,
+    appliedCoupon,
+    setAppliedCoupon,
+    couponDiscountAmount,
   } = useCustomer();
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCustomerNote, setOrderCustomerNote] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const currency = restaurant?.currency || 'USD';
 
@@ -60,7 +69,59 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   const isGeofenceConfigured = Boolean(geo && (geo.enabled !== false || hasCoordinates));
   const isOrderBlockedByGeofence = isGeofenceConfigured && isInsideGeofence !== true;
 
-  // Handle final order submission
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError(null);
+
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+
+    const availableCoupons = restaurant?.settings?.coupons || [];
+    const found = availableCoupons.find((c) => c.code.toUpperCase() === code && c.isActive);
+
+    if (!found) {
+      setCouponError('Invalid or expired coupon code');
+      showToast('Invalid Coupon', 'Code not found or no longer active', 'error');
+      return;
+    }
+
+    if (found.minOrderAmount && cartTotals.subtotal < found.minOrderAmount) {
+      const err = `Minimum subtotal of ${formatCurrency(found.minOrderAmount, currency)} required`;
+      setCouponError(err);
+      showToast('Minimum Order Required', err, 'error');
+      return;
+    }
+
+    if (found.appliesTo === 'category' && found.targetCategoryId) {
+      const hasCategoryItem = cart.some((item) => item.categoryId === found.targetCategoryId);
+      if (!hasCategoryItem) {
+        const err = `Coupon only applies to items from ${found.targetCategoryName || 'the specified category'}`;
+        setCouponError(err);
+        showToast('Not Applicable', err, 'error');
+        return;
+      }
+    }
+
+    if (found.appliesTo === 'dishes' && Array.isArray(found.targetDishIds) && found.targetDishIds.length > 0) {
+      const hasDishItem = cart.some((item) => found.targetDishIds?.includes(item.dishId));
+      if (!hasDishItem) {
+        const err = 'Coupon only applies to specific eligible dishes in the menu';
+        setCouponError(err);
+        showToast('Not Applicable', err, 'error');
+        return;
+      }
+    }
+
+    setAppliedCoupon(found);
+    setCouponInput('');
+    showToast('Coupon Applied!', `${found.code} applied successfully`, 'success');
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+    showToast('Coupon Removed', undefined, 'info');
+  };
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !restaurant?.id || !table?.id) return;
 
@@ -101,6 +162,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           customerNote: orderCustomerNote.trim() || undefined,
           idempotencyKey,
           customerCoordinates: customerLocation || undefined,
+          couponCode: appliedCoupon?.code,
         }),
       });
 
@@ -287,6 +349,71 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         ))}
       </div>
 
+      {/* Promo Code / Coupon Section */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+            <TicketPercent className="w-4 h-4 text-emerald-600" />
+            <span>Offers &amp; Promo Code</span>
+          </div>
+          {appliedCoupon && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Applied
+            </span>
+          )}
+        </div>
+
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="font-mono font-bold text-xs text-emerald-800">{appliedCoupon.code}</span>
+              </div>
+              <p className="text-[11px] text-emerald-700">
+                {appliedCoupon.title} •{' '}
+                {appliedCoupon.discountType === 'percentage'
+                  ? `${appliedCoupon.discountValue}% OFF`
+                  : `${formatCurrency(appliedCoupon.discountValue, currency)} OFF`}
+              </p>
+            </div>
+            <button
+              onClick={handleRemoveCoupon}
+              className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
+              title="Remove promo code"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleApplyCoupon} className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => {
+                  setCouponInput(e.target.value.toUpperCase());
+                  setCouponError(null);
+                }}
+                placeholder="Enter promo code (e.g. WELCOME20)"
+                className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-200 uppercase font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 placeholder:text-slate-400 placeholder:normal-case placeholder:font-sans"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!couponInput.trim()}
+                className="text-xs bg-slate-900 hover:bg-slate-800 text-white shrink-0 cursor-pointer disabled:opacity-40"
+              >
+                Apply
+              </Button>
+            </div>
+            {couponError && (
+              <p className="text-[11px] text-rose-600 font-medium pl-1">{couponError}</p>
+            )}
+          </form>
+        )}
+      </div>
+
       {/* Table-wide Chef Note */}
       <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-2">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
@@ -309,6 +436,12 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           <span>Items Subtotal</span>
           <span>{formatCurrency(cartTotals.subtotal, currency)}</span>
         </div>
+        {couponDiscountAmount > 0 && (
+          <div className="flex justify-between text-emerald-600 font-semibold">
+            <span>Coupon Discount ({appliedCoupon?.code})</span>
+            <span>-{formatCurrency(couponDiscountAmount, currency)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-slate-600">
           <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
           <span>{formatCurrency(cartTotals.taxAmount, currency)}</span>

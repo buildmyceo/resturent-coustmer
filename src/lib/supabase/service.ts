@@ -301,6 +301,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         radiusMeters: 50,
         address: r.address || 'sagunamore, patna',
       };
+      let coupons: any[] = [];
       if (s?.receipt_footer) {
         const match = s.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
         if (match && match[1]) {
@@ -317,6 +318,16 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
               longitude: parsed.longitude || 85.039305,
               radiusMeters: Math.min(200, Math.max(10, parsed.radiusMeters || 50)),
             };
+          } catch {}
+        }
+
+        const couponMatch = s.receipt_footer.match(/<!--ZOVO_COUPONS_CONFIG:([\s\S]*?)-->/);
+        if (couponMatch && couponMatch[1]) {
+          try {
+            const parsedCoupons = JSON.parse(couponMatch[1]);
+            if (Array.isArray(parsedCoupons)) {
+              coupons = parsedCoupons;
+            }
           } catch {}
         }
       }
@@ -349,6 +360,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
           receiptFooter: s?.receipt_footer || 'Thank you for dining with us!',
           openingHours: s?.opening_hours || undefined,
           geofence,
+          coupons,
         },
       };
     }

@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       customerNote,
       idempotencyKey,
       customerCoordinates,
+      couponCode,
     } = body;
 
     // 1. Check Idempotency Key
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
     // 3. Fetch restaurant settings for taxes & fees
     let taxRate = 8.5;
     let serviceFeeRate = 10.0;
+    let storedCoupons: any[] = [];
     try {
       const { data: settingsData } = await supabase
         .from('restaurant_settings')
@@ -95,6 +97,16 @@ export async function POST(request: Request) {
       if (settingsData) {
         taxRate = settingsData.tax_enabled !== false ? Number(settingsData.tax_percentage ?? 8.5) : 0;
         serviceFeeRate = settingsData.service_charge_enabled !== false ? Number(settingsData.service_charge_percentage ?? 10.0) : 0;
+
+        if (settingsData.receipt_footer) {
+          const couponMatch = settingsData.receipt_footer.match(/<!--ZOVO_COUPONS_CONFIG:([\s\S]*?)-->/);
+          if (couponMatch && couponMatch[1]) {
+            try {
+              const parsedC = JSON.parse(couponMatch[1]);
+              if (Array.isArray(parsedC)) storedCoupons = parsedC;
+            } catch {}
+          }
+        }
 
         // Server-Side Geofence Validation
         if (settingsData.receipt_footer) {
@@ -233,9 +245,82 @@ export async function POST(request: Request) {
       });
     }
 
-    const calculatedTax = Number(((calculatedSubtotal * taxRate) / 100).toFixed(2));
-    const calculatedServiceFee = Number(((calculatedSubtotal * serviceFeeRate) / 100).toFixed(2));
-    const calculatedTotal = Number((calculatedSubtotal + calculatedTax + calculatedServiceFee).toFixed(2));
+    // 5b. Validate & Apply Coupon Discount (if provided)
+    let calculatedDiscount = 0;
+    let validatedCouponCode: string | null = null;
+
+    if (couponCode && typeof couponCode === 'string') {
+      const normalizedCode = couponCode.trim().toUpperCase();
+      const matchedCoupon = storedCoupons.find(
+        (c: any) => c.code?.toUpperCase() === normalizedCode && c.isActive
+      );
+
+      if (matchedCoupon) {
+        // Verify minimum order requirement
+        if (!matchedCoupon.minOrderAmount || calculatedSubtotal >= matchedCoupon.minOrderAmount) {
+          if (matchedCoupon.appliesTo === 'category' && matchedCoupon.targetCategoryId) {
+            // Only discount items belonging to this category
+            let eligibleSubtotal = 0;
+            for (const item of items) {
+              const dbDish = dishMap.get(item.dishId);
+              if (dbDish && dbDish.category_id === matchedCoupon.targetCategoryId) {
+                const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+                const unitPrice = Number(dbDish.price);
+                eligibleSubtotal += unitPrice * quantity;
+              }
+            }
+
+            if (eligibleSubtotal > 0) {
+              if (matchedCoupon.discountType === 'percentage') {
+                calculatedDiscount = (eligibleSubtotal * matchedCoupon.discountValue) / 100;
+              } else {
+                calculatedDiscount = Math.min(matchedCoupon.discountValue, eligibleSubtotal);
+              }
+              validatedCouponCode = matchedCoupon.code;
+            }
+          } else if (matchedCoupon.appliesTo === 'dishes' && Array.isArray(matchedCoupon.targetDishIds) && matchedCoupon.targetDishIds.length > 0) {
+            // Only discount items matching targetDishIds
+            let eligibleSubtotal = 0;
+            for (const item of items) {
+              if (matchedCoupon.targetDishIds.includes(item.dishId)) {
+                const dbDish = dishMap.get(item.dishId);
+                const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+                const unitPrice = dbDish ? Number(dbDish.price) : Number(item.price || 0);
+                eligibleSubtotal += unitPrice * quantity;
+              }
+            }
+
+            if (eligibleSubtotal > 0) {
+              if (matchedCoupon.discountType === 'percentage') {
+                calculatedDiscount = (eligibleSubtotal * matchedCoupon.discountValue) / 100;
+              } else {
+                calculatedDiscount = Math.min(matchedCoupon.discountValue, eligibleSubtotal);
+              }
+              validatedCouponCode = matchedCoupon.code;
+            }
+          } else {
+            // Entire Menu
+            if (matchedCoupon.discountType === 'percentage') {
+              calculatedDiscount = (calculatedSubtotal * matchedCoupon.discountValue) / 100;
+            } else {
+              calculatedDiscount = Math.min(matchedCoupon.discountValue, calculatedSubtotal);
+            }
+            validatedCouponCode = matchedCoupon.code;
+          }
+
+          if (matchedCoupon.maxDiscountAmount && calculatedDiscount > matchedCoupon.maxDiscountAmount) {
+            calculatedDiscount = matchedCoupon.maxDiscountAmount;
+          }
+        }
+      }
+    }
+
+    calculatedDiscount = Number(Math.min(calculatedDiscount, calculatedSubtotal).toFixed(2));
+    const discountedSubtotal = Math.max(0, calculatedSubtotal - calculatedDiscount);
+
+    const calculatedTax = Number(((discountedSubtotal * taxRate) / 100).toFixed(2));
+    const calculatedServiceFee = Number(((discountedSubtotal * serviceFeeRate) / 100).toFixed(2));
+    const calculatedTotal = Number((discountedSubtotal + calculatedTax + calculatedServiceFee).toFixed(2));
 
     const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -301,11 +386,16 @@ export async function POST(request: Request) {
       order_number: orderNumber,
       order_source: 'Customer',
       subtotal: calculatedSubtotal,
+      discount_amount: calculatedDiscount,
       tax_amount: calculatedTax,
       service_fee: calculatedServiceFee,
       total_amount: calculatedTotal,
       status: 'waiting_for_waiter',
-      customer_note: customerNote ? String(customerNote).slice(0, 500) : null,
+      customer_note: validatedCouponCode
+        ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})`
+        : customerNote
+        ? String(customerNote).slice(0, 500)
+        : null,
       payment_status: 'pending',
       assigned_waiter_id: assignedWaiterId,
       assigned_at: assignedWaiterId ? new Date().toISOString() : null,

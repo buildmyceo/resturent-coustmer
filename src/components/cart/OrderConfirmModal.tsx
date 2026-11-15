@@ -14,7 +14,7 @@ interface OrderConfirmModalProps {
 }
 
 export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmitting }: OrderConfirmModalProps) {
-  const { restaurant, table, cart, cartTotals, participant } = useCustomer();
+  const { restaurant, table, cart, cartTotals, participant, appliedCoupon, couponDiscountAmount } = useCustomer();
 
   if (!isOpen) return null;
 
@@ -94,6 +94,12 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
               <span>Subtotal ({cartTotals.itemCount} items)</span>
               <span>{formatCurrency(cartTotals.subtotal, currency)}</span>
             </div>
+            {couponDiscountAmount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-semibold">
+                <span>Coupon ({appliedCoupon?.code})</span>
+                <span>-{formatCurrency(couponDiscountAmount, currency)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-600">
               <span>Estimated Taxes &amp; Fees</span>
               <span>{formatCurrency(cartTotals.taxAmount + cartTotals.serviceFee, currency)}</span>
