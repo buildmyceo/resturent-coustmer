@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { calculateDistanceMeters } from '@/lib/geofence';
+import { checkIsRestaurantOpen } from '@/lib/schedule';
 
 // In-memory idempotency cache for duplicate submission prevention
 const idempotencyStore = new Map<string, { timestamp: number; result: any }>();
@@ -45,7 +46,50 @@ export async function POST(request: Request) {
 
     const supabase = await createServerSupabaseClient();
 
-    // 2. Validate Table Session is active & not expired
+    // 2. Validate Restaurant is active and OPEN according to admin operational schedule
+    try {
+      const { data: restData } = await supabase
+        .from('restaurants')
+        .select('id, name, status, timezone')
+        .eq('id', restaurantId)
+        .maybeSingle();
+
+      if (restData) {
+        if (restData.status === 'inactive' || restData.status === 'suspended') {
+          return NextResponse.json(
+            { success: false, error: 'Restaurant is currently inactive or closed. No orders can be accepted.' },
+            { status: 403 }
+          );
+        }
+
+        const { data: restSettings } = await supabase
+          .from('restaurant_settings')
+          .select('opening_hours, timezone')
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+
+        const openCheck = checkIsRestaurantOpen(
+          restSettings?.opening_hours,
+          restSettings?.timezone || restData.timezone
+        );
+
+        if (!openCheck.isOpen) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                openCheck.reason ||
+                'The restaurant is currently closed. Ordering is paused until the next operating window.',
+            },
+            { status: 403 }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('Error checking restaurant open status:', e);
+    }
+
+    // 3. Validate Table Session is active & not expired
     if (tableSessionId) {
       try {
         const { data: sessionData, error: sessionErr } = await supabase
@@ -83,7 +127,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Fetch restaurant settings for taxes & fees
+    // 4. Fetch restaurant settings for taxes & fees
     let taxRate = 8.5;
     let serviceFeeRate = 10.0;
     let storedCoupons: any[] = [];

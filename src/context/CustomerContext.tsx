@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/client';
 import { customerAudio } from '@/lib/audio';
 import { touchGuestSession, isSessionExpired, getGuestSession, clearGuestSession } from '@/lib/guest-session';
 import { calculateDistanceMeters } from '@/lib/geofence';
+import { checkIsRestaurantOpen, OperatingHoursCheck } from '@/lib/schedule';
 
 export interface ToastMessage {
   id: string;
@@ -82,6 +83,8 @@ interface CustomerContextType {
   distanceToRestaurant: number | null;
   locationStatus: 'checking' | 'inside' | 'outside' | 'denied' | 'unsupported' | 'disabled';
   checkCustomerLocation: () => Promise<void>;
+  operatingHoursStatus: OperatingHoursCheck;
+  isShopOpen: boolean;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
@@ -621,6 +624,21 @@ export function CustomerProvider({
     return !!session && session.status !== 'completed' && session.status !== 'cancelled';
   }, [session]);
 
+  // Operational Hours & Timezone Status
+  const operatingHoursStatus = useMemo(() => {
+    return checkIsRestaurantOpen(
+      restaurant?.settings?.openingHours,
+      restaurant?.timezone || restaurant?.settings?.timezone
+    );
+  }, [restaurant]);
+
+  // Shop is open ONLY if restaurant status is active/open AND within operating hours schedule
+  const isShopOpen = useMemo(() => {
+    if (!restaurant) return true;
+    if (restaurant.status === 'inactive' || restaurant.status === 'suspended') return false;
+    return operatingHoursStatus.isOpen;
+  }, [restaurant, operatingHoursStatus]);
+
   return (
     <CustomerContext.Provider
       value={{
@@ -664,6 +682,8 @@ export function CustomerProvider({
         distanceToRestaurant,
         locationStatus,
         checkCustomerLocation,
+        operatingHoursStatus,
+        isShopOpen,
       }}
     >
       {children}

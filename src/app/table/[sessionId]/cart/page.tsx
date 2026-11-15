@@ -30,6 +30,8 @@ import {
   TicketPercent,
   Sparkles,
   Flame,
+  Clock,
+  Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -60,6 +62,8 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     setAppliedCoupon,
     couponDiscountAmount,
     menuDishes,
+    isShopOpen,
+    operatingHoursStatus,
   } = useCustomer();
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -169,6 +173,15 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   };
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !restaurant?.id || !table?.id) return;
+
+    if (!isShopOpen) {
+      showToast(
+        'Restaurant Closed',
+        operatingHoursStatus.reason || 'The restaurant is currently closed. Ordering is paused.',
+        'error'
+      );
+      return;
+    }
 
     if (isOrderBlockedByGeofence) {
       showToast(
@@ -586,6 +599,29 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         <span>Prices validated against verified restaurant database records</span>
       </div>
 
+      {/* Shop Closed Warning Banner */}
+      {!isShopOpen && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-900 font-bold">
+            <Store className="w-4 h-4 text-amber-600" />
+            <span>Restaurant is Currently Closed</span>
+          </div>
+          <p className="text-amber-950 font-medium">
+            {operatingHoursStatus.reason ||
+              'Online ordering is currently paused according to the restaurant operating hours schedule.'}
+          </p>
+          <div className="flex items-center gap-1.5 text-[11px] text-amber-800 pt-1">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span>
+              Today ({operatingHoursStatus.currentDayName}):{' '}
+              {operatingHoursStatus.todaySchedule?.closed
+                ? 'Closed all day'
+                : `${operatingHoursStatus.todaySchedule?.open} to ${operatingHoursStatus.todaySchedule?.close}`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Geofence Boundary Warning */}
       {isOrderBlockedByGeofence && (
         <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs">
@@ -610,13 +646,17 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         <Button
           onClick={() => setIsConfirmModalOpen(true)}
           size="lg"
-          disabled={isOrderBlockedByGeofence}
+          disabled={isOrderBlockedByGeofence || !isShopOpen}
           className="w-full shadow-lg shadow-blue-500/20 justify-between py-4"
         >
           <div className="flex items-center gap-2">
             <Utensils className="w-5 h-5" />
             <span className="font-extrabold tracking-wide">
-              {isOrderBlockedByGeofence ? 'Outside Ordering Area' : 'Review & Place Order'}
+              {!isShopOpen
+                ? 'Restaurant Closed • Ordering Paused'
+                : isOrderBlockedByGeofence
+                ? 'Outside Ordering Area'
+                : 'Review & Place Order'}
             </span>
           </div>
           <span className="font-extrabold text-base">

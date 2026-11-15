@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Category, Dish, DietaryType } from '@/types';
 import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
-import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle, ArrowRight, Store, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatDistance } from '@/lib/geofence';
@@ -39,6 +39,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     checkCustomerLocation,
     cartTotals,
     updateCartQuantity,
+    isShopOpen,
+    operatingHoursStatus,
   } = useCustomer();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -290,6 +292,29 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           )}
         </div>
       </div>
+
+      {/* Shop Closed Warning Banner */}
+      {!isShopOpen && (
+        <div className="mx-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-2 text-xs shadow-xs">
+          <div className="flex items-center gap-2 text-amber-900 font-bold">
+            <Store className="w-4 h-4 text-amber-600" />
+            <span>Restaurant is Currently Closed</span>
+          </div>
+          <p className="text-amber-950 font-medium leading-relaxed">
+            {operatingHoursStatus.reason ||
+              'Online food ordering is temporarily paused outside of restaurant operating hours.'}
+          </p>
+          <div className="flex items-center gap-1.5 text-[11px] text-amber-800 pt-0.5">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span>
+              Schedule ({operatingHoursStatus.currentDayName}):{' '}
+              {operatingHoursStatus.todaySchedule?.closed
+                ? 'Closed all day'
+                : `${operatingHoursStatus.todaySchedule?.open} to ${operatingHoursStatus.todaySchedule?.close}`}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Location Checking Indicator */}
       {locationStatus === 'checking' && (
