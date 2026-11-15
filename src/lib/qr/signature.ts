@@ -39,6 +39,39 @@ export function verifyTableSignatureSync(
   uniqueCode: string
 ): boolean {
   if (!uniqueCode) return false;
-  const expectedSignature = generateTableSignatureSync(restaurantSlug, tableNumber);
-  return uniqueCode === expectedSignature;
+
+  const s = (restaurantSlug || '').toLowerCase().trim();
+  const rawTbl = (tableNumber || '').toLowerCase().trim();
+  const digitsOnly = rawTbl.replace(/\D/g, '');
+  const alphaNum = rawTbl.replace(/[^a-z0-9]/g, '');
+
+  const slugCandidates = [s];
+  if (s.includes('-')) slugCandidates.push(s.split('-')[0]);
+
+  // If uniqueCode itself embeds the encoded slug
+  if (uniqueCode.startsWith('zv_')) {
+    const parts = uniqueCode.split('_');
+    if (parts.length >= 4 && parts[1]) {
+      slugCandidates.push(parts[1].toLowerCase());
+    }
+  }
+
+  const tblCandidates = [rawTbl, alphaNum];
+  if (digitsOnly) {
+    tblCandidates.push(digitsOnly);
+    tblCandidates.push('t' + digitsOnly);
+    tblCandidates.push('t' + digitsOnly.padStart(2, '0'));
+    tblCandidates.push(digitsOnly.replace(/^0+/, ''));
+  }
+
+  // Check if uniqueCode matches any authentic variation for this table
+  for (const cSlug of slugCandidates) {
+    for (const cTbl of tblCandidates) {
+      if (uniqueCode === generateTableSignatureSync(cSlug, cTbl)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
