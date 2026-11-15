@@ -370,7 +370,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
       description: d.description || '',
       price: Number(d.price || 0),
       categoryId: d.category_id || '',
-      image: d.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+      image: d.image_url || '',
       prepTime: d.preparation_time || 15,
       dietaryType: d.dietary_type || 'vegetarian',
       allergens: Array.isArray(d.allergens) ? d.allergens : [],

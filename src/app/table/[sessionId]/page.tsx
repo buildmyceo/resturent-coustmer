@@ -513,31 +513,63 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             </button>
           </div>
         ) : (
-          groupedDishes.map((group) => (
-            <section key={group.category.id} className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-extrabold text-slate-900 text-lg tracking-tight">
-                  {group.category.name}
-                </h3>
-                <span className="text-xs font-semibold text-slate-400">
-                  {group.dishes.length} {group.dishes.length === 1 ? 'item' : 'items'}
-                </span>
-              </div>
+          groupedDishes.map((group) => {
+            const catImage = (group.category as any)?.image;
+            const hasCatImage = Boolean(catImage && catImage.trim() !== '');
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {group.dishes.map((dish) => (
-                  <DishCard
-                    key={dish.id}
-                    dish={dish}
-                    currency={restaurant?.currency}
-                    cartQuantity={cartQuantityMap.get(dish.id) || 0}
-                    onOpenDetail={(d) => setSelectedDishModal(d)}
-                    onQuickAdd={(d) => addToCart(d)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))
+            return (
+              <section key={group.category.id} className="space-y-3.5 scroll-mt-24">
+                {/* Category Header with Banner Image */}
+                {hasCatImage ? (
+                  <div className="relative h-28 sm:h-36 w-full rounded-2xl overflow-hidden shadow-xs border border-slate-100 group">
+                    <img
+                      src={catImage}
+                      alt={group.category.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between text-white">
+                      <div>
+                        <h3 className="font-black text-xl tracking-tight text-white drop-shadow-sm">
+                          {group.category.name}
+                        </h3>
+                        {(group.category as any)?.description && (
+                          <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
+                            {(group.category as any).description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white shrink-0">
+                        {group.dishes.length} {group.dishes.length === 1 ? 'item' : 'items'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline justify-between border-b border-slate-100 pb-2">
+                    <h3 className="font-extrabold text-slate-900 text-lg tracking-tight">
+                      {group.category.name}
+                    </h3>
+                    <span className="text-xs font-semibold text-slate-400">
+                      {group.dishes.length} {group.dishes.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {group.dishes.map((dish) => (
+                    <DishCard
+                      key={dish.id}
+                      dish={dish}
+                      currency={restaurant?.currency}
+                      cartQuantity={cartQuantityMap.get(dish.id) || 0}
+                      onOpenDetail={(d) => setSelectedDishModal(d)}
+                      onQuickAdd={(d) => addToCart(d)}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })
         )}
       </div>
     </div>

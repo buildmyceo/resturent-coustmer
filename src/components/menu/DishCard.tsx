@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Dish } from '@/types';
 import { DietaryBadge } from './DietaryBadge';
 import { formatCurrency } from '@/lib/format';
-import { Plus, Clock } from 'lucide-react';
+import { Plus, Clock, UtensilsCrossed } from 'lucide-react';
 
 interface DishCardProps {
   dish: Dish;
@@ -27,40 +27,61 @@ export function DishCard({ dish, currency = 'USD', onOpenDetail, onQuickAdd, car
     }
   };
 
+  const hasPhoto = Boolean(dish.image && dish.image.trim() !== '');
+
   return (
     <div
       onClick={() => onOpenDetail(dish)}
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-xs hover:shadow-md hover:border-slate-200 transition-all duration-200 cursor-pointer flex flex-col justify-between"
     >
-      <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
-        <Image
-          src={dish.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80'}
-          alt={dish.name}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+      {hasPhoto ? (
+        <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
+          <Image
+            src={dish.image}
+            alt={dish.name}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
 
-        {/* Dietary Badge Floating Top-Left */}
-        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-xs flex items-center">
-          <DietaryBadge type={dish.dietaryType} />
+          {/* Dietary Badge Floating Top-Left */}
+          <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-xs flex items-center">
+            <DietaryBadge type={dish.dietaryType} />
+          </div>
+
+          {/* Prep Time Floating Top-Right */}
+          {dish.prepTime > 0 && (
+            <div className="absolute top-2.5 right-2.5 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+              <Clock className="w-3 h-3 text-slate-300" />
+              <span>{dish.prepTime}m</span>
+            </div>
+          )}
+
+          {/* Cart Quantity Badge if already in cart */}
+          {cartQuantity > 0 && (
+            <div className="absolute bottom-2.5 left-2.5 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md animate-in zoom-in-75">
+              {cartQuantity} in cart
+            </div>
+          )}
         </div>
-
-        {/* Prep Time Floating Top-Right */}
-        {dish.prepTime > 0 && (
-          <div className="absolute top-2.5 right-2.5 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
-            <Clock className="w-3 h-3 text-slate-300" />
-            <span>{dish.prepTime}m</span>
+      ) : (
+        <div className="relative p-4 pb-0 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <DietaryBadge type={dish.dietaryType} />
+            {dish.prepTime > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                <Clock className="w-3 h-3" />
+                {dish.prepTime}m
+              </span>
+            )}
           </div>
-        )}
-
-        {/* Cart Quantity Badge if already in cart */}
-        {cartQuantity > 0 && (
-          <div className="absolute bottom-2.5 left-2.5 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md animate-in zoom-in-75">
-            {cartQuantity} in cart
-          </div>
-        )}
-      </div>
+          {cartQuantity > 0 && (
+            <span className="bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+              {cartQuantity} in cart
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="p-4 flex-1 flex flex-col justify-between">
         <div>
