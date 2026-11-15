@@ -125,9 +125,9 @@ export function DishCard({
           <span className="text-sm font-black text-slate-900 font-mono tracking-tight">
             {formatCurrency(dish.price, currency)}
           </span>
-          {dish.price > 100 && (
+          {dish.originalPrice && dish.originalPrice > dish.price && (
             <span className="text-[10px] text-slate-400 line-through">
-              {formatCurrency(Math.round(dish.price * 1.15), currency)}
+              {formatCurrency(dish.originalPrice, currency)}
             </span>
           )}
         </div>

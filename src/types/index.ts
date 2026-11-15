@@ -32,6 +32,7 @@ export interface Dish {
   name: string;
   description: string;
   price: number;
+  originalPrice?: number; // Optional strike-through / cut price set by admin
   categoryId: string;
   categoryName?: string;
   image: string;

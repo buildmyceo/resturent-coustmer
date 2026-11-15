@@ -122,8 +122,15 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
           <div>
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-xl font-bold text-slate-900 leading-snug">{dish.name}</h2>
-              <div className="text-lg font-bold text-blue-600 shrink-0">
-                {formatCurrency(dish.price, currency)}
+              <div className="flex items-baseline gap-1.5 shrink-0">
+                <span className="text-lg font-bold text-blue-600">
+                  {formatCurrency(dish.price, currency)}
+                </span>
+                {dish.originalPrice && dish.originalPrice > dish.price && (
+                  <span className="text-xs text-slate-400 line-through">
+                    {formatCurrency(dish.originalPrice, currency)}
+                  </span>
+                )}
               </div>
             </div>
             <p className="text-sm text-slate-600 mt-2 leading-relaxed">{dish.description}</p>
