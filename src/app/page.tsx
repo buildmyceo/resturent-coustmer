@@ -177,14 +177,8 @@ export default function CustomerPortalLandingPage() {
           )}
         </div>
 
-        {/* Right Controls: Geofence Indicator */}
+        {/* Right Controls */}
         <div className="flex items-center gap-2">
-          {isWithinGeofence && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all shadow-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>In Restaurant</span>
-            </div>
-          )}
         </div>
       </header>
 
