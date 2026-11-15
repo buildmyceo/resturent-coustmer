@@ -105,6 +105,38 @@ export async function GET(request: Request) {
     let website = '';
     let helpline = r.phone || '';
 
+    // Landing Page Theme & Customization Configuration
+    let landingPage = {
+      themePreset: 'starbucks',
+      primaryColor: '#006241',
+      secondaryColor: '#1e3932',
+      heroHeadline: '',
+      tagline: '',
+      subheadline: '',
+      heroBadge: 'Open',
+      heroImageUrl: '',
+      showFeaturedCategories: true,
+      featuredCategories: [
+        { id: '1', name: 'Beverages', icon: '☕', active: true },
+        { id: '2', name: 'Food', icon: '🍔', active: true },
+        { id: '3', name: 'Desserts', icon: '🍰', active: true },
+      ],
+      showHelpline: true,
+      helplineNumber: r.phone || '',
+      showEmail: true,
+      contactEmail: r.email || '',
+      showAddress: true,
+      socialLinks: {
+        whatsapp: r.phone ? r.phone.replace(/[^0-9]/g, '') : '',
+        instagram: '',
+        facebook: '',
+        twitter: '',
+        youtube: '',
+      },
+      ctaText: 'Scan Table QR to Order',
+      footerText: 'Powered by Ceova Restaurant OS',
+    };
+
     if (settingsObj?.receipt_footer) {
       const footer = settingsObj.receipt_footer;
       const geoMatch = footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
@@ -115,6 +147,25 @@ export async function GET(request: Request) {
         } catch {
           // Non-blocking
         }
+      }
+
+      const landingMatch = footer.match(/<!--ZOVO_LANDING_CONFIG:([\s\S]*?)-->/);
+      if (landingMatch && landingMatch[1]) {
+        try {
+          const parsedLanding = JSON.parse(landingMatch[1]);
+          landingPage = {
+            ...landingPage,
+            ...parsedLanding,
+            socialLinks: {
+              ...landingPage.socialLinks,
+              ...(parsedLanding.socialLinks || {}),
+            },
+          };
+          if (parsedLanding.socialLinks) {
+            socialLinks = { ...socialLinks, ...parsedLanding.socialLinks };
+          }
+          if (parsedLanding.helplineNumber) helpline = parsedLanding.helplineNumber;
+        } catch {}
       }
 
       const socialMatch = footer.match(/<!--ZOVO_SOCIAL_CONFIG:([\s\S]*?)-->/);
@@ -154,6 +205,7 @@ export async function GET(request: Request) {
       status: r.status,
       socialLinks: cached?.socialLinks || socialLinks,
       geofence: cached?.geofence || geofence,
+      landingPage: cached?.landingPage || landingPage,
     };
 
     return NextResponse.json({

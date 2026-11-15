@@ -233,8 +233,34 @@ export default function CustomerPortalLandingPage() {
           /* STATE B: INSIDE RESTAURANT GEOFENCE -> SHOW RESTAURANT INFO, SOCIAL, CALL */
           /* ========================================================================= */
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Restaurant Profile Card */}
+            {/* Restaurant Profile Card with Dynamic Theme Customization */}
             <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-5 relative overflow-hidden">
+              {/* Dynamic Theme Color Top Glow */}
+              {restaurant.landingPage?.primaryColor && (
+                <div
+                  className="absolute top-0 right-0 w-52 h-52 rounded-full blur-3xl opacity-20 -z-10 pointer-events-none"
+                  style={{ backgroundColor: restaurant.landingPage.primaryColor }}
+                />
+              )}
+
+              {/* Floating Hero Visual Showcase (e.g. coffee cup, samosa platter, taco meal) */}
+              {restaurant.landingPage?.heroImageUrl && (
+                <div className="relative w-full h-44 rounded-2xl overflow-hidden shadow-md -mt-1">
+                  <img
+                    src={restaurant.landingPage.heroImageUrl}
+                    alt={restaurant.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 text-white">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xs">
+                      {restaurant.landingPage.heroBadge || 'Signature Highlights'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Identity Header */}
               <div className="flex items-start gap-3.5">
                 <div className="w-14 h-14 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center shrink-0 font-black text-2xl shadow-md p-1.5 overflow-hidden">
                   {restaurant.logoUrl ? (
@@ -248,14 +274,19 @@ export default function CustomerPortalLandingPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="text-lg font-black text-slate-900 tracking-tight truncate">
-                      {restaurant.name}
+                      {restaurant.landingPage?.heroHeadline || restaurant.name}
                     </h1>
                     <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
-                      Open
+                      {restaurant.landingPage?.heroBadge || 'Open'}
                     </span>
                   </div>
+                  {restaurant.landingPage?.tagline && (
+                    <p className="text-[11px] font-semibold text-slate-700 mt-0.5 truncate">
+                      {restaurant.landingPage.tagline}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
-                    {restaurant.description}
+                    {restaurant.landingPage?.subheadline || restaurant.description}
                   </p>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
                     <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
@@ -264,20 +295,35 @@ export default function CustomerPortalLandingPage() {
                 </div>
               </div>
 
+              {/* Featured Category Badges / Pills */}
+              {restaurant.landingPage?.featuredCategories && restaurant.landingPage.featuredCategories.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
+                  {restaurant.landingPage.featuredCategories.map((c: any) => (
+                    <div
+                      key={c.id}
+                      className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-700 flex items-center gap-1.5 shadow-2xs shrink-0 hover:bg-slate-100 transition-colors"
+                    >
+                      <span>{c.icon || '🍽️'}</span>
+                      <span>{c.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Quick Contact & Helpline Bar */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                {restaurant.helpline && (
+                {(restaurant.landingPage?.helplineNumber || restaurant.helpline) && (
                   <a
-                    href={`tel:${restaurant.helpline}`}
+                    href={`tel:${restaurant.landingPage?.helplineNumber || restaurant.helpline}`}
                     className="flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-emerald-50 text-emerald-700 font-bold text-xs hover:bg-emerald-100/70 transition-colors border border-emerald-100"
                   >
                     <Phone className="w-3.5 h-3.5" />
                     <span>Call Helpline</span>
                   </a>
                 )}
-                {restaurant.email && (
+                {(restaurant.landingPage?.contactEmail || restaurant.email) && (
                   <a
-                    href={`mailto:${restaurant.email}`}
+                    href={`mailto:${restaurant.landingPage?.contactEmail || restaurant.email}`}
                     className="flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100/70 transition-colors border border-blue-100"
                   >
                     <Mail className="w-3.5 h-3.5" />
@@ -308,6 +354,18 @@ export default function CustomerPortalLandingPage() {
                   Connect & Follow
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  {restaurant.socialLinks?.whatsapp && (
+                    <a
+                      href={`https://wa.me/${restaurant.socialLinks.whatsapp.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200 text-emerald-800 text-xs font-semibold transition-colors"
+                    >
+                      <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
+                      <span className="truncate">WhatsApp</span>
+                    </a>
+                  )}
+
                   {restaurant.socialLinks?.instagram && (
                     <a
                       href={restaurant.socialLinks.instagram}
@@ -329,18 +387,6 @@ export default function CustomerPortalLandingPage() {
                     >
                       <FacebookIcon className="w-4 h-4 text-blue-600" />
                       <span className="truncate">Facebook</span>
-                    </a>
-                  )}
-
-                  {restaurant.socialLinks?.whatsapp && (
-                    <a
-                      href={`https://wa.me/${restaurant.socialLinks.whatsapp.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/60 hover:bg-emerald-100/60 border border-emerald-100 text-emerald-700 text-xs font-semibold transition-colors"
-                    >
-                      <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
-                      <span className="truncate">WhatsApp</span>
                     </a>
                   )}
 
@@ -366,10 +412,17 @@ export default function CustomerPortalLandingPage() {
                     setIsScannerOpen(true);
                   }}
                   size="lg"
-                  className="w-full gap-2.5 shadow-lg shadow-blue-500/20 text-sm font-bold"
+                  className="w-full gap-2.5 shadow-lg text-sm font-bold text-white transition-all"
+                  style={{
+                    backgroundColor: restaurant.landingPage?.primaryColor || '#2563eb',
+                    boxShadow: restaurant.landingPage?.primaryColor
+                      ? `0 10px 25px -5px ${restaurant.landingPage.primaryColor}55`
+                      : undefined,
+                  }}
                 >
                   <QrCode className="w-5 h-5" />
-                  <span>Scan Table QR to Order</span>
+                  <span>{restaurant.landingPage?.ctaText || 'Scan Table QR to Order'}</span>
+                  <ArrowRight className="w-4 h-4 ml-auto" />
                 </Button>
                 <p className="text-[11px] text-center text-slate-400 mt-2">
                   Scan the QR code placed on your table to browse the menu.
