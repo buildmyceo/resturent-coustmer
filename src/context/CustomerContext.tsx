@@ -144,6 +144,7 @@ export function CustomerProvider({
       (pos) => {
         const userLat = pos.coords.latitude;
         const userLon = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy || 0;
         setCustomerLocation({ latitude: userLat, longitude: userLon });
 
         const restaurantLat = geo?.latitude || 25.618193;
@@ -156,8 +157,12 @@ export function CustomerProvider({
         );
         setDistanceToRestaurant(dist);
 
-        const allowedRadius = Math.min(200, Math.max(10, geo?.radiusMeters || 50));
-        if (dist <= allowedRadius) {
+        const configuredRadius = geo?.radiusMeters || 200;
+        // Compensate for mobile indoor GPS inaccuracy/cell tower drift (up to pos.coords.accuracy or minimum 60m indoor margin)
+        const accuracyMargin = Math.max(60, Math.min(accuracy, 1000));
+        const effectiveRadius = configuredRadius + accuracyMargin;
+
+        if (dist <= effectiveRadius) {
           setIsInsideGeofence(true);
           setLocationStatus('inside');
         } else {
@@ -170,7 +175,7 @@ export function CustomerProvider({
         setLocationStatus('denied');
         setIsInsideGeofence(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, [restaurant]);
 

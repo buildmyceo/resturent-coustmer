@@ -131,9 +131,9 @@ export async function POST(request: Request) {
                   geofence.longitude
                 );
 
-                // Clamp radius between 10m and 200m (default: 50m) + 30m GPS accuracy/indoor drift buffer
-                const configuredRadius = Math.min(200, Math.max(10, Number(geofence.radiusMeters) || 50));
-                const allowedRadius = configuredRadius + 30;
+                // Allow configured radius with generous buffer for indoor phone GPS accuracy drift (up to 1000m)
+                const configuredRadius = Number(geofence.radiusMeters) || 200;
+                const allowedRadius = configuredRadius + 1000;
                 if (distance > allowedRadius) {
                   return NextResponse.json(
                     {
