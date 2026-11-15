@@ -14,19 +14,33 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
   if (categories.length === 0) return null;
 
   return (
-    <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 py-2.5 px-4">
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+    <div className="bg-white border-b border-slate-100 py-3 px-4">
+      {/* Blinkit Category Icon Tiles Carousel */}
+      <div className="flex items-start gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-1">
+        {/* All Items Tile */}
         <button
           onClick={() => onSelectCategory('all')}
-          className={`shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 select-none ${
-            activeCategoryId === 'all'
-              ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-          }`}
+          className="flex flex-col items-center gap-1.5 shrink-0 select-none group cursor-pointer"
         >
-          All Items
+          <div
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+              activeCategoryId === 'all'
+                ? 'bg-emerald-100 border-2 border-emerald-600 shadow-xs'
+                : 'bg-slate-100/90 border border-slate-200/60 group-hover:bg-slate-200/70'
+            }`}
+          >
+            <span className="text-xl">🍽️</span>
+          </div>
+          <span
+            className={`text-[11px] text-center font-bold tracking-tight max-w-[64px] truncate leading-tight ${
+              activeCategoryId === 'all' ? 'text-emerald-700' : 'text-slate-600'
+            }`}
+          >
+            All Items
+          </span>
         </button>
 
+        {/* Categories Tiles */}
         {categories.map((cat) => {
           const isActive = activeCategoryId === cat.id;
           const hasImage = Boolean(cat.image && cat.image.trim() !== '');
@@ -35,23 +49,34 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
             <button
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}
-              className={`shrink-0 pl-1.5 pr-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 select-none whitespace-nowrap flex items-center gap-2 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200/70 hover:text-slate-900'
-              }`}
+              className="flex flex-col items-center gap-1.5 shrink-0 select-none group cursor-pointer"
             >
-              {hasImage && (
-                <div className="relative w-5 h-5 rounded-full overflow-hidden bg-slate-200 shrink-0">
+              <div
+                className={`relative w-14 h-14 rounded-2xl overflow-hidden transition-all bg-slate-50 flex items-center justify-center ${
+                  isActive
+                    ? 'border-2 border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
+                    : 'border border-slate-200/70 group-hover:border-slate-300'
+                }`}
+              >
+                {hasImage ? (
                   <Image
                     src={cat.image!}
                     alt={cat.name}
                     fill
-                    className="object-cover"
+                    sizes="56px"
+                    className="object-cover group-hover:scale-105 transition-transform"
                   />
-                </div>
-              )}
-              <span>{cat.name}</span>
+                ) : (
+                  <span className="text-xl">☕</span>
+                )}
+              </div>
+              <span
+                className={`text-[11px] text-center font-bold tracking-tight max-w-[64px] line-clamp-2 leading-tight ${
+                  isActive ? 'text-emerald-700 font-extrabold' : 'text-slate-700'
+                }`}
+              >
+                {cat.name}
+              </span>
             </button>
           );
         })}
@@ -59,5 +84,6 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
     </div>
   );
 }
+
 
 

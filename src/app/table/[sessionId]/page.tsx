@@ -9,10 +9,11 @@ import { createClient } from '@/lib/supabase/client';
 import { Category, Dish, DietaryType } from '@/types';
 import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
-import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatDistance } from '@/lib/geofence';
+import { formatCurrency } from '@/lib/format';
 
 interface MenuPageProps {
   params: Promise<{ sessionId: string }>;
@@ -35,6 +36,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     distanceToRestaurant,
     locationStatus,
     checkCustomerLocation,
+    cartTotals,
+    updateCartQuantity,
   } = useCustomer();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -479,7 +482,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
             {popularDishes.map((dish) => (
               <DishCard
                 key={`pop-${dish.id}`}
@@ -488,6 +491,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
                 cartQuantity={cartQuantityMap.get(dish.id) || 0}
                 onOpenDetail={(d) => setSelectedDishModal(d)}
                 onQuickAdd={(d) => addToCart(d)}
+                onDecrement={(d) => {
+                  const existingCartItem = cart.find((item) => item.dishId === d.id);
+                  if (existingCartItem) {
+                    updateCartQuantity(existingCartItem.cartItemId, existingCartItem.quantity - 1);
+                  }
+                }}
               />
             ))}
           </div>
@@ -555,7 +564,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
                   {group.dishes.map((dish) => (
                     <DishCard
                       key={dish.id}
@@ -564,6 +573,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
                       cartQuantity={cartQuantityMap.get(dish.id) || 0}
                       onOpenDetail={(d) => setSelectedDishModal(d)}
                       onQuickAdd={(d) => addToCart(d)}
+                      onDecrement={(d) => {
+                        const existingCartItem = cart.find((item) => item.dishId === d.id);
+                        if (existingCartItem) {
+                          updateCartQuantity(existingCartItem.cartItemId, existingCartItem.quantity - 1);
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -572,6 +587,35 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           })
         )}
       </div>
+
+      {/* Blinkit Style Sticky Bottom Floating View Cart Bar */}
+      {cartTotals.itemCount > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-40 max-w-md mx-auto animate-in slide-in-from-bottom-5 duration-200">
+          <Link
+            href={`/table/${sessionId}/cart`}
+            className="flex items-center justify-between bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-2xl shadow-xl shadow-emerald-950/20 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm">
+                {cartTotals.itemCount}
+              </div>
+              <div>
+                <div className="text-[11px] font-medium text-emerald-100">
+                  {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'} added
+                </div>
+                <div className="text-sm font-black font-mono">
+                  {formatCurrency(cartTotals.subtotal, restaurant?.currency)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 font-extrabold text-sm tracking-wide pr-1">
+              <span>View Cart</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
+            </div>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
