@@ -358,19 +358,6 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
         </div>
       )}
 
-      {/* Verified Location Badge */}
-      {isInsideGeofence === true && restaurant?.settings?.geofence?.enabled && (
-        <div className="mx-4 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs text-emerald-800 shadow-xs">
-          <div className="flex items-center gap-2 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>✓ Verified Inside Restaurant ({distanceToRestaurant !== null ? formatDistance(distanceToRestaurant) : 'On premises'})</span>
-          </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
-            Ordering Active
-          </span>
-        </div>
-      )}
-
       {/* Settled Dining Session Notice */}
       {isSessionSettled && (
         <div className="mx-4 p-4 bg-emerald-50/95 border border-emerald-200/90 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-in fade-in">
