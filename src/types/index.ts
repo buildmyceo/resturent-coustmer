@@ -139,6 +139,8 @@ export interface OrderItem {
   variantName?: string;
   addons?: { name: string; price: number }[];
   status?: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
+  prepTime?: number; // dish preparation time in minutes
+  servedAt?: string;
 }
 
 export interface Order {

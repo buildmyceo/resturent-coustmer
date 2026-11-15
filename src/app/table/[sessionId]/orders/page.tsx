@@ -1,6 +1,6 @@
 'use client';
 
-import React, { use } from 'react';
+import React, { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCustomer } from '@/context/CustomerContext';
 import { formatCurrency, formatTime } from '@/lib/format';
@@ -16,6 +16,8 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
+  Hourglass,
+  Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -29,6 +31,13 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
 
   const { orders, refreshOrders, isOrdersLoading, restaurant, table } = useCustomer();
   const currency = restaurant?.currency || 'USD';
+
+  // Live timer tick every 10 seconds to update countdowns smoothly
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (orders.length === 0 && !isOrdersLoading) {
     return (
@@ -174,34 +183,78 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 assignedWaiterName={order.assignedWaiterName}
               />
 
-              {/* Itemized Dish List */}
-              <div className="pt-2 border-t border-slate-50 space-y-2">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start justify-between text-xs py-1"
-                  >
-                    <div className="flex-1 pr-2">
-                      <span className="font-semibold text-slate-800">
-                        {item.quantity}x {item.dishName}
-                      </span>
-                      {item.variantName && (
-                        <span className="text-slate-500 font-normal"> ({item.variantName})</span>
-                      )}
-                      {item.notes && (
-                        <div className="text-[11px] text-amber-700 italic">
-                          &quot;{item.notes}&quot;
+              {/* Itemized Dish List with Live Dish Preparation Timings */}
+              <div className="pt-2 border-t border-slate-50 space-y-2.5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <span>Ordered Dishes</span>
+                  <span>Estimated Time</span>
+                </div>
+
+                {order.items.map((item) => {
+                  const prepMins = item.prepTime || 15;
+                  const orderPlacedEpoch = new Date(order.orderTime || order.createdAt || Date.now()).getTime();
+                  const targetFinishEpoch = orderPlacedEpoch + prepMins * 60 * 1000;
+                  const remainingMinutes = Math.max(0, Math.ceil((targetFinishEpoch - now) / 60000));
+
+                  const isItemServed = isServed || item.status === 'served';
+                  const isItemReady = isReady || item.status === 'ready';
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900">
+                            {item.quantity}x {item.dishName}
+                          </span>
+                          {item.variantName && (
+                            <span className="text-slate-500 font-normal">({item.variantName})</span>
+                          )}
                         </div>
-                      )}
+                        {item.notes && (
+                          <div className="text-[11px] text-amber-700 italic mt-0.5">
+                            &quot;{item.notes}&quot;
+                          </div>
+                        )}
+                        <div className="font-semibold text-slate-500 text-[11px] mt-0.5">
+                          {formatCurrency(item.unitPrice * item.quantity, currency)}
+                        </div>
+                      </div>
+
+                      {/* Timing status badge */}
+                      <div className="shrink-0 text-right">
+                        {isItemServed ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100/70 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Served
+                          </span>
+                        ) : isItemReady ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 animate-bounce">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                            Ready to Serve
+                          </span>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+                            <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                            <div className="leading-tight text-right">
+                              <span className="text-[11px] font-bold text-slate-800 block">
+                                {remainingMinutes > 0 ? `~${remainingMinutes} mins` : 'Any moment'}
+                              </span>
+                              <span className="text-[9px] text-slate-400">
+                                {prepMins}m kitchen prep
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <span className="font-bold text-slate-700 shrink-0">
-                      {formatCurrency(item.unitPrice * item.quantity, currency)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {order.customerNote && (
-                  <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-2">
+                  <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <strong>Note:</strong> {order.customerNote}
                   </div>
                 )}

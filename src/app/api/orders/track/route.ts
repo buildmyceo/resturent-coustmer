@@ -20,11 +20,18 @@ export async function GET(request: Request) {
       try {
         const { data } = await supabase
           .from('orders')
+          .select('*, order_items(*, dishes(preparation_time, image_url))')
+          .eq('id', orderId)
+          .maybeSingle();
+        if (data) ordersData = [data];
+      } catch {
+        const { data } = await supabase
+          .from('orders')
           .select('*, order_items(*)')
           .eq('id', orderId)
           .maybeSingle();
         if (data) ordersData = [data];
-      } catch {}
+      }
     }
 
     // 2. Query by table_id (most reliable for physical table dining)
@@ -33,13 +40,21 @@ export async function GET(request: Request) {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*)')
+          .select('*, order_items(*, dishes(preparation_time, image_url))')
           .eq('table_id', targetTableId)
           .neq('status', 'cancelled')
           .order('created_at', { ascending: false });
 
         if (!error && data && data.length > 0) {
           ordersData = data;
+        } else {
+          const { data: fallbackData } = await supabase
+            .from('orders')
+            .select('*, order_items(*)')
+            .eq('table_id', targetTableId)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+          if (fallbackData) ordersData = fallbackData;
         }
       } catch {}
     }
@@ -50,7 +65,7 @@ export async function GET(request: Request) {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*)')
+          .select('*, order_items(*, dishes(preparation_time, image_url))')
           .eq('restaurant_id', targetRestId)
           .neq('status', 'cancelled')
           .order('created_at', { ascending: false })
@@ -58,6 +73,15 @@ export async function GET(request: Request) {
 
         if (!error && data && data.length > 0) {
           ordersData = data;
+        } else {
+          const { data: fallbackData } = await supabase
+            .from('orders')
+            .select('*, order_items(*)')
+            .eq('restaurant_id', targetRestId)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false })
+            .limit(10);
+          if (fallbackData) ordersData = fallbackData;
         }
       } catch {}
     }
@@ -92,7 +116,9 @@ export async function GET(request: Request) {
         notes: i.notes,
         variantName: i.variant_name,
         addons: Array.isArray(i.addons) ? i.addons : [],
-        status: o.status,
+        status: i.status || o.status,
+        prepTime: Number(i.dishes?.preparation_time || i.preparation_time || 15),
+        servedAt: i.served_at,
       })),
     }));
 

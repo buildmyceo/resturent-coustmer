@@ -242,6 +242,7 @@ export async function POST(request: Request) {
         notes: item.specialInstructions ? String(item.specialInstructions).slice(0, 500) : null,
         variant_name: variantName,
         addons: validatedAddons,
+        prep_time: dbDish ? Number(dbDish.preparation_time || 15) : 15,
       });
     }
 
