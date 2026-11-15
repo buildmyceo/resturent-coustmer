@@ -227,11 +227,8 @@ export default function CustomerPortalLandingPage() {
           </div>
         )}
 
-        {/* 2. DYNAMIC CONTENT: GEOFENCE SWITCH */}
-        {isWithinGeofence && restaurant ? (
-          /* ========================================================================= */
-          /* STATE B: INSIDE RESTAURANT GEOFENCE -> SHOW RESTAURANT INFO, SOCIAL, CALL */
-          /* ========================================================================= */
+        {/* 2. RESTAURANT LANDING CARD (ALWAYS VISIBLE TO GUESTS) */}
+        {restaurant ? (
           <div className="space-y-5 animate-in fade-in duration-300">
             {/* Restaurant Profile Card with Dynamic Theme Customization */}
             <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-5 relative overflow-hidden">
@@ -288,10 +285,12 @@ export default function CustomerPortalLandingPage() {
                   <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
                     {restaurant.landingPage?.subheadline || restaurant.description}
                   </p>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
-                    <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                    <span className="truncate">{restaurant.address}, {restaurant.city}</span>
-                  </div>
+                  {restaurant.address && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
+                      <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                      <span className="truncate">{restaurant.address}, {restaurant.city}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -431,86 +430,9 @@ export default function CustomerPortalLandingPage() {
             </div>
           </div>
         ) : (
-          /* ========================================================================= */
-          /* STATE A: OUT OF RANGE / DEFAULT COMPANY MESSAGE (CEOVA SIGNATURE)         */
-          /* ========================================================================= */
-          <div className="space-y-6 text-center animate-in fade-in duration-300">
-            {/* Pill Badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-              <span>Contactless Dining Experience</span>
-            </div>
-
-            {/* BIG TYPOGRAPHY HEADLINE */}
-            <div className="space-y-4">
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
-                Thank you for dining in your favourite restaurant{' '}
-                <span className="inline-block text-rose-500 animate-pulse drop-shadow-md">
-                  ❤️
-                </span>
-              </h1>
-
-              {/* Signature Typography */}
-              <div className="pt-1">
-                <p className="text-lg sm:text-xl font-bold bg-gradient-to-r from-rose-600 via-amber-600 to-rose-700 bg-clip-text text-transparent italic tracking-wide">
-                  Taste and Love from Ceova
-                </p>
-                <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mt-2 leading-relaxed">
-                  Every meal is a memory. Ceova powers interactive dining, effortless contactless orders, and real-time kitchen tracking for restaurants worldwide.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature Showcase Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-left">
-              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm mb-2">
-                  <Utensils className="w-4 h-4" />
-                </div>
-                <h3 className="text-xs font-bold text-slate-800">Live Menus</h3>
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  High-res dishes, custom allergens, & live availability.
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm mb-2">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <h3 className="text-xs font-bold text-slate-800">Kitchen Sync</h3>
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  Track food preparation directly from the kitchen display.
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm mb-2">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <h3 className="text-xs font-bold text-slate-800">Zero Wait Bill</h3>
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  Shared table orders, direct UPI payments, & tax receipts.
-                </p>
-              </div>
-            </div>
-
-            {/* Primary Action Button */}
-            <div className="pt-2">
-              <Button
-                onClick={() => {
-                  playTap();
-                  setIsScannerOpen(true);
-                }}
-                size="lg"
-                className="w-full gap-2.5 shadow-xl shadow-rose-500/20 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-sm font-bold"
-              >
-                <QrCode className="w-5 h-5" />
-                <span>Scan Table QR to Order</span>
-              </Button>
-              <p className="text-[11px] text-slate-400 mt-2">
-                Sitting at a table? Scan the QR code to order right away.
-              </p>
-            </div>
+          /* Loading fallback */
+          <div className="py-12 text-center text-slate-400 text-sm">
+            Loading restaurant menu...
           </div>
         )}
       </main>
