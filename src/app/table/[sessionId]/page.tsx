@@ -11,7 +11,6 @@ import { CategoryBar } from '@/components/menu/CategoryBar';
 import { DishCard } from '@/components/menu/DishCard';
 import { Search, Flame, Sparkles, Filter, AlertCircle, Loader2, CheckCircle2, QrCode, MapPinOff, RefreshCw, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import BlinkitLoader from '@/components/ui/BlinkitLoader';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatDistance } from '@/lib/geofence';
 import { formatCurrency } from '@/lib/format';
@@ -248,11 +247,11 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
   if (isLoading) {
     return (
-      <BlinkitLoader
-        fullScreen={false}
-        className="py-16"
-        subtitle="Fetching chef's live menu from kitchen..."
-      />
+      <div className="py-24 text-center space-y-3">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+        <h3 className="text-sm font-bold text-slate-800">Loading Chef&apos;s Menu...</h3>
+        <p className="text-xs text-slate-400">Fetching live dishes from Supabase database</p>
+      </div>
     );
   }
 

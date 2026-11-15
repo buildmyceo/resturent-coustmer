@@ -7,7 +7,6 @@ import { useCustomer } from '@/context/CustomerContext';
 import { saveGuestSession, generateGuestToken } from '@/lib/guest-session';
 import { Utensils, Users, ArrowRight, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import BlinkitLoader from '@/components/ui/BlinkitLoader';
 
 interface PageProps {
   params: Promise<{
@@ -196,11 +195,13 @@ export default function TableLandingPage({ params }: PageProps) {
 
   if (isLoading) {
     return (
-      <BlinkitLoader
-        fullScreen={true}
-        title={`Connecting to Table ${tableNumber}...`}
-        subtitle="Verifying table security credentials & session..."
-      />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+        <h2 className="text-base font-bold text-slate-800">Connecting to Table {tableNumber}...</h2>
+        <p className="text-xs text-slate-500 mt-1">Verifying restaurant security credentials</p>
+      </div>
     );
   }
 
