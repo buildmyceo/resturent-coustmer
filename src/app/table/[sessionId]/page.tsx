@@ -57,6 +57,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
   const [activeCategoryId, setActiveCategoryId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non-veg' | 'vegan'>('all');
+  const [priceSort, setPriceSort] = useState<'default' | 'low-high' | 'high-low'>('default');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   // Load Restaurant & Menu from Supabase
   useEffect(() => {
@@ -157,9 +159,9 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     return map;
   }, [cart]);
 
-  // Filter dishes by Category, Search Query, and Dietary Preference
+  // Filter dishes by Category, Search Query, Dietary Preference, and Price Sort
   const filteredDishes = useMemo(() => {
-    return dishes.filter((dish) => {
+    let result = dishes.filter((dish) => {
       // 1. Availability filter (only available dishes)
       if (!dish.isAvailable || dish.isArchived) return false;
 
@@ -187,7 +189,15 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
       return true;
     });
-  }, [dishes, activeCategoryId, searchQuery, dietaryFilter]);
+
+    if (priceSort === 'low-high') {
+      result = [...result].sort((a, b) => a.price - b.price);
+    } else if (priceSort === 'high-low') {
+      result = [...result].sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [dishes, activeCategoryId, searchQuery, dietaryFilter, priceSort]);
 
   // Popular / Chef's Recommendation dishes (top 4 based on ordersCount)
   const popularDishes = useMemo(() => {
@@ -383,71 +393,83 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
         </div>
       )}
 
-      {/* 2. Search & Dietary Filter Bar */}
-      <div className="px-4 space-y-3">
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search dishes, pastas, cocktails, burrata..."
-            className="w-full text-xs pl-10 pr-4 py-3 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-xs placeholder:text-slate-400 transition-all text-slate-900"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full w-5 h-5 flex items-center justify-center"
-            >
-              ×
-            </button>
-          )}
+      {/* 2. Search & Filter Bar */}
+      <div className="px-4">
+        <div className="flex items-center gap-2">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search dishes, drinks, desserts..."
+              className="w-full text-xs pl-10 pr-8 py-3 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-xs placeholder:text-slate-400 transition-all text-slate-900"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full w-5 h-5 flex items-center justify-center"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Filter Trigger Button */}
+          <button
+            onClick={() => setIsFilterModalOpen(true)}
+            className={`p-3 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 ${
+              dietaryFilter !== 'all' || priceSort !== 'default'
+                ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-500/20'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title="Open Filters"
+          >
+            <Filter className="w-4 h-4" />
+            <span>Filter</span>
+            {(dietaryFilter !== 'all' || priceSort !== 'default') && (
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            )}
+          </button>
         </div>
 
-        {/* Dietary Quick Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setDietaryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold select-none transition-colors shrink-0 ${
-              dietaryFilter === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            All Diets
-          </button>
-          <button
-            onClick={() => setDietaryFilter('veg')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold select-none transition-colors shrink-0 ${
-              dietaryFilter === 'veg'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            🌱 Vegetarian Only
-          </button>
-          <button
-            onClick={() => setDietaryFilter('non-veg')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold select-none transition-colors shrink-0 ${
-              dietaryFilter === 'non-veg'
-                ? 'bg-rose-600 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            🍗 Non-Vegetarian
-          </button>
-          <button
-            onClick={() => setDietaryFilter('vegan')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold select-none transition-colors shrink-0 ${
-              dietaryFilter === 'vegan'
-                ? 'bg-emerald-700 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            🌿 100% Vegan
-          </button>
-        </div>
+        {/* Active Filter Badges (if any applied) */}
+        {(dietaryFilter !== 'all' || priceSort !== 'default') && (
+          <div className="flex items-center gap-2 mt-2 pt-1 flex-wrap">
+            {dietaryFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                {dietaryFilter === 'veg' ? 'Veg Only' : dietaryFilter === 'non-veg' ? 'Non-Veg Only' : 'Vegan Only'}
+                <button
+                  onClick={() => setDietaryFilter('all')}
+                  className="hover:text-emerald-950 font-black ml-0.5"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {priceSort !== 'default' && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                {priceSort === 'low-high' ? 'Price: Low to High' : 'Price: High to Low'}
+                <button
+                  onClick={() => setPriceSort('default')}
+                  className="hover:text-slate-950 font-black ml-0.5"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setDietaryFilter('all');
+                setPriceSort('default');
+              }}
+              className="text-[11px] text-slate-400 hover:text-slate-600 font-semibold underline"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 3. Horizontal Sticky Category Bar */}
@@ -601,6 +623,156 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
               <ArrowRight className="w-4 h-4 stroke-[3]" />
             </div>
           </Link>
+        </div>
+      )}
+
+      {/* Filter Modal (Price & Veg/Non-Veg options) */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 p-0 sm:p-4">
+          <div
+            className="fixed inset-0"
+            onClick={() => setIsFilterModalOpen(false)}
+          />
+
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-5 z-10 animate-in slide-in-from-bottom duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-black text-base text-slate-900">Filter Menu</h3>
+              </div>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Section 1: Food Preference (Veg / Non-Veg) */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                Food Preference
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDietaryFilter('all')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    dietaryFilter === 'all'
+                      ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>All Dishes</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDietaryFilter('veg')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    dietaryFilter === 'veg'
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50/50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/60'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span>Veg Only</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDietaryFilter('non-veg')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    dietaryFilter === 'non-veg'
+                      ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50/50 border-rose-200 text-rose-800 hover:bg-rose-100/60'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <span>Non-Veg Only</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDietaryFilter('vegan')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    dietaryFilter === 'vegan'
+                      ? 'bg-teal-700 border-teal-700 text-white shadow-xs'
+                      : 'bg-teal-50/50 border-teal-200 text-teal-800 hover:bg-teal-100/60'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-teal-500" />
+                  <span>Vegan Only</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Section 2: Price Sorting */}
+            <div className="space-y-2.5 pt-2 border-t border-slate-100">
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                Sort by Price
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPriceSort('default')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                    priceSort === 'default'
+                      ? 'bg-slate-900 border-slate-900 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  Featured
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPriceSort('low-high')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                    priceSort === 'low-high'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  ₹ Low to High
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPriceSort('high-low')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                    priceSort === 'high-low'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  ₹ High to Low
+                </button>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setDietaryFilter('all');
+                  setPriceSort('default');
+                }}
+                className="flex-1 py-3 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Reset All
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFilterModalOpen(false)}
+                className="flex-1 py-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
