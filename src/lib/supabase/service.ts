@@ -293,6 +293,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
     const s = settingsRes.data;
 
     let restaurant: RestaurantProfile | null = null;
+    let dishMetaMap: Record<string, any> = {};
     if (r) {
       let geofence = {
         enabled: true,
@@ -327,6 +328,16 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             const parsedCoupons = JSON.parse(couponMatch[1]);
             if (Array.isArray(parsedCoupons)) {
               coupons = parsedCoupons;
+            }
+          } catch {}
+        }
+
+        const extrasMatch = s.receipt_footer.match(/<!--ZOVO_DISH_EXTRAS_CONFIG:([\s\S]*?)-->/);
+        if (extrasMatch && extrasMatch[1]) {
+          try {
+            const parsedExtras = JSON.parse(extrasMatch[1]);
+            if (parsedExtras && typeof parsedExtras === 'object') {
+              dishMetaMap = parsedExtras;
             }
           } catch {}
         }
@@ -375,40 +386,47 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
       isActive: c.is_active,
     }));
 
-    const dishes: Dish[] = (dishesRes.data || []).map((d: any) => ({
-      id: d.id,
-      restaurantId: d.restaurant_id,
-      name: d.name,
-      description: d.description || '',
-      price: Number(d.price || 0),
-      categoryId: d.category_id || '',
-      image: d.image_url || '',
-      prepTime: d.preparation_time || 15,
-      dietaryType: d.dietary_type || 'vegetarian',
-      allergens: Array.isArray(d.allergens) ? d.allergens : [],
-      isAvailable: d.is_available,
-      isArchived: d.is_archived,
-      variants: (d.dish_variants || [])
-        .filter((v: any) => v.is_active)
-        .map((v: any) => ({
-          id: v.id,
-          dishId: v.dish_id,
-          name: v.name,
-          price: Number(v.price),
-          isActive: v.is_active,
-        })),
-      addons: (d.dish_addons || [])
-        .filter((a: any) => a.is_active)
-        .map((a: any) => ({
-          id: a.id,
-          dishId: a.dish_id,
-          name: a.name,
-          additionalPrice: Number(a.additional_price),
-          isActive: a.is_active,
-        })),
-      ordersCount: d.orders_count || 0,
-      createdAt: d.created_at,
-    }));
+    const dishes: Dish[] = (dishesRes.data || []).map((d: any) => {
+      const meta = dishMetaMap[d.id] || {};
+      return {
+        id: d.id,
+        restaurantId: d.restaurant_id,
+        name: d.name,
+        description: d.description || '',
+        price: Number(d.price || 0),
+        originalPrice: meta.originalPrice !== undefined ? Number(meta.originalPrice) : undefined,
+        categoryId: d.category_id || '',
+        image: d.image_url || '',
+        prepTime: d.preparation_time || 15,
+        dietaryType: d.dietary_type || 'vegetarian',
+        allergens: Array.isArray(d.allergens) ? d.allergens : [],
+        isAvailable: d.is_available,
+        isArchived: d.is_archived,
+        spiceLevel: meta.spiceLevel || undefined,
+        sweetnessLevel: meta.sweetnessLevel || undefined,
+        temperature: meta.temperature || undefined,
+        variants: (d.dish_variants || [])
+          .filter((v: any) => v.is_active)
+          .map((v: any) => ({
+            id: v.id,
+            dishId: v.dish_id,
+            name: v.name,
+            price: Number(v.price),
+            isActive: v.is_active,
+          })),
+        addons: (d.dish_addons || [])
+          .filter((a: any) => a.is_active)
+          .map((a: any) => ({
+            id: a.id,
+            dishId: a.dish_id,
+            name: a.name,
+            additionalPrice: Number(a.additional_price),
+            isActive: a.is_active,
+          })),
+        ordersCount: d.orders_count || 0,
+        createdAt: d.created_at,
+      };
+    });
 
     return { restaurant, categories, dishes };
   } catch (err) {

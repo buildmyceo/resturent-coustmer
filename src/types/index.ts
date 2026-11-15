@@ -43,6 +43,10 @@ export interface Dish {
   isArchived: boolean;
   variants?: DishVariant[];
   addons?: DishAddon[];
+  // Optional Taste & Preparation Preferences
+  spiceLevel?: 'none' | 'mild' | 'medium' | 'hot' | 'extra_hot';
+  sweetnessLevel?: 'none' | 'low' | 'regular' | 'extra';
+  temperature?: 'normal' | 'hot' | 'warm' | 'iced' | 'extra_cold';
   ordersCount?: number;
   createdAt?: string;
 }

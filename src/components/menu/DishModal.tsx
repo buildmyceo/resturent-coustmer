@@ -39,6 +39,11 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
   // Special instructions
   const [specialInstructions, setSpecialInstructions] = useState('');
 
+  // Taste & Temperature customization
+  const [selectedSpice, setSelectedSpice] = useState<string>(dish?.spiceLevel || '');
+  const [selectedTemp, setSelectedTemp] = useState<string>(dish?.temperature || '');
+  const [selectedSweet, setSelectedSweet] = useState<string>(dish?.sweetnessLevel || '');
+
   // Calculate live total price
   const totalPrice = useMemo(() => {
     if (!dish) return 0;
@@ -62,13 +67,52 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
       .filter((a) => selectedAddonIds.includes(a.id))
       .map((a) => ({ id: a.id, name: a.name, additionalPrice: Number(a.additionalPrice) }));
 
+    const tastePreferences: string[] = [];
+    if (selectedSpice) {
+      const spiceLabels: Record<string, string> = {
+        none: 'No Spice',
+        mild: 'Mild 🌶️',
+        medium: 'Medium 🌶️🌶️',
+        hot: 'Hot 🌶️🌶️🌶️',
+        extra_hot: 'Extra Hot 🔥',
+      };
+      tastePreferences.push(spiceLabels[selectedSpice] || selectedSpice);
+    }
+    if (selectedTemp) {
+      const tempLabels: Record<string, string> = {
+        normal: 'Normal Temp',
+        iced: 'Iced / Cold 🧊',
+        extra_cold: 'Extra Cold ❄️',
+        warm: 'Warm ☕',
+        hot: 'Hot ♨️',
+      };
+      tastePreferences.push(tempLabels[selectedTemp] || selectedTemp);
+    }
+    if (selectedSweet) {
+      const sweetLabels: Record<string, string> = {
+        none: 'Sugar Free 🚫',
+        low: 'Low Sweet 🍯',
+        regular: 'Regular Sweet 🍬',
+        extra: 'Extra Sweet 🧁',
+      };
+      tastePreferences.push(sweetLabels[selectedSweet] || selectedSweet);
+    }
+
+    const combinedNotesParts = [];
+    if (tastePreferences.length > 0) {
+      combinedNotesParts.push(`[${tastePreferences.join(' • ')}]`);
+    }
+    if (specialInstructions.trim()) {
+      combinedNotesParts.push(specialInstructions.trim());
+    }
+
     onAddToCart(dish, {
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
       variantPrice: selectedVariant ? Number(selectedVariant.price) : undefined,
       selectedAddons: selectedAddonsObjects,
       quantity,
-      specialInstructions: specialInstructions.trim() || undefined,
+      specialInstructions: combinedNotesParts.join(' ') || undefined,
     });
 
     onClose();
@@ -229,6 +273,92 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
               </div>
             </div>
           )}
+
+          {/* Optional Taste & Temperature Preferences */}
+          <div className="space-y-3.5 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Custom Preferences</h3>
+              <span className="text-[11px] text-slate-400 font-medium">Optional</span>
+            </div>
+
+            {/* Spice Level Selection */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-slate-700 block">Spice Level</span>
+              <div className="grid grid-cols-4 gap-1.5 text-xs">
+                {[
+                  { value: 'mild', label: 'Mild 🌶️' },
+                  { value: 'medium', label: 'Medium 🌶️🌶️' },
+                  { value: 'hot', label: 'Hot 🌶️🌶️🌶️' },
+                  { value: 'extra_hot', label: 'Extra 🔥' },
+                ].map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setSelectedSpice(selectedSpice === s.value ? '' : s.value)}
+                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                      selectedSpice === s.value
+                        ? 'border-amber-500 bg-amber-50 text-amber-900 font-bold shadow-2xs'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Temperature / Cold Level */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-slate-700 block">Temperature / Cold</span>
+              <div className="grid grid-cols-4 gap-1.5 text-xs">
+                {[
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'iced', label: 'Iced 🧊' },
+                  { value: 'extra_cold', label: 'Extra ❄️' },
+                  { value: 'hot', label: 'Hot ♨️' },
+                ].map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setSelectedTemp(selectedTemp === t.value ? '' : t.value)}
+                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                      selectedTemp === t.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-900 font-bold shadow-2xs'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sweetness Level */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-slate-700 block">Sweetness Level</span>
+              <div className="grid grid-cols-4 gap-1.5 text-xs">
+                {[
+                  { value: 'none', label: 'No Sugar 🚫' },
+                  { value: 'low', label: 'Low 🍯' },
+                  { value: 'regular', label: 'Regular 🍬' },
+                  { value: 'extra', label: 'Extra 🧁' },
+                ].map((sw) => (
+                  <button
+                    key={sw.value}
+                    type="button"
+                    onClick={() => setSelectedSweet(selectedSweet === sw.value ? '' : sw.value)}
+                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                      selectedSweet === sw.value
+                        ? 'border-pink-500 bg-pink-50 text-pink-900 font-bold shadow-2xs'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    {sw.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           {/* 3. Special Instructions */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
