@@ -184,8 +184,8 @@ export default function QRScanResolverPage({ params }: PageProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-4">
+          <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
         </div>
         <h2 className="text-base font-bold text-slate-800">Connecting to Dining Table...</h2>
         <p className="text-xs text-slate-500 mt-1">Verifying restaurant security credentials</p>
@@ -225,9 +225,8 @@ export default function QRScanResolverPage({ params }: PageProps) {
       <div className="max-w-md w-full mx-auto my-auto pt-6 pb-8 space-y-6">
         {/* Welcome Card */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
-          <div className="w-16 h-16 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto shadow-md font-black text-2xl overflow-hidden p-1.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ceova-logo.png" alt="Ceova" className="w-full h-full object-contain" />
+          <div className="relative w-16 h-16 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto shadow-md font-black text-2xl overflow-hidden p-1.5">
+            <Image src="/ceova-logo.png" alt="Ceova Restaurant" fill className="object-contain p-1.5" />
           </div>
 
           <div>
@@ -298,7 +297,7 @@ export default function QRScanResolverPage({ params }: PageProps) {
                 onChange={(e) => setGuestName(e.target.value)}
                 placeholder="e.g. Alex, Maya (or leave blank as Guest)"
                 maxLength={30}
-                className="w-full text-sm p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400 bg-white"
+                className="w-full text-sm p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 bg-white"
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 Helps your friends at the table and the waiter identify who ordered each dish.
@@ -309,7 +308,7 @@ export default function QRScanResolverPage({ params }: PageProps) {
               type="submit"
               size="lg"
               isLoading={isJoining}
-              className="w-full shadow-lg shadow-blue-500/20 gap-2"
+              className="w-full shadow-lg shadow-slate-900/20 gap-2"
             >
               <span>{isExistingSession ? 'Join Table & View Menu' : 'Start Table Session'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -318,8 +317,8 @@ export default function QRScanResolverPage({ params }: PageProps) {
         </div>
 
         <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-slate-500" />
-          <span>Powered by Ceova Restaurant Platform</span>
+          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+          <span>Powered by Ceova Restaurant Experience</span>
         </div>
       </div>
     </div>
