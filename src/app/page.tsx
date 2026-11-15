@@ -26,7 +26,6 @@ import { Button } from '@/components/ui/Button';
 import { getGuestSession, clearGuestSession, GuestSessionState } from '@/lib/guest-session';
 import { calculateDistanceMeters, formatDistance } from '@/lib/geofence';
 import { QRScannerModal } from '@/components/scanner/QRScannerModal';
-import { BottomCornerScanButton } from '@/components/layout/BottomCornerScanButton';
 import { playTap } from '@/lib/audio';
 
 export default function CustomerPortalLandingPage() {
@@ -439,12 +438,6 @@ export default function CustomerPortalLandingPage() {
           </p>
         </footer>
       )}
-
-      {/* FLOATING SCAN BUTTON IN BOTTOM CORNER */}
-      <BottomCornerScanButton
-        onClick={() => setIsScannerOpen(true)}
-        label="Scan Table QR"
-      />
 
       {/* QR CAMERA & CODE SCANNER MODAL */}
       <QRScannerModal
