@@ -42,6 +42,7 @@ export async function GET(request: Request) {
       let customerPhone = '';
       let paymentRef = `pay_ref_${Date.now()}`;
       let restName = 'bikaner';
+      let restLogoUrl: string | null = null;
       let restAddr = 'sagunamore, patna, bihar, 801503';
       let restPhone = '+91 9229950815';
       let restEmail = 'harshit10205@gmail.com';
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
           const firstOrd = dbOrders[0];
           if (firstOrd.restaurants) {
             restName = firstOrd.restaurants.name || restName;
+            restLogoUrl = firstOrd.restaurants.logo_url || null;
             restAddr = firstOrd.restaurants.address || restAddr;
             restPhone = firstOrd.restaurants.phone || restPhone;
             restEmail = firstOrd.restaurants.email || restEmail;
@@ -118,6 +120,7 @@ export async function GET(request: Request) {
           id: invoiceId || sessionId,
           invoiceNumber,
           restaurantName: restName,
+          restaurantLogoUrl: restLogoUrl,
           restaurantAddress: restAddr,
           restaurantPhone: restPhone,
           restaurantEmail: restEmail,
@@ -146,6 +149,7 @@ export async function GET(request: Request) {
         id: invoice.id,
         invoiceNumber: invoice.invoice_number,
         restaurantName: invoice.restaurants?.name || 'Ceova Restaurant',
+        restaurantLogoUrl: invoice.restaurants?.logo_url || null,
         restaurantAddress: invoice.restaurants?.address || 'Dining Room',
         restaurantPhone: invoice.restaurants?.phone,
         restaurantEmail: invoice.restaurants?.email,

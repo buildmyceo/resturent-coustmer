@@ -45,6 +45,14 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; message: string } | null>(null);
 
+  // Helper to clean raw config HTML comments from receipt footer
+  const cleanReceiptFooter = (rawFooter?: string) => {
+    if (!rawFooter) return 'Thank you for dining with us!';
+    // Strip <!--ZOVO_...--> configuration tags that are stored inside receipt_footer
+    const stripped = rawFooter.replace(/<!--[\s\S]*?-->/g, '').trim();
+    return stripped || 'Thank you for dining with us!';
+  };
+
   useEffect(() => {
     async function loadReceipt() {
       setIsLoading(true);
@@ -182,9 +190,13 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xl space-y-6 print:border-0 print:shadow-none print:p-0">
         {/* Receipt Header */}
         <div className="text-center space-y-1.5 pb-5 border-b border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto mb-2 p-1 overflow-hidden">
+          <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200/80 text-white flex items-center justify-center mx-auto mb-2 p-1 overflow-hidden shadow-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ceova-logo.png" alt="Ceova" className="w-full h-full object-contain" />
+            <img
+              src={receipt.restaurantLogoUrl || restaurant?.logoUrl || '/ceova-logo.png'}
+              alt={receipt.restaurantName || 'Restaurant Logo'}
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
             {receipt.restaurantName}
@@ -303,7 +315,7 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
 
         {/* Receipt Footer Message */}
         <div className="text-center pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
-          <p>{restaurant?.settings?.receiptFooter || 'Thank you for dining with us!'}</p>
+          <p>{cleanReceiptFooter(restaurant?.settings?.receiptFooter)}</p>
           <p className="text-[10px]">Ceova Restaurant SaaS Platform</p>
         </div>
       </div>
