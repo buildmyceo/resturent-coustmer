@@ -92,42 +92,50 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Send real-time broadcast alert to all connected portals (Staff, Admin)
+    // 3. Fetch table number/name for immediate rich waiter notification
+    let tableNumber = '';
+    try {
+      const { data: tbl } = await supabase
+        .from('restaurant_tables')
+        .select('table_number, table_name')
+        .eq('id', tableId)
+        .maybeSingle();
+      if (tbl) {
+        tableNumber = tbl.table_number || tbl.table_name || '';
+      }
+    } catch {}
+
+    // 4. Send real-time broadcast alert to all connected portals (Staff, Admin)
     try {
       const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
       });
       await rtChannel.subscribe();
+      const eventPayload = {
+        id: requestId,
+        restaurant_id: restaurantId,
+        table_id: tableId,
+        table_number: tableNumber,
+        request_type: requestType,
+        notes: notes ? String(notes).slice(0, 500) : 'Customer called for waiter',
+        requested_by_name: requestedByName || 'Guest',
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
       await rtChannel.send({
         type: 'broadcast',
         event: 'SERVICE_REQUEST',
-        payload: {
-          id: requestId,
-          restaurant_id: restaurantId,
-          table_id: tableId,
-          request_type: requestType,
-          notes: notes ? String(notes).slice(0, 500) : 'Customer called for waiter',
-          requested_by_name: requestedByName || 'Guest',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        },
+        payload: eventPayload,
       });
-      // Also send call_waiter event for backward compatibility
       await rtChannel.send({
         type: 'broadcast',
         event: 'call_waiter',
-        payload: {
-          id: requestId,
-          restaurant_id: restaurantId,
-          table_id: tableId,
-          request_type: requestType,
-          notes: notes ? String(notes).slice(0, 500) : 'Customer called for waiter',
-          requested_by_name: requestedByName || 'Guest',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        },
+        payload: eventPayload,
       });
-      supabase.removeChannel(rtChannel);
+      // Allow brief moment for broadcast delivery before closing
+      setTimeout(() => {
+        try { supabase.removeChannel(rtChannel); } catch {}
+      }, 500);
     } catch (broadcastErr) {
       // Non-blocking broadcast
     }
