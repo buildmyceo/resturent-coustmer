@@ -103,12 +103,13 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
     // Prioritize admin-picked dishes
     const adminPicked = eligible.filter((d) => Boolean(d.featuredInCart));
-    // Popular / highest ordered
+    // Popular / highest ordered (only dishes with actual order count)
     const popular = eligible
-      .filter((d) => !d.featuredInCart)
+      .filter((d) => !d.featuredInCart && (d.ordersCount || 0) > 0)
       .sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0));
 
-    return [...adminPicked, ...popular].slice(0, 6);
+    // Limit top recommendations to 4 to 5 items maximum
+    return [...adminPicked, ...popular].slice(0, 5);
   }, [allAvailableDishes, cart]);
 
   const currency = restaurant?.currency || 'USD';

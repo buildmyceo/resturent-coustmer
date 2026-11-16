@@ -203,9 +203,17 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     return result;
   }, [dishes, activeCategoryId, searchQuery, dietaryFilter, priceSort]);
 
-  // Chef's Signature Highlights: Only render dishes explicitly marked as signature by admin
+  // Chef's Signature Highlights / Top Selling: Render explicitly marked signature dishes or top sellers (capped to 4-5 items)
   const popularDishes = useMemo(() => {
-    return dishes.filter((d) => d.isAvailable && !d.isArchived && d.isSignature === true);
+    const signatureDishes = dishes.filter((d) => d.isAvailable && !d.isArchived && d.isSignature === true);
+    if (signatureDishes.length > 0) {
+      return signatureDishes.slice(0, 5);
+    }
+    // If no signature dishes marked, show top selling dishes (with orders > 0) up to 5
+    const topSellers = dishes
+      .filter((d) => d.isAvailable && !d.isArchived && (d.ordersCount || 0) > 0)
+      .sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0));
+    return topSellers.slice(0, 5);
   }, [dishes]);
 
   // Group filtered dishes by Category
