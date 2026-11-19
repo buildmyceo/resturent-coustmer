@@ -559,7 +559,25 @@ export function CustomerProvider({
         const orderData = payload?.payload;
         if (orderData) {
           const newStatus = orderData.status;
-          if (newStatus === 'accepted') {
+
+          // Instant optimistic local state update so customer sees progress with 0ms delay
+          setOrders((prev) =>
+            prev.map((o) => {
+              if (o.id === orderData.id || o.orderNumber === orderData.order_number) {
+                return {
+                  ...o,
+                  status: newStatus,
+                  items: o.items.map((it) => ({
+                    ...it,
+                    status: newStatus === 'ready' ? 'ready' : newStatus === 'served' ? 'served' : it.status,
+                  })),
+                };
+              }
+              return o;
+            })
+          );
+
+          if (newStatus === 'accepted' || newStatus === 'sent_to_kitchen') {
             customerAudio.playTap();
             showToast(
               'Order Accepted! 👨‍🍳',
@@ -640,7 +658,7 @@ export function CustomerProvider({
     };
   }, [restaurant?.id, table?.id, supabase, refreshOrders, showToast]);
 
-  // Adaptive background heartbeat (30s when tab is active; paused completely when screen/tab is hidden)
+  // Adaptive background heartbeat (every 5s while order is being prepared/tracked; 20s otherwise)
   useEffect(() => {
     const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;
     const activeTableId = table?.id || getGuestSession()?.tableId;
@@ -650,11 +668,15 @@ export function CustomerProvider({
 
     const startTimer = () => {
       if (timer) clearInterval(timer);
+      const hasActiveOrders = orders.some((o) =>
+        ['pending', 'waiting_for_waiter', 'accepted', 'sent_to_kitchen', 'preparing', 'ready'].includes(o.status)
+      );
+      const intervalMs = hasActiveOrders ? 4000 : 20000;
       timer = setInterval(() => {
         if (document.visibilityState === 'visible') {
           refreshOrders();
         }
-      }, 30000);
+      }, intervalMs);
     };
 
     const handleVisibility = () => {
@@ -680,7 +702,7 @@ export function CustomerProvider({
       if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [restaurant?.id, table?.id, refreshOrders]);
+  }, [restaurant?.id, table?.id, orders, refreshOrders]);
 
   const isSessionActive = useMemo(() => {
     return !!session && session.status !== 'completed' && session.status !== 'cancelled';
