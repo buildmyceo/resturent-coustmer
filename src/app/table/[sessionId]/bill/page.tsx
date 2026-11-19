@@ -207,14 +207,18 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
           <span>Items Subtotal</span>
           <span>{formatCurrency(bill.subtotal, currency)}</span>
         </div>
-        <div className="flex justify-between text-slate-600">
-          <span>Sales Tax (8.5%)</span>
-          <span>{formatCurrency(bill.taxAmount, currency)}</span>
-        </div>
-        <div className="flex justify-between text-slate-600">
-          <span>Service Charge (10%)</span>
-          <span>{formatCurrency(bill.serviceFee, currency)}</span>
-        </div>
+        {bill.taxAmount > 0 && (
+          <div className="flex justify-between text-slate-600">
+            <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
+            <span>{formatCurrency(bill.taxAmount, currency)}</span>
+          </div>
+        )}
+        {bill.serviceFee > 0 && (
+          <div className="flex justify-between text-slate-600">
+            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 10}%)</span>
+            <span>{formatCurrency(bill.serviceFee, currency)}</span>
+          </div>
+        )}
         {bill.discountAmount > 0 && (
           <div className="flex justify-between text-emerald-600 font-medium">
             <span>Discounts</span>

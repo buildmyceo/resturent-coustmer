@@ -134,10 +134,43 @@ export async function GET(request: Request) {
       }
     }
 
-    // Tax & Service rates (settings or defaults)
+    // Tax & Service rates from restaurant settings
+    let defaultTaxRate = 0.05;
+    let defaultServiceFeeRate = 0;
+    try {
+      const { data: settingsData } = await supabase
+        .from('restaurant_settings')
+        .select('tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer')
+        .eq('restaurant_id', resolvedRestId)
+        .maybeSingle();
+
+      if (settingsData) {
+        let taxEnabled = settingsData.tax_enabled !== false;
+        let taxPercent = Number(settingsData.tax_percentage ?? 5.0);
+        let serviceFeeEnabled = settingsData.service_charge_enabled === true;
+        let serviceFeePercent = Number(settingsData.service_charge_percentage ?? 0);
+
+        if (settingsData.receipt_footer) {
+          const paymentMatch = settingsData.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
+          if (paymentMatch && paymentMatch[1]) {
+            try {
+              const pConfig = JSON.parse(paymentMatch[1]);
+              if (pConfig.taxRate !== undefined) taxPercent = Number(pConfig.taxRate);
+              if (pConfig.taxIncluded) taxEnabled = false;
+              if (pConfig.serviceChargeRate !== undefined) serviceFeePercent = Number(pConfig.serviceChargeRate);
+              if (pConfig.serviceChargeEnabled !== undefined) serviceFeeEnabled = Boolean(pConfig.serviceChargeEnabled);
+            } catch {}
+          }
+        }
+
+        defaultTaxRate = taxEnabled ? taxPercent / 100 : 0;
+        defaultServiceFeeRate = serviceFeeEnabled ? serviceFeePercent / 100 : 0;
+      }
+    } catch {}
+
     const effectiveSubtotal = ordersSubtotal > 0 ? ordersSubtotal : itemsSubtotal;
-    const effectiveTax = ordersTax > 0 ? ordersTax : Number((effectiveSubtotal * 0.085).toFixed(2));
-    const effectiveServiceFee = ordersServiceFee > 0 ? ordersServiceFee : Number((effectiveSubtotal * 0.10).toFixed(2));
+    const effectiveTax = ordersTax > 0 ? ordersTax : Number((effectiveSubtotal * defaultTaxRate).toFixed(2));
+    const effectiveServiceFee = ordersServiceFee > 0 ? ordersServiceFee : Number((effectiveSubtotal * defaultServiceFeeRate).toFixed(2));
     const effectiveTotal = ordersTotal > 0 ? ordersTotal : Number((effectiveSubtotal + effectiveTax + effectiveServiceFee).toFixed(2));
 
     const outstandingBalance = Math.max(0, Number((effectiveTotal - totalPaid).toFixed(2)));

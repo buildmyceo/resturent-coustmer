@@ -142,6 +142,27 @@ export async function POST(request: Request) {
         taxRate = settingsData.tax_enabled !== false ? Number(settingsData.tax_percentage ?? 8.5) : 0;
         serviceFeeRate = settingsData.service_charge_enabled !== false ? Number(settingsData.service_charge_percentage ?? 10.0) : 0;
 
+        // Apply payment config overrides if present in receipt_footer
+        if (settingsData.receipt_footer) {
+          const paymentConfigMatch = settingsData.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
+          if (paymentConfigMatch && paymentConfigMatch[1]) {
+            try {
+              const paymentConfig = JSON.parse(paymentConfigMatch[1]);
+              if (paymentConfig.taxRate !== undefined) {
+                taxRate = Number(paymentConfig.taxRate);
+              }
+              if (paymentConfig.serviceChargeRate !== undefined) {
+                serviceFeeRate = Number(paymentConfig.serviceChargeRate);
+              }
+              if (paymentConfig.serviceChargeEnabled !== undefined) {
+                if (paymentConfig.serviceChargeEnabled === false) {
+                  serviceFeeRate = 0;
+                }
+              }
+            } catch {}
+          }
+        }
+
         if (settingsData.receipt_footer) {
           const couponMatch = settingsData.receipt_footer.match(/<!--ZOVO_COUPONS_CONFIG:([\s\S]*?)-->/);
           if (couponMatch && couponMatch[1]) {

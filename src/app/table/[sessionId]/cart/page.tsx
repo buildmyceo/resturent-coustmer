@@ -580,14 +580,18 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             <span>-{formatCurrency(couponDiscountAmount, currency)}</span>
           </div>
         )}
-        <div className="flex justify-between text-slate-600">
-          <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
-          <span>{formatCurrency(cartTotals.taxAmount, currency)}</span>
-        </div>
-        <div className="flex justify-between text-slate-600">
-          <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 10}%)</span>
-          <span>{formatCurrency(cartTotals.serviceFee, currency)}</span>
-        </div>
+        {restaurant?.settings?.taxEnabled !== false && cartTotals.taxAmount > 0 && (
+          <div className="flex justify-between text-slate-600">
+            <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
+            <span>{formatCurrency(cartTotals.taxAmount, currency)}</span>
+          </div>
+        )}
+        {restaurant?.settings?.serviceChargeEnabled && cartTotals.serviceFee > 0 && (
+          <div className="flex justify-between text-slate-600">
+            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 10}%)</span>
+            <span>{formatCurrency(cartTotals.serviceFee, currency)}</span>
+          </div>
+        )}
         <div className="pt-2 border-t border-slate-100 flex justify-between font-bold text-sm text-slate-900">
           <span>Estimated Total</span>
           <span className="text-blue-600 text-base">{formatCurrency(cartTotals.totalAmount, currency)}</span>

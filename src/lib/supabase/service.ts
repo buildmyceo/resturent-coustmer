@@ -343,6 +343,29 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         }
       }
 
+      let taxPercentage = Number(s?.tax_percentage ?? 8.5);
+      let serviceChargeEnabled = s?.service_charge_enabled ?? true;
+      let serviceChargePercentage = Number(s?.service_charge_percentage ?? 10.0);
+
+      // Re-apply payment config overrides if present in receipt_footer
+      if (s?.receipt_footer) {
+        const paymentConfigMatch = s.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
+        if (paymentConfigMatch && paymentConfigMatch[1]) {
+          try {
+            const paymentConfig = JSON.parse(paymentConfigMatch[1]);
+            if (paymentConfig.taxRate !== undefined) {
+              taxPercentage = Number(paymentConfig.taxRate);
+            }
+            if (paymentConfig.serviceChargeRate !== undefined) {
+              serviceChargePercentage = Number(paymentConfig.serviceChargeRate);
+            }
+            if (paymentConfig.serviceChargeEnabled !== undefined) {
+              serviceChargeEnabled = Boolean(paymentConfig.serviceChargeEnabled);
+            }
+          } catch { }
+        }
+      }
+
       restaurant = {
         id: r.id,
         name: r.name,
@@ -363,9 +386,9 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         status: r.status,
         settings: {
           taxEnabled: s?.tax_enabled ?? true,
-          taxPercentage: Number(s?.tax_percentage ?? 8.5),
-          serviceChargeEnabled: s?.service_charge_enabled ?? true,
-          serviceChargePercentage: Number(s?.service_charge_percentage ?? 10.0),
+          taxPercentage,
+          serviceChargeEnabled,
+          serviceChargePercentage,
           currency: s?.currency || r.currency || 'USD',
           timezone: s?.timezone || r.timezone || 'America/Los_Angeles',
           receiptFooter: s?.receipt_footer || 'Thank you for dining with us!',
