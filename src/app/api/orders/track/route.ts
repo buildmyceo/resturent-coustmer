@@ -88,7 +88,6 @@ export async function GET(request: Request) {
 
     // Filter out internal service request / call marker rows
     // Only return actual food orders
-    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
     const foodOrders = (ordersData || []).filter((o: any) => {
       const orderNum = o.order_number || '';
       const note = o.customer_note || '';
@@ -106,10 +105,10 @@ export async function GET(request: Request) {
         return false;
       }
 
-      // Filter out past completed orders older than 2 hours so new guests don't see past table orders
-      if (o.status === 'completed' || o.status === 'served') {
-        const orderTime = new Date(o.created_at).getTime();
-        if (orderTime < twoHoursAgo) {
+      // If an order is completed OR marked paid, do NOT show it to new table visitors
+      // unless specifically requested by exact orderId
+      if (!orderId) {
+        if (o.status === 'completed' || o.payment_status === 'paid') {
           return false;
         }
       }

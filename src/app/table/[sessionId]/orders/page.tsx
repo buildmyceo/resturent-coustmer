@@ -111,12 +111,14 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
               {formatCurrency(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0), currency)} Total
             </h3>
             <p className="text-xs text-blue-100 mt-0.5">
-              Food is being prepared & served! You can review items and settle your bill anytime.
+              {orders.every(o => o.paymentStatus === 'paid')
+                ? 'All orders have been paid & settled! Enjoy your meal.'
+                : 'Food is being prepared & served! You can review items and settle your bill anytime.'}
             </p>
           </div>
           <Link href={`/table/${sessionId}/bill`} className="shrink-0">
             <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md gap-2 w-full sm:w-auto">
-              <span>View & Pay Bill</span>
+              <span>{orders.every(o => o.paymentStatus === 'paid') ? 'View Settled Receipt' : 'View & Pay Bill'}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>

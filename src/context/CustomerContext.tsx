@@ -559,7 +559,17 @@ export function CustomerProvider({
       (payload: any) => {
         const currentTableId = table?.id || getGuestSession()?.tableId;
         if (!payload?.payload?.table_id || payload.payload.table_id === currentTableId) {
+          clearGuestSession();
+          clearCart();
+          setOrders([]);
+          showToast('Bill Settled & Table Closed', 'Thank you for dining with us! The table has been refreshed.', 'info');
           debouncedRefresh();
+          // Optionally refresh table page if on orders or bill
+          if (typeof window !== 'undefined' && (window.location.pathname.includes('/orders') || window.location.pathname.includes('/bill'))) {
+            setTimeout(() => {
+              window.location.reload();
+            }, 800);
+          }
         }
       }
     );
