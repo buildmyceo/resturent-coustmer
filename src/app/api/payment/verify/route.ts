@@ -18,8 +18,8 @@ export async function POST(request: Request) {
     const supabase = await createServerSupabaseClient();
 
     // 1. Resolve table & restaurant
-    const resolvedTableId = tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
-    const resolvedRestId = restaurantId || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const resolvedTableId = tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
+    const resolvedRestId = restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6';
 
     // 2. Fetch pending orders for this table to calculate paid amount
     let paidAmount = 0;

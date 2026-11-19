@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       if (defaultRests && defaultRests.length > 0) realRest = defaultRests[0];
     }
 
-    const resolvedRestId = realRest?.id || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const resolvedRestId = realRest?.id || 'a9feec11-8dee-4202-be6e-a097e45266e6';
     const resolvedRestName = realRest?.name || 'bikaner';
     const resolvedCurrency = realRest?.currency || 'INR';
 
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       if (tList && tList.length > 0) realTable = tList[0];
     }
 
-    const resolvedTableId = realTable?.id || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+    const resolvedTableId = realTable?.id || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
     const resolvedTableNumber = realTable?.table_number || 'T-01';
     const resolvedTableName = realTable?.table_name || 'Table 1';
 

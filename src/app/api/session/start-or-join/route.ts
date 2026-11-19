@@ -124,10 +124,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const tableId = table?.id || bodyTableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+    const tableId = table?.id || bodyTableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
     const tableNum = table?.table_number || tableNumber || 'T-01';
     const tableName = table?.table_name || `Table ${tableNum}`;
-    const restaurantId = restaurant?.id || bodyRestId || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+    const restaurantId = restaurant?.id || bodyRestId || 'a9feec11-8dee-4202-be6e-a097e45266e6';
     const restaurantName = restaurant?.name || (restaurantSlug ? restaurantSlug.charAt(0).toUpperCase() + restaurantSlug.slice(1) : 'bikaner');
     const restSlug = restaurant?.slug || restaurantSlug || 'bikaner-w7bt';
 

@@ -52,10 +52,10 @@ export async function POST(request: Request) {
         if (tList && tList.length > 0) realTable = tList[0];
       }
 
-      const restId = realRest?.id || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+      const restId = realRest?.id || 'a9feec11-8dee-4202-be6e-a097e45266e6';
       const restName = realRest?.name || 'bikaner';
       const restSlug = realRest?.slug || 'bikaner-w7bt';
-      const tableId = realTable?.id || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+      const tableId = realTable?.id || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
       const tableNumber = realTable?.table_number || 'T-01';
       const tableName = realTable?.table_name || 'Table 1';
 

@@ -424,72 +424,65 @@ export async function POST(request: Request) {
       console.warn('Waiter assignment error:', assignErr);
     }
 
-    // 7. Insert Order into Supabase with status = 'waiting_for_waiter'
-    const orderPayload: any = {
+    // 7. Insert Order into Supabase
+    // We only use standard verified database columns:
+    // id, restaurant_id, table_id, order_number, order_source, subtotal, tax_amount, service_fee, total_amount, status, customer_note, payment_status
+    const noteWithCoupon = validatedCouponCode
+      ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})`
+      : customerNote
+      ? String(customerNote).slice(0, 500)
+      : null;
+
+    const baseOrderPayload = {
       restaurant_id: restaurantId,
       table_id: tableId,
       order_number: orderNumber,
       order_source: 'Customer',
       subtotal: calculatedSubtotal,
-      discount_amount: calculatedDiscount,
       tax_amount: calculatedTax,
       service_fee: calculatedServiceFee,
       total_amount: calculatedTotal,
-      status: 'waiting_for_waiter',
-      customer_note: validatedCouponCode
-        ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})`
-        : customerNote
-        ? String(customerNote).slice(0, 500)
-        : null,
+      status: 'pending',
+      customer_note: noteWithCoupon,
       payment_status: 'pending',
+    };
+
+    let createdOrder: any = null;
+
+    // Try insert with optional fields first (in case migration added assigned_waiter_id)
+    const extendedPayload = {
+      ...baseOrderPayload,
+      status: 'waiting_for_waiter',
       assigned_waiter_id: assignedWaiterId,
       assigned_at: assignedWaiterId ? new Date().toISOString() : null,
       assignment_method: 'equal_distribution',
       assignment_status: assignmentStatus,
+      ...(tableSessionId ? { table_session_id: tableSessionId } : {}),
+      ...(participantId ? { participant_id: participantId } : {}),
+      ...(participantName ? { participant_name: participantName } : {}),
     };
-
-    if (tableSessionId) {
-      orderPayload.table_session_id = tableSessionId;
-    }
-    if (participantId) {
-      orderPayload.participant_id = participantId;
-    }
-    if (participantName) {
-      orderPayload.participant_name = participantName;
-    }
-
-    let createdOrder: any = null;
 
     const { data: insertedOrder, error: orderErr } = await supabase
       .from('orders')
-      .insert(orderPayload)
+      .insert(extendedPayload)
       .select('id, order_number, status, total_amount, created_at, assigned_waiter_id')
       .maybeSingle();
 
     if (orderErr) {
-      // Clean fallback if assignment columns are missing from earlier migration
-      delete orderPayload.assigned_waiter_id;
-      delete orderPayload.assigned_at;
-      delete orderPayload.assignment_method;
-      delete orderPayload.assignment_status;
-      delete orderPayload.table_session_id;
-      delete orderPayload.participant_id;
-      delete orderPayload.participant_name;
-      orderPayload.status = 'pending';
-
-      const { data: retryOrder } = await supabase
+      console.warn('Extended order insert failed, falling back to canonical orders schema:', orderErr.message);
+      // Clean fallback using strictly verified columns only
+      const { data: retryOrder, error: retryErr } = await supabase
         .from('orders')
-        .insert(orderPayload)
+        .insert(baseOrderPayload)
         .select('id, order_number, status, total_amount, created_at')
         .maybeSingle();
 
-      createdOrder = retryOrder || {
-        id: `ord_${Date.now()}`,
-        order_number: orderNumber,
-        status: 'waiting_for_waiter',
-        total_amount: calculatedTotal,
-        created_at: new Date().toISOString(),
-      };
+      if (retryErr) {
+        console.error('Fatal order insert error:', retryErr);
+        throw new Error(retryErr.message || 'Failed to insert order into database');
+      }
+
+      createdOrder = retryOrder;
     } else {
       createdOrder = insertedOrder;
     }

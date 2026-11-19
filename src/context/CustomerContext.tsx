@@ -200,8 +200,8 @@ export function CustomerProvider({
     if (stored) {
       if (stored.tableNumber && !table) {
         setTable({
-          id: stored.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
-          restaurantId: stored.restaurantId || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+          id: stored.tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6',
+          restaurantId: stored.restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6',
           number: stored.tableNumber,
           name: stored.tableName || `Table ${stored.tableNumber}`,
           capacity: 4,

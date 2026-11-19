@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     // 2. Query by table_id (most reliable for physical table dining)
     if (ordersData.length === 0) {
-      const targetTableId = tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a';
+      const targetTableId = tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
       try {
         const { data, error } = await supabase
           .from('orders')
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
     // 3. Fallback: Query by restaurant_id
     if (ordersData.length === 0) {
-      const targetRestId = restaurantId || '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+      const targetRestId = restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6';
       try {
         const { data, error } = await supabase
           .from('orders')
@@ -86,7 +86,38 @@ export async function GET(request: Request) {
       } catch {}
     }
 
-    const formattedOrders = (ordersData || []).map((o: any) => ({
+    // Filter out internal service request / call marker rows
+    // Only return actual food orders
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    const foodOrders = (ordersData || []).filter((o: any) => {
+      const orderNum = o.order_number || '';
+      const note = o.customer_note || '';
+
+      // Exclude service requests & status markers
+      if (
+        orderNum.startsWith('CALL-') ||
+        orderNum.startsWith('SR_STATE-') ||
+        orderNum.startsWith('ACK-') ||
+        orderNum.startsWith('TEST-') ||
+        note.startsWith('SR_STATUS:') ||
+        note.startsWith('CALL_WAITER:') ||
+        note.startsWith('ACK:')
+      ) {
+        return false;
+      }
+
+      // Filter out past completed orders older than 2 hours so new guests don't see past table orders
+      if (o.status === 'completed' || o.status === 'served') {
+        const orderTime = new Date(o.created_at).getTime();
+        if (orderTime < twoHoursAgo) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const formattedOrders = foodOrders.map((o: any) => ({
       id: o.id,
       restaurantId: o.restaurant_id,
       tableId: o.table_id,

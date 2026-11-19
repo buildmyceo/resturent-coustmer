@@ -94,8 +94,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             }
             if (data.session.tableNumber) {
               setTable({
-                id: data.session.tableId || 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
-                restaurantId: targetRestId || '07e9a4c7-edae-4bf0-8786-fc220c152d43',
+                id: data.session.tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6',
+                restaurantId: targetRestId || 'a9feec11-8dee-4202-be6e-a097e45266e6',
                 number: data.session.tableNumber,
                 name: data.session.tableName || `Table ${data.session.tableNumber}`,
                 capacity: 4,
@@ -120,7 +120,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
         // Default to known active restaurant ID if all else fails
         if (!targetRestId || targetRestId.startsWith('11111111')) {
-          targetRestId = '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+          targetRestId = 'a9feec11-8dee-4202-be6e-a097e45266e6';
         }
 
         if (targetRestId) {
@@ -135,7 +135,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           // If table is still not set in context, set it from stored or default table
           if (stored?.tableNumber && stored.tableNumber !== 'Table 05' && (!table || table.number !== stored.tableNumber)) {
             setTable({
-              id: stored.tableId && !stored.tableId.startsWith('44444444') ? stored.tableId : 'ebfc2c24-6cf7-4adf-aef9-c0238b5eaa6a',
+              id: stored.tableId && !stored.tableId.startsWith('44444444') ? stored.tableId : '24f7b562-0d70-4f5e-bde4-9bd01639dbb6',
               restaurantId: targetRestId,
               number: stored.tableNumber,
               name: stored.tableName || `Table ${stored.tableNumber}`,

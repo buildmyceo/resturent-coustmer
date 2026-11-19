@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     const r = restaurants && restaurants.length > 0 ? restaurants[0] : null;
 
     if (rErr || !r) {
-      const fallbackId = '07e9a4c7-edae-4bf0-8786-fc220c152d43';
+      const fallbackId = 'a9feec11-8dee-4202-be6e-a097e45266e6';
       const cached = restaurantOverrides.get(fallbackId);
       return NextResponse.json({
         success: true,
