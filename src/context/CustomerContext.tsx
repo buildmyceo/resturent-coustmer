@@ -121,6 +121,19 @@ export function CustomerProvider({
   const [selectedDishModal, setSelectedDishModal] = useState<Dish | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Toast Notification Manager
+  const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setToasts((prev) => [...prev, { id, title, description, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   // Geofence & Location Enforcement State
   const [customerLocation, setCustomerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [distanceToRestaurant, setDistanceToRestaurant] = useState<number | null>(null);
@@ -146,93 +159,75 @@ export function CustomerProvider({
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setLocationStatus('unsupported');
       setIsInsideGeofence(false);
+      showToast('Location Unsupported', 'Your browser does not support geolocation.', 'error');
       return;
     }
 
     setLocationStatus('checking');
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const userLat = pos.coords.latitude;
-        const userLon = pos.coords.longitude;
-        const accuracy = pos.coords.accuracy || 0;
-        setCustomerLocation({ latitude: userLat, longitude: userLon });
+    // Helper to evaluate coordinates against restaurant location
+    const handlePosition = (pos: GeolocationPosition) => {
+      const userLat = pos.coords.latitude;
+      const userLon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy || 0;
+      setCustomerLocation({ latitude: userLat, longitude: userLon });
 
-        const restaurantLat = geo?.latitude || 25.618193;
-        const restaurantLon = geo?.longitude || 85.039305;
-        const dist = calculateDistanceMeters(
-          userLat,
-          userLon,
-          restaurantLat,
-          restaurantLon
-        );
-        setDistanceToRestaurant(dist);
+      const restaurantLat = geo?.latitude || 25.618193;
+      const restaurantLon = geo?.longitude || 85.039305;
+      const dist = calculateDistanceMeters(
+        userLat,
+        userLon,
+        restaurantLat,
+        restaurantLon
+      );
+      setDistanceToRestaurant(dist);
 
-        const configuredRadius = geo?.radiusMeters || 200;
-        // Compensate for mobile indoor GPS inaccuracy/cell tower drift (up to pos.coords.accuracy or minimum 60m indoor margin)
-        const accuracyMargin = Math.max(60, Math.min(accuracy, 1000));
-        const effectiveRadius = configuredRadius + accuracyMargin;
+      const configuredRadius = geo?.radiusMeters || 200;
+      // Compensate for mobile indoor GPS inaccuracy/cell tower drift (up to pos.coords.accuracy or minimum 60m indoor margin)
+      const accuracyMargin = Math.max(60, Math.min(accuracy, 1000));
+      const effectiveRadius = configuredRadius + accuracyMargin;
 
-        if (dist <= effectiveRadius) {
-          setIsInsideGeofence(true);
-          setLocationStatus('inside');
-        } else {
-          setIsInsideGeofence(false);
-          setLocationStatus('outside');
-        }
-      },
-      (err) => {
-        console.warn('Geolocation error:', err.message);
-        setLocationStatus('denied');
+      if (dist <= effectiveRadius) {
+        setIsInsideGeofence(true);
+        setLocationStatus('inside');
+        showToast('Location Verified', 'Welcome! You are within the restaurant dining area.', 'success');
+      } else {
         setIsInsideGeofence(false);
+        setLocationStatus('outside');
+        showToast('Outside Restaurant Area', `You are approx ${dist}m away (allowed: ${configuredRadius}m).`, 'error');
+      }
+    };
+
+    // Primary attempt: high accuracy with fallback to low accuracy / IP-network geolocation
+    navigator.geolocation.getCurrentPosition(
+      (pos) => handlePosition(pos),
+      (err) => {
+        console.warn('Geolocation highAccuracy error, trying standard accuracy fallback:', err.message);
+        // Fallback: standard/network geolocation without maximumAge restriction
+        navigator.geolocation.getCurrentPosition(
+          (fallbackPos) => handlePosition(fallbackPos),
+          (fallbackErr) => {
+            console.warn('Geolocation fallback error:', fallbackErr.message);
+            setLocationStatus('denied');
+            setIsInsideGeofence(false);
+            if (fallbackErr.code === 1) { // PERMISSION_DENIED
+              showToast('Location Denied', 'Please allow location permission in your browser settings and try again.', 'error');
+            } else if (fallbackErr.code === 2) { // POSITION_UNAVAILABLE
+              showToast('Location Unavailable', 'GPS signal unavailable. Please ensure location/GPS is toggled ON on your device.', 'error');
+            } else {
+              showToast('Location Timeout', 'Location request timed out. Please tap Re-check Location again.', 'error');
+            }
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
+        );
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
-  }, [restaurant]);
+  }, [restaurant, showToast]);
 
   useEffect(() => {
     checkCustomerLocation();
   }, [checkCustomerLocation]);
-
-  // Restore stored session on mount
-  useEffect(() => {
-    const stored = getGuestSession();
-    if (stored) {
-      if (stored.tableNumber && !table) {
-        setTable({
-          id: stored.tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6',
-          restaurantId: stored.restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6',
-          number: stored.tableNumber,
-          name: stored.tableName || `Table ${stored.tableNumber}`,
-          capacity: 4,
-          isActive: true,
-        });
-      }
-      if (stored.participantId && !participant) {
-        setParticipant({
-          id: stored.participantId,
-          sessionId: stored.sessionId,
-          name: stored.guestName || 'Guest',
-          guestToken: stored.guestToken || '',
-          isHost: stored.isHost || false,
-          joinedAt: new Date().toISOString(),
-        });
-      }
-    }
-  }, []);
-
-  // Toast Notification Manager
-  const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    setToasts((prev) => [...prev, { id, title, description, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
-  }, []);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
 
   // Cart Management
   const addToCart = useCallback(

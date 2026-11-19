@@ -358,25 +358,34 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           </div>
 
           {locationStatus === 'denied' && (
-            <div className="bg-white/90 p-3 rounded-2xl border border-rose-200 text-xs text-rose-800">
-              <span className="font-bold">Location Permission Required:</span> Please enable location/GPS in your browser settings so we can verify you are at the restaurant dining area.
+            <div className="bg-white/95 p-3.5 rounded-2xl border border-rose-300 text-xs text-rose-900 space-y-1 shadow-xs">
+              <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Location Permission Required</span>
+              </div>
+              <p className="text-[11px] text-slate-700 leading-relaxed">
+                Your browser or device has blocked location access. Please tap the lock/tune icon in the browser address bar to <strong>Allow Location</strong>, then click <strong>Re-check Location</strong> below.
+              </p>
             </div>
           )}
 
-          {distanceToRestaurant !== null && (
-            <div className="bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-rose-200/80 text-xs text-slate-600 space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Your current distance:</span>
+          {locationStatus === 'outside' && distanceToRestaurant !== null && (
+            <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-amber-200 text-xs text-slate-700 space-y-1.5 shadow-xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Your current distance:</span>
                 <span className="font-bold text-rose-700 font-mono">
                   {formatDistance(distanceToRestaurant)} away
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Permitted dining circle:</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Permitted dining circle:</span>
                 <span className="font-bold text-slate-800 font-mono">
                   within {restaurant?.settings?.geofence?.radiusMeters || 200}m
                 </span>
               </div>
+              <p className="text-[10px] text-slate-500 pt-0.5">
+                Indoor GPS or Wi-Fi can sometimes take a moment to calibrate. If you are already at the table, tap <strong>Re-check Location</strong>.
+              </p>
             </div>
           )}
 
