@@ -272,6 +272,7 @@ export interface GeofenceSettings {
 export interface RestaurantSettings {
   taxEnabled: boolean;
   taxPercentage: number;
+  taxName?: string;
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
   currency: string;

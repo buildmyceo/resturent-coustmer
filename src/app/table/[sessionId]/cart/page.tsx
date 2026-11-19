@@ -582,13 +582,13 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         )}
         {restaurant?.settings?.taxEnabled !== false && cartTotals.taxAmount > 0 && (
           <div className="flex justify-between text-slate-600">
-            <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
+            <span>{restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)</span>
             <span>{formatCurrency(cartTotals.taxAmount, currency)}</span>
           </div>
         )}
-        {restaurant?.settings?.serviceChargeEnabled && cartTotals.serviceFee > 0 && (
+        {restaurant?.settings?.serviceChargeEnabled === true && cartTotals.serviceFee > 0 && (
           <div className="flex justify-between text-slate-600">
-            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 10}%)</span>
+            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)</span>
             <span>{formatCurrency(cartTotals.serviceFee, currency)}</span>
           </div>
         )}

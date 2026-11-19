@@ -131,6 +131,19 @@ export async function GET(request: Request) {
     });
 
     // Check status markers (ORD_STATE-*) to overlay live order progress
+    const statusRank: Record<string, number> = {
+      pending: 0,
+      waiting_for_waiter: 1,
+      confirmed: 2,
+      accepted: 3,
+      sent_to_kitchen: 3,
+      accepted_by_kitchen: 3,
+      preparing: 4,
+      ready: 5,
+      served: 6,
+      completed: 6,
+    };
+
     const stateMap = new Map<string, string>();
     (ordersData || []).forEach((row: any) => {
       const note = row.customer_note || '';
@@ -139,7 +152,10 @@ export async function GET(request: Request) {
         if (parts.length >= 3) {
           const ordId = parts[1];
           const st = parts[2];
-          if (!stateMap.has(ordId)) {
+          const currentBest = stateMap.get(ordId);
+          const currentRank = currentBest ? (statusRank[currentBest] ?? 0) : -1;
+          const newRank = statusRank[st] ?? 0;
+          if (newRank >= currentRank) {
             stateMap.set(ordId, st);
           }
         }

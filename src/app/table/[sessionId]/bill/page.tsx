@@ -209,13 +209,13 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
         </div>
         {bill.taxAmount > 0 && (
           <div className="flex justify-between text-slate-600">
-            <span>Sales Tax ({restaurant?.settings?.taxPercentage ?? 8.5}%)</span>
+            <span>{restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)</span>
             <span>{formatCurrency(bill.taxAmount, currency)}</span>
           </div>
         )}
-        {bill.serviceFee > 0 && (
+        {restaurant?.settings?.serviceChargeEnabled === true && bill.serviceFee > 0 && (
           <div className="flex justify-between text-slate-600">
-            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 10}%)</span>
+            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)</span>
             <span>{formatCurrency(bill.serviceFee, currency)}</span>
           </div>
         )}

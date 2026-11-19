@@ -343,9 +343,10 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         }
       }
 
-      let taxPercentage = Number(s?.tax_percentage ?? 8.5);
-      let serviceChargeEnabled = s?.service_charge_enabled ?? true;
-      let serviceChargePercentage = Number(s?.service_charge_percentage ?? 10.0);
+      let taxPercentage = Number(s?.tax_percentage ?? 5.0);
+      let taxName = 'GST / Tax';
+      let serviceChargeEnabled = s?.service_charge_enabled ?? false;
+      let serviceChargePercentage = Number(s?.service_charge_percentage ?? 0);
 
       // Re-apply payment config overrides if present in receipt_footer
       if (s?.receipt_footer) {
@@ -353,6 +354,9 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         if (paymentConfigMatch && paymentConfigMatch[1]) {
           try {
             const paymentConfig = JSON.parse(paymentConfigMatch[1]);
+            if (paymentConfig.taxName) {
+              taxName = paymentConfig.taxName;
+            }
             if (paymentConfig.taxRate !== undefined) {
               taxPercentage = Number(paymentConfig.taxRate);
             }
@@ -387,6 +391,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         settings: {
           taxEnabled: s?.tax_enabled ?? true,
           taxPercentage,
+          taxName,
           serviceChargeEnabled,
           serviceChargePercentage,
           currency: s?.currency || r.currency || 'USD',

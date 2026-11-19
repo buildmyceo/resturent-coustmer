@@ -18,6 +18,7 @@ import { customerAudio } from '@/lib/audio';
 import { touchGuestSession, isSessionExpired, getGuestSession, clearGuestSession } from '@/lib/guest-session';
 import { calculateDistanceMeters } from '@/lib/geofence';
 import { checkIsRestaurantOpen, OperatingHoursCheck } from '@/lib/schedule';
+import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 
 export interface ToastMessage {
   id: string;
@@ -357,11 +358,25 @@ export function CustomerProvider({
     }
   }, []);
 
+  // Auto-hydrate restaurant from Supabase if missing from context
+  useEffect(() => {
+    if (!restaurant?.id) {
+      const stored = getGuestSession();
+      const targetRestId = stored?.restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6';
+      fetchRestaurantAndMenuDB(targetRestId)
+        .then(({ restaurant: r, dishes }) => {
+          if (r) setRestaurant(r);
+          if (dishes && dishes.length > 0) setMenuDishes(dishes);
+        })
+        .catch(() => {});
+    }
+  }, [restaurant?.id]);
+
   // Server-matching Cart Totals Calculation with Coupon Discounts
   const { cartTotals, couponDiscountAmount } = useMemo(() => {
     const subtotal = Number(cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2));
-    const taxRate = restaurant?.settings?.taxEnabled ? Number(restaurant?.settings?.taxPercentage ?? 8.5) : 0;
-    const serviceFeeRate = restaurant?.settings?.serviceChargeEnabled ? Number(restaurant?.settings?.serviceChargePercentage ?? 10.0) : 0;
+    const taxRate = restaurant?.settings?.taxEnabled !== false ? Number(restaurant?.settings?.taxPercentage ?? 5.0) : 0;
+    const serviceFeeRate = restaurant?.settings?.serviceChargeEnabled === true ? Number(restaurant?.settings?.serviceChargePercentage ?? 0) : 0;
 
     // Calculate coupon discount
     let discount = 0;
