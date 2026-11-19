@@ -32,6 +32,18 @@ export async function GET(request: Request) {
           .maybeSingle();
         if (data) ordersData = [data];
       }
+
+      // Also fetch any state markers for this order
+      try {
+        const shortId = String(orderId).replace(/-/g, '').slice(0, 8);
+        const { data: stateRows } = await supabase
+          .from('orders')
+          .select('order_number, status, customer_note, updated_at')
+          .like('order_number', `ORD_STATE-${shortId}%`);
+        if (stateRows && stateRows.length > 0) {
+          ordersData.push(...stateRows);
+        }
+      } catch {}
     }
 
     // 2. Query by table_id (most reliable for physical table dining)
