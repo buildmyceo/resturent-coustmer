@@ -529,7 +529,17 @@ export function CustomerProvider({
         const orderData = payload?.payload;
         if (orderData) {
           const newStatus = orderData.status;
-          if (newStatus === 'ready') {
+          if (newStatus === 'accepted') {
+            customerAudio.playTap();
+            showToast(
+              'Order Accepted! 👨‍🍳',
+              `Your order #${orderData.order_number || ''} was accepted and sent to kitchen!`,
+              'success'
+            );
+          } else if (newStatus === 'preparing') {
+            customerAudio.playTap();
+            showToast('Preparing Food 🔥', 'The kitchen has started preparing your dishes.', 'info');
+          } else if (newStatus === 'ready') {
             customerAudio.playFoodReady();
             showToast(
               'Your Food is Ready! 🍽️',
@@ -544,6 +554,18 @@ export function CustomerProvider({
           }
         }
         debouncedRefresh();
+      }
+    );
+
+    // 1b. Listen for bill settlement event
+    channel.on(
+      'broadcast',
+      { event: 'BILL_SETTLED' },
+      (payload: any) => {
+        const currentTableId = table?.id || getGuestSession()?.tableId;
+        if (!payload?.payload?.table_id || payload.payload.table_id === currentTableId) {
+          debouncedRefresh();
+        }
       }
     );
 

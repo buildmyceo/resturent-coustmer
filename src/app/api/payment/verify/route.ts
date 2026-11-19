@@ -139,6 +139,34 @@ export async function POST(request: Request) {
       // Non-blocking
     }
 
+    // 6. Broadcast BILL_SETTLED event so waiter and customer portals immediately refresh
+    try {
+      const channel = supabase.channel(`restaurant:${resolvedRestId}`);
+      await channel.subscribe();
+      await channel.send({
+        type: 'broadcast',
+        event: 'BILL_SETTLED',
+        payload: {
+          table_id: resolvedTableId,
+          session_id: sessionId,
+          paid_amount: paidAmount,
+          settled_at: new Date().toISOString(),
+        },
+      });
+      await channel.send({
+        type: 'broadcast',
+        event: 'ORDER_UPDATED',
+        payload: {
+          table_id: resolvedTableId,
+          status: 'completed',
+          payment_status: 'paid',
+        },
+      });
+      supabase.removeChannel(channel);
+    } catch {
+      // Non-blocking
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Payment verified successfully. Table bill settled!',
