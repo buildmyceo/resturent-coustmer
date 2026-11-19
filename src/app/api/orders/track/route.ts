@@ -96,9 +96,11 @@ export async function GET(request: Request) {
       if (
         orderNum.startsWith('CALL-') ||
         orderNum.startsWith('SR_STATE-') ||
+        orderNum.startsWith('ORD_STATE-') ||
         orderNum.startsWith('ACK-') ||
         orderNum.startsWith('TEST-') ||
         note.startsWith('SR_STATUS:') ||
+        note.startsWith('ORDER_STATUS:') ||
         note.startsWith('CALL_WAITER:') ||
         note.startsWith('ACK:')
       ) {
@@ -116,41 +118,60 @@ export async function GET(request: Request) {
       return true;
     });
 
-    const formattedOrders = foodOrders.map((o: any) => ({
-      id: o.id,
-      restaurantId: o.restaurant_id,
-      tableId: o.table_id,
-      tableSessionId: sessionId || o.table_id,
-      participantId: o.participant_id || 'guest',
-      participantName: o.participant_name || 'Guest',
-      orderNumber: o.order_number,
-      tableNumber: o.table_number || 'T-01',
-      orderSource: o.order_source || 'Customer',
-      subtotal: Number(o.subtotal || 0),
-      taxAmount: Number(o.tax_amount || 0),
-      serviceFee: Number(o.service_fee || 0),
-      totalAmount: Number(o.total_amount || 0),
-      status: o.status,
-      orderTime: o.created_at,
-      createdAt: o.created_at,
-      customerNote: o.customer_note,
-      paymentMethod: o.payment_method || 'Online',
-      paymentStatus: o.payment_status || 'pending',
-      items: (o.order_items || []).map((i: any) => ({
-        id: i.id,
-        orderId: i.order_id,
-        dishId: i.dish_id,
-        dishName: i.dish_name,
-        quantity: i.quantity || 1,
-        unitPrice: Number(i.unit_price || 0),
-        notes: i.notes,
-        variantName: i.variant_name,
-        addons: Array.isArray(i.addons) ? i.addons : [],
-        status: i.status || o.status,
-        prepTime: Number(i.dishes?.preparation_time || i.preparation_time || 15),
-        servedAt: i.served_at,
-      })),
-    }));
+    // Check status markers (ORD_STATE-*) to overlay live order progress
+    const stateMap = new Map<string, string>();
+    (ordersData || []).forEach((row: any) => {
+      const note = row.customer_note || '';
+      if (note.startsWith('ORDER_STATUS:')) {
+        const parts = note.split(':');
+        if (parts.length >= 3) {
+          const ordId = parts[1];
+          const st = parts[2];
+          if (!stateMap.has(ordId)) {
+            stateMap.set(ordId, st);
+          }
+        }
+      }
+    });
+
+    const formattedOrders = foodOrders.map((o: any) => {
+      const effectiveStatus = stateMap.get(o.id) || o.status;
+      return {
+        id: o.id,
+        restaurantId: o.restaurant_id,
+        tableId: o.table_id,
+        tableSessionId: sessionId || o.table_id,
+        participantId: o.participant_id || 'guest',
+        participantName: o.participant_name || 'Guest',
+        orderNumber: o.order_number,
+        tableNumber: o.table_number || 'T-01',
+        orderSource: o.order_source || 'Customer',
+        subtotal: Number(o.subtotal || 0),
+        taxAmount: Number(o.tax_amount || 0),
+        serviceFee: Number(o.service_fee || 0),
+        totalAmount: Number(o.total_amount || 0),
+        status: effectiveStatus,
+        orderTime: o.created_at,
+        createdAt: o.created_at,
+        customerNote: o.customer_note,
+        paymentMethod: o.payment_method || 'Online',
+        paymentStatus: o.payment_status || 'pending',
+        items: (o.order_items || []).map((i: any) => ({
+          id: i.id,
+          orderId: i.order_id,
+          dishId: i.dish_id,
+          dishName: i.dish_name,
+          quantity: i.quantity || 1,
+          unitPrice: Number(i.unit_price || 0),
+          notes: i.notes,
+          variantName: i.variant_name,
+          addons: Array.isArray(i.addons) ? i.addons : [],
+          status: i.status || effectiveStatus,
+          prepTime: Number(i.dishes?.preparation_time || i.preparation_time || 15),
+          servedAt: i.served_at,
+        })),
+      };
+    });
 
     return NextResponse.json({
       success: true,
