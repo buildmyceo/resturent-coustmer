@@ -110,7 +110,13 @@ export async function POST(request: Request) {
       const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
       });
-      await rtChannel.subscribe();
+      await new Promise<void>((resolve) => {
+        rtChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') resolve();
+        });
+        setTimeout(resolve, 300); // 300ms max wait
+      });
+
       const eventPayload = {
         id: requestId,
         restaurant_id: restaurantId,
@@ -135,7 +141,7 @@ export async function POST(request: Request) {
       // Allow brief moment for broadcast delivery before closing
       setTimeout(() => {
         try { supabase.removeChannel(rtChannel); } catch {}
-      }, 500);
+      }, 1000);
     } catch (broadcastErr) {
       // Non-blocking broadcast
     }

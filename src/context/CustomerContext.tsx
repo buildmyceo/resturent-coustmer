@@ -456,6 +456,9 @@ export function CustomerProvider({
     refreshOrders();
   }, [refreshOrders]);
 
+  // Supabase Realtime channel reference
+  const realtimeChannelRef = React.useRef<any>(null);
+
   // Submit Call Waiter Service Request
   const submitServiceRequest = useCallback(
     async (type: ServiceRequestType, notes?: string): Promise<{ success: boolean; error?: string }> => {
@@ -480,6 +483,37 @@ export function CustomerProvider({
         const data = await res.json();
         if (data.success) {
           customerAudio.playServiceAlert();
+
+          // Instant direct client-side broadcast to waiter devices
+          try {
+            if (realtimeChannelRef.current) {
+              const tableNum = table.number || table.name || 'T-01';
+              const broadcastPayload = {
+                id: data.request?.id || `req_${Date.now()}`,
+                restaurant_id: restaurant.id,
+                table_id: table.id,
+                table_number: tableNum,
+                request_type: type,
+                notes: notes || 'Customer called for waiter',
+                requested_by_name: participant?.name || 'Guest',
+                status: 'pending',
+                created_at: new Date().toISOString(),
+              };
+              realtimeChannelRef.current.send({
+                type: 'broadcast',
+                event: 'SERVICE_REQUEST',
+                payload: broadcastPayload,
+              });
+              realtimeChannelRef.current.send({
+                type: 'broadcast',
+                event: 'call_waiter',
+                payload: broadcastPayload,
+              });
+            }
+          } catch (e) {
+            console.warn('Realtime client broadcast error:', e);
+          }
+
           showToast(
             'Request Sent',
             `Waiter notified for "${type.replace('_', ' ')}". They will assist you shortly.`,
@@ -507,6 +541,7 @@ export function CustomerProvider({
     const channel = supabase.channel(`restaurant:${activeRestId}`, {
       config: { broadcast: { self: false } },
     });
+    realtimeChannelRef.current = channel;
 
     let debounceTimer: NodeJS.Timeout | null = null;
     const debouncedRefresh = () => {
