@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
-import { DietaryBadge } from '@/components/menu/DietaryBadge';
 import { formatCurrency } from '@/lib/format';
 import { OrderConfirmModal } from '@/components/cart/OrderConfirmModal';
 import { customerAudio } from '@/lib/audio';
@@ -17,21 +16,18 @@ import {
   Plus,
   Minus,
   Trash2,
-  ArrowRight,
   Utensils,
-  ShieldCheck,
   MessageSquare,
   ArrowLeft,
   MapPinOff,
   QrCode,
   Tag,
-  Check,
   X,
   TicketPercent,
-  Sparkles,
-  Flame,
   Clock,
   Store,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -73,7 +69,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [fallbackDishes, setFallbackDishes] = useState<Dish[]>([]);
 
-  // If menuDishes was not yet populated from context (e.g. direct nav or refresh), fetch once
+  // If menuDishes was not yet populated from context, fetch once
   useEffect(() => {
     if (menuDishes && menuDishes.length > 0) return;
     if (!restaurant?.id) return;
@@ -89,10 +85,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
   const allAvailableDishes = menuDishes && menuDishes.length > 0 ? menuDishes : fallbackDishes;
 
-  // Filter recommendations:
-  // 1. Must be active, in stock, not already in cart
-  // 2. Admin featuredInCart items first
-  // 3. Followed by top-selling / popular items
+  // Filter recommendations (top-selling / chef picks not already in cart)
   const recommendedDishes = useMemo(() => {
     if (!allAvailableDishes || allAvailableDishes.length === 0) return [];
     const cartDishIds = new Set(cart.map((item) => item.dishId));
@@ -101,23 +94,26 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       (d) => d.isAvailable && !d.isArchived && !cartDishIds.has(d.id)
     );
 
-    // Prioritize admin-picked dishes
     const adminPicked = eligible.filter((d) => Boolean(d.featuredInCart));
-    // Popular / highest ordered (only dishes with actual order count)
     const popular = eligible
       .filter((d) => !d.featuredInCart && (d.ordersCount || 0) > 0)
       .sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0));
 
-    // Limit top recommendations to 4 to 5 items maximum
-    return [...adminPicked, ...popular].slice(0, 5);
+    return [...adminPicked, ...popular].slice(0, 4);
   }, [allAvailableDishes, cart]);
 
-  const currency = restaurant?.currency || 'USD';
+  const currency = restaurant?.currency || 'INR';
 
   const geo = restaurant?.settings?.geofence;
   const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
   const isGeofenceConfigured = Boolean(geo && (geo.enabled !== false || hasCoordinates));
   const isOrderBlockedByGeofence = isGeofenceConfigured && isInsideGeofence !== true;
+
+  // Compute estimated max prep time across dishes in cart
+  const estimatedPrepTime = useMemo(() => {
+    if (cart.length === 0) return 15;
+    return 15;
+  }, [cart]);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +168,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     setCouponError(null);
     showToast('Coupon Removed', undefined, 'info');
   };
+
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !restaurant?.id || !table?.id) return;
 
@@ -195,7 +192,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
     setIsSubmitting(true);
 
-    // Generate unique idempotency key to prevent double submits
     const idempotencyKey = `ord_idemp_${sessionId}_${Date.now()}_${Math.random()
       .toString(36)
       .substr(2, 6)}`;
@@ -237,7 +233,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       // Order Success!
       customerAudio.playOrderPlaced();
 
-      // Trigger Confetti Burst
       try {
         confetti({
           particleCount: 80,
@@ -258,7 +253,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       setIsSubmitting(false);
       setIsConfirmModalOpen(false);
 
-      // Refresh orders in background & redirect to Live Order Tracking
       await refreshOrders();
       router.push(`/table/${sessionId}/orders`);
     } catch (err: any) {
@@ -268,406 +262,442 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     }
   };
 
+  const tableNumberDisplay = table?.number || 'T-01';
+
+  // Empty Cart State
   if (cart.length === 0) {
     return (
-      <div className="px-4 py-20 text-center space-y-5">
-        <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100 shadow-xs">
-          <ShoppingBag className="w-9 h-9 stroke-[1.75]" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Your Cart is Empty</h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-            You haven&apos;t added any delicious dishes to your table cart yet.
-          </p>
-        </div>
-        <div className="pt-2">
-          <Link href={`/table/${sessionId}`}>
-            <Button size="lg" className="shadow-md gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Browse Restaurant Menu</span>
-            </Button>
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-12 pb-36 flex flex-col gap-8">
+        <section className="py-20 px-6 bg-light-surface-container-lowest border border-light-outline-variant/60 rounded-2xl flex flex-col items-center text-center gap-4 max-w-lg mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-light-secondary-container/70 text-light-primary flex items-center justify-center">
+            <ShoppingBag className="w-8 h-8 stroke-[1.75]" />
+          </div>
+          <div className="flex flex-col gap-1 max-w-md">
+            <h2 className="font-headline text-2xl text-light-on-surface">Your Cart is Empty</h2>
+            <p className="font-body text-xs sm:text-sm text-light-on-surface-variant text-pretty">
+              You haven&apos;t added any delicious dishes or handcrafted coffees to your table cart yet.
+            </p>
+          </div>
+          <Link
+            href={`/table/${sessionId}`}
+            className="mt-2 inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container px-6 py-3 rounded-full font-label text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Browse Restaurant Menu</span>
           </Link>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <div className="p-4 space-y-6 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
+    <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-6 pb-36 flex flex-col gap-8">
+      {/* Page Header */}
+      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-light-outline-variant/60 pb-4">
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Link
-              href={`/table/${sessionId}`}
-              className="text-slate-400 hover:text-slate-700 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Your Order Cart</h1>
+            <h1 className="font-headline text-2xl sm:text-3xl text-light-on-surface">Table Cart</h1>
+            <span className="shrink-0 font-label text-xs sm:text-sm bg-light-secondary-container text-light-on-secondary-container px-3 py-1 rounded-full tabular-nums whitespace-nowrap font-medium">
+              {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'}
+            </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5 ml-7">
-            {table?.number} • {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'dish' : 'dishes'}
+          <p className="font-body text-xs sm:text-sm text-light-on-surface-variant">
+            Review your selected dishes before sending them to the kitchen for Table {tableNumberDisplay}.
           </p>
         </div>
 
-        <button
-          onClick={clearCart}
-          className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 transition-colors"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>Clear All</span>
-        </button>
-      </div>
-
-      {/* Cart Items List */}
-      <div className="space-y-3">
-        {cart.map((item) => (
-          <div
-            key={item.cartItemId}
-            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex flex-col justify-between space-y-3"
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={clearCart}
+            type="button"
+            className="inline-flex items-center gap-1.5 bg-light-surface-container-lowest border border-light-outline-variant/80 hover:border-light-error hover:text-light-error text-light-on-surface-variant px-3.5 py-2 rounded-xl text-xs font-label font-semibold transition-colors cursor-pointer shadow-2xs"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
-                <Image
-                  src={item.dishImage && item.dishImage.trim() !== '' ? item.dishImage : '/placeholder-dish.jpg'}
-                  alt={item.dishName}
-                  fill
-                  className="object-cover"
-                />
-              </div>
+            <Trash2 className="w-4 h-4" />
+            <span>Clear Cart</span>
+          </button>
+        </div>
+      </section>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <DietaryBadge type={item.dietaryType} />
-                    <h3 className="font-bold text-sm text-slate-900 truncate">{item.dishName}</h3>
-                  </div>
-                  <span className="font-bold text-sm text-slate-900 shrink-0">
-                    {formatCurrency(item.totalPrice, currency)}
-                  </span>
-                </div>
+      {/* Populated Cart Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Cart Items, Kitchen Note, Coupons & Pairings */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Cart Items List */}
+          <section aria-label="Items in table cart" className="flex flex-col gap-4">
+            {cart.map((item) => {
+              const dietaryLower = String(item.dietaryType || '').toLowerCase();
+              const isVeg = (dietaryLower.includes('veg') && !dietaryLower.includes('non')) || dietaryLower === 'vegan';
+              const hasPhoto = Boolean(item.dishImage && item.dishImage.trim() !== '');
 
-                {/* Variant & Addons tags */}
-                {item.variantName && (
-                  <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
-                    Option: {item.variantName}
-                  </div>
-                )}
-
-                {item.selectedAddons.length > 0 && (
-                  <div className="text-[11px] text-blue-600 mt-0.5">
-                    Extras: {item.selectedAddons.map((a) => a.name).join(', ')}
-                  </div>
-                )}
-
-                {/* Special Instructions */}
-                {item.specialInstructions && (
-                  <div className="text-[11px] text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Note: &quot;{item.specialInstructions}&quot;
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quantity Stepper & Unit Price */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-              <span className="text-xs text-slate-400">
-                {formatCurrency(item.unitPrice, currency)} each
-              </span>
-
-              <div className="flex items-center gap-3">
-                <div className="flex items-center border border-slate-200 bg-slate-50 rounded-xl overflow-hidden shadow-2xs">
-                  <button
-                    onClick={() => updateCartQuantity(item.cartItemId, item.quantity - 1)}
-                    className="p-1.5 text-slate-600 hover:bg-slate-200 transition-colors"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="w-7 text-center font-bold text-xs text-slate-900 select-none">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => updateCartQuantity(item.cartItemId, item.quantity + 1)}
-                    className="p-1.5 text-slate-600 hover:bg-slate-200 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => removeFromCart(item.cartItemId)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                  title="Remove item"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Recommended / Most Selling / Chef Promoted in Cart */}
-      {recommendedDishes.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-bold text-slate-800">You Might Also Like</span>
-            </div>
-            <span className="text-[10px] font-semibold text-slate-400">Frequently ordered together</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {recommendedDishes.map((dish) => {
-              const hasPhoto = Boolean(dish.image && dish.image.trim() !== '');
               return (
-                <div
-                  key={dish.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all gap-3"
+                <article
+                  key={item.cartItemId}
+                  className="cart-row bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="relative w-12 h-12 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
+                  <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-light-surface-container-low shrink-0 border border-light-outline-variant/40">
                       {hasPhoto ? (
                         <Image
-                          src={dish.image}
-                          alt={dish.name}
+                          src={item.dishImage}
+                          alt={item.dishName}
                           fill
-                          className="object-cover"
-                          sizes="48px"
+                          className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Utensils className="w-5 h-5 text-slate-300" />
+                        <div className="w-full h-full flex items-center justify-center text-light-outline bg-light-surface-container">
+                          <Utensils className="w-6 h-6 stroke-[1.5]" />
+                        </div>
                       )}
+                      {/* Veg / Non-Veg Indicator */}
+                      <span
+                        className={`absolute top-1.5 left-1.5 w-4 h-4 rounded-xs bg-light-surface-container-lowest border ${
+                          isVeg ? 'border-veg' : 'border-rose-600'
+                        } flex items-center justify-center`}
+                        title={isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+                      >
+                        {isVeg ? (
+                          <span className="w-2 h-2 rounded-full bg-veg" />
+                        ) : (
+                          <span className="w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-b-[6px] border-b-rose-600" />
+                        )}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1">
-                        <DietaryBadge type={dish.dietaryType} />
-                        <h4 className="text-xs font-bold text-slate-900 truncate">{dish.name}</h4>
+
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-title text-base font-semibold text-light-on-surface truncate">
+                          {item.dishName}
+                        </h2>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs font-bold text-slate-800">
-                          {formatCurrency(dish.price, currency)}
+                      <p className="font-body text-xs text-light-on-surface-variant line-clamp-1">
+                        {item.variantName ? `Option: ${item.variantName}` : '1 portion'}
+                        {item.selectedAddons.length > 0 &&
+                          ` • ${item.selectedAddons.map((a) => a.name).join(', ')}`}
+                      </p>
+                      {item.specialInstructions && (
+                        <span className="font-body text-[11px] text-warning bg-amber-badge/40 px-2 py-0.5 rounded-md inline-block max-w-fit">
+                          Note: &quot;{item.specialInstructions}&quot;
                         </span>
-                        {dish.originalPrice && dish.originalPrice > dish.price && (
-                          <span className="text-[10px] text-slate-400 line-through">
-                            {formatCurrency(dish.originalPrice, currency)}
-                          </span>
-                        )}
-                        {dish.featuredInCart && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
-                            Chef Pick
-                          </span>
-                        )}
-                        {!dish.featuredInCart && (dish.ordersCount || 0) > 0 && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-100 text-orange-800 flex items-center gap-0.5">
-                            <Flame className="w-2.5 h-2.5" /> Top
-                          </span>
-                        )}
-                      </div>
+                      )}
+                      <span className="font-label text-xs font-semibold text-light-on-surface-variant tabular-nums">
+                        {formatCurrency(item.unitPrice, currency)} each
+                      </span>
                     </div>
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      addToCart(dish);
-                      showToast('Added to Cart', `${dish.name} was added`, 'success');
-                      customerAudio.playTap();
-                    }}
-                    className="h-7 px-3 text-xs font-bold bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-400 shadow-2xs shrink-0 cursor-pointer"
-                  >
-                    + Add
-                  </Button>
-                </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-light-outline-variant/40 shrink-0">
+                    <div className="inline-flex items-center gap-2 bg-light-surface-container-low border border-light-outline-variant rounded-lg px-2 py-1">
+                      <button
+                        type="button"
+                        onClick={() => updateCartQuantity(item.cartItemId, item.quantity - 1)}
+                        className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-light-surface-container-high text-light-on-surface transition-colors cursor-pointer"
+                        aria-label={`Decrease ${item.dishName} quantity`}
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="font-label text-sm font-semibold text-light-on-surface tabular-nums min-w-4 text-center">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateCartQuantity(item.cartItemId, item.quantity + 1)}
+                        className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-light-surface-container-high text-light-on-surface transition-colors cursor-pointer"
+                        aria-label={`Increase ${item.dishName} quantity`}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="font-title text-base font-semibold text-light-on-surface tabular-nums min-w-[76px] text-right">
+                        {formatCurrency(item.totalPrice, currency)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.cartItemId)}
+                        className="w-8 h-8 inline-flex items-center justify-center rounded-full text-light-on-surface-variant hover:text-light-error hover:bg-light-error-container/40 transition-colors cursor-pointer"
+                        aria-label={`Remove ${item.dishName}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
               );
             })}
-          </div>
-        </div>
-      )}
+          </section>
 
-      {/* Promo Code / Coupon Section */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-            <TicketPercent className="w-4 h-4 text-emerald-600" />
-            <span>Offers &amp; Promo Code</span>
-          </div>
-          {appliedCoupon && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Applied
-            </span>
+          {/* Special Kitchen Instructions */}
+          <section
+            aria-label="Special instructions"
+            className="bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-4 flex flex-col gap-2 shadow-xs"
+          >
+            <label htmlFor="kitchen-note" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-light-primary" />
+              <span className="font-title text-sm font-semibold text-light-on-surface">
+                Note for Kitchen &amp; Barista
+              </span>
+            </label>
+            <textarea
+              id="kitchen-note"
+              rows={2}
+              value={orderCustomerNote}
+              onChange={(e) => setOrderCustomerNote(e.target.value)}
+              placeholder="Any allergies, spice level, or coffee strength preferences..."
+              className="w-full rounded-xl border border-light-outline-variant/80 bg-light-surface-container-low px-3.5 py-2.5 font-body text-xs sm:text-sm text-light-on-surface placeholder:text-light-on-surface-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary outline-none transition-all"
+            />
+          </section>
+
+          {/* Offers & Promo Code Section */}
+          <section
+            aria-label="Offers and promo code"
+            className="bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-4 flex flex-col gap-3 shadow-xs"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-light-on-surface">
+                <TicketPercent className="w-4 h-4 text-light-primary" />
+                <span>Offers &amp; Promo Code</span>
+              </div>
+              {appliedCoupon && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-light-secondary-container text-light-on-secondary-container">
+                  Applied
+                </span>
+              )}
+            </div>
+
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-light-secondary-container/50 border border-light-secondary">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-light-primary" />
+                    <span className="font-mono font-bold text-xs text-light-primary">{appliedCoupon.code}</span>
+                  </div>
+                  <p className="text-[11px] text-light-on-secondary-container">
+                    {appliedCoupon.title} •{' '}
+                    {appliedCoupon.discountType === 'percentage'
+                      ? `${appliedCoupon.discountValue}% OFF`
+                      : `${formatCurrency(appliedCoupon.discountValue, currency)} OFF`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="p-1 text-light-on-surface-variant hover:text-light-error rounded-lg transition-colors cursor-pointer"
+                  title="Remove promo code"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      setCouponError(null);
+                    }}
+                    placeholder="Enter promo code (e.g. WELCOME20)"
+                    className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-light-outline-variant/80 bg-light-surface-container-low uppercase font-mono tracking-wider focus:outline-none focus:ring-1 focus:ring-light-primary focus:border-light-primary text-light-on-surface placeholder:text-light-outline placeholder:normal-case placeholder:font-sans"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!couponInput.trim()}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-light-inverse-surface text-light-inverse-on-surface hover:bg-light-on-surface shrink-0 cursor-pointer disabled:opacity-40 transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {couponError && (
+                  <p className="text-[11px] text-light-error font-medium pl-1">{couponError}</p>
+                )}
+              </form>
+            )}
+          </section>
+
+          {/* Quick Pairings: Complete Your Table Order */}
+          {recommendedDishes.length > 0 && (
+            <section aria-label="Frequently paired with" className="flex flex-col gap-3">
+              <h2 className="font-headline text-lg sm:text-xl text-light-on-surface">
+                Complete Your Table Order
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                {recommendedDishes.map((dish) => {
+                  const hasPhoto = Boolean(dish.image && dish.image.trim() !== '');
+                  return (
+                    <article
+                      key={dish.id}
+                      className="h-full bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xs hover:border-light-primary/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-light-surface-container-low shrink-0 border border-light-outline-variant/40">
+                          {hasPhoto ? (
+                            <Image
+                              src={dish.image}
+                              alt={dish.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-light-outline">
+                              <Utensils className="w-5 h-5 stroke-[1.5]" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <h3 className="font-title text-sm font-semibold text-light-on-surface truncate">
+                            {dish.name}
+                          </h3>
+                          <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
+                            {formatCurrency(dish.price, currency)}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addToCart(dish);
+                          showToast('Added to Cart', `${dish.name} was added`, 'success');
+                          customerAudio.playTap();
+                        }}
+                        className="shrink-0 bg-light-surface-container-lowest text-light-primary border border-light-primary hover:bg-light-primary hover:text-light-on-primary px-3 py-1.5 rounded-lg font-label text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           )}
         </div>
 
-        {appliedCoupon ? (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="font-mono font-bold text-xs text-emerald-800">{appliedCoupon.code}</span>
+        {/* Right Column: Order Summary */}
+        <aside
+          aria-label="Order summary"
+          className="lg:col-span-4 bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-6 flex flex-col gap-5 lg:sticky lg:top-24 shadow-xs"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-light-surface-container pb-3">
+            <h2 className="font-headline text-xl text-light-on-surface">Order Summary</h2>
+            <span className="font-mono text-xs font-semibold bg-amber-badge text-on-amber-badge px-2.5 py-0.5 rounded-full tabular-nums">
+              {tableNumberDisplay}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-light-secondary-container/50 text-light-on-secondary-container px-3.5 py-2.5 rounded-xl text-xs">
+            <Clock className="w-4 h-4 shrink-0 text-light-primary" />
+            <span className="font-body text-xs">Estimated prep time: {estimatedPrepTime}–18 mins</span>
+          </div>
+
+          <dl className="flex flex-col gap-2 text-xs sm:text-sm">
+            <div className="flex items-center justify-between">
+              <dt className="font-body text-light-on-surface-variant">Items Subtotal</dt>
+              <dd className="font-body text-light-on-surface tabular-nums">
+                {formatCurrency(cartTotals.subtotal, currency)}
+              </dd>
+            </div>
+
+            {couponDiscountAmount > 0 && (
+              <div className="flex items-center justify-between text-light-primary font-medium">
+                <dt className="font-body">Coupon Discount ({appliedCoupon?.code})</dt>
+                <dd className="font-body tabular-nums">
+                  -{formatCurrency(couponDiscountAmount, currency)}
+                </dd>
               </div>
-              <p className="text-[11px] text-emerald-700">
-                {appliedCoupon.title} •{' '}
-                {appliedCoupon.discountType === 'percentage'
-                  ? `${appliedCoupon.discountValue}% OFF`
-                  : `${formatCurrency(appliedCoupon.discountValue, currency)} OFF`}
+            )}
+
+            {restaurant?.settings?.taxEnabled !== false && cartTotals.taxAmount > 0 && (
+              <div className="flex items-center justify-between">
+                <dt className="font-body text-light-on-surface-variant">
+                  {restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)
+                </dt>
+                <dd className="font-body text-light-on-surface tabular-nums">
+                  {formatCurrency(cartTotals.taxAmount, currency)}
+                </dd>
+              </div>
+            )}
+
+            {restaurant?.settings?.serviceChargeEnabled === true && cartTotals.serviceFee > 0 && (
+              <div className="flex items-center justify-between">
+                <dt className="font-body text-light-on-surface-variant">
+                  Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)
+                </dt>
+                <dd className="font-body text-light-on-surface tabular-nums">
+                  {formatCurrency(cartTotals.serviceFee, currency)}
+                </dd>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-light-outline-variant/60">
+              <dt className="font-title text-base font-semibold text-light-on-surface">Order Total</dt>
+              <dd className="font-title text-xl font-bold text-light-primary tabular-nums">
+                {formatCurrency(cartTotals.totalAmount, currency)}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="font-body text-xs text-light-on-surface-variant leading-relaxed">
+            No immediate payment required. Items are added to your running table bill.
+          </p>
+
+          {/* Shop Closed Alert */}
+          {!isShopOpen && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-1 text-xs">
+              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                <Store className="w-3.5 h-3.5 text-amber-600" />
+                <span>Restaurant Closed</span>
+              </div>
+              <p className="text-amber-950 text-[11px]">
+                {operatingHoursStatus.reason || 'Ordering is paused outside operating hours.'}
               </p>
             </div>
-            <button
-              onClick={handleRemoveCoupon}
-              className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
-              title="Remove promo code"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleApplyCoupon} className="space-y-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponInput}
-                onChange={(e) => {
-                  setCouponInput(e.target.value.toUpperCase());
-                  setCouponError(null);
-                }}
-                placeholder="Enter promo code (e.g. WELCOME20)"
-                className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-200 uppercase font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 placeholder:text-slate-400 placeholder:normal-case placeholder:font-sans"
-              />
-              <Button
-                type="submit"
-                size="sm"
-                disabled={!couponInput.trim()}
-                className="text-xs bg-slate-900 hover:bg-slate-800 text-white shrink-0 cursor-pointer disabled:opacity-40"
-              >
-                Apply
-              </Button>
+          )}
+
+          {/* Geofence Boundary Alert */}
+          {isOrderBlockedByGeofence && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl space-y-1 text-xs">
+              <div className="flex items-center gap-1.5 text-rose-800 font-bold">
+                <MapPinOff className="w-3.5 h-3.5 text-rose-600" />
+                <span>Outside Restaurant Area</span>
+              </div>
+              <p className="text-rose-900 text-[11px]">
+                Visit restaurant to order food, or scan table QR code.
+              </p>
             </div>
-            {couponError && (
-              <p className="text-[11px] text-rose-600 font-medium pl-1">{couponError}</p>
-            )}
-          </form>
-        )}
-      </div>
+          )}
 
-      {/* Table-wide Chef Note */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-          <span>Note for the Kitchen (Optional)</span>
-        </div>
-        <textarea
-          value={orderCustomerNote}
-          onChange={(e) => setOrderCustomerNote(e.target.value)}
-          placeholder="e.g. Please serve starters together, bring extra cutlery for 4 people..."
-          rows={2}
-          maxLength={300}
-          className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
-        />
-      </div>
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              id="place-order-btn"
+              type="button"
+              onClick={() => setIsConfirmModalOpen(true)}
+              disabled={isOrderBlockedByGeofence || !isShopOpen || isSubmitting}
+              className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container active:scale-[0.99] px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md shadow-light-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Utensils className="w-5 h-5" />
+              )}
+              <span>
+                {!isShopOpen
+                  ? 'Restaurant Closed'
+                  : isOrderBlockedByGeofence
+                  ? 'Outside Ordering Area'
+                  : `Send to Kitchen • ${formatCurrency(cartTotals.totalAmount, currency)}`}
+              </span>
+            </button>
 
-      {/* Subtotal & Estimated Taxes Breakdown */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-2.5 text-xs">
-        <div className="flex justify-between text-slate-600">
-          <span>Items Subtotal</span>
-          <span>{formatCurrency(cartTotals.subtotal, currency)}</span>
-        </div>
-        {couponDiscountAmount > 0 && (
-          <div className="flex justify-between text-emerald-600 font-semibold">
-            <span>Coupon Discount ({appliedCoupon?.code})</span>
-            <span>-{formatCurrency(couponDiscountAmount, currency)}</span>
+            <Link
+              href={`/table/${sessionId}`}
+              className="w-full inline-flex items-center justify-center gap-2 bg-light-surface-container-lowest text-light-primary border border-light-primary hover:bg-light-secondary-container/40 px-5 py-2.5 rounded-full font-label text-sm font-semibold transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Add More Dishes</span>
+            </Link>
           </div>
-        )}
-        {restaurant?.settings?.taxEnabled !== false && cartTotals.taxAmount > 0 && (
-          <div className="flex justify-between text-slate-600">
-            <span>{restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)</span>
-            <span>{formatCurrency(cartTotals.taxAmount, currency)}</span>
-          </div>
-        )}
-        {restaurant?.settings?.serviceChargeEnabled === true && cartTotals.serviceFee > 0 && (
-          <div className="flex justify-between text-slate-600">
-            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)</span>
-            <span>{formatCurrency(cartTotals.serviceFee, currency)}</span>
-          </div>
-        )}
-        <div className="pt-2 border-t border-slate-100 flex justify-between font-bold text-sm text-slate-900">
-          <span>Estimated Total</span>
-          <span className="text-blue-600 text-base">{formatCurrency(cartTotals.totalAmount, currency)}</span>
-        </div>
-      </div>
-
-      {/* Security attribution */}
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-        <span>Prices validated against verified restaurant database records</span>
-      </div>
-
-      {/* Shop Closed Warning Banner */}
-      {!isShopOpen && (
-        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-900 font-bold">
-            <Store className="w-4 h-4 text-amber-600" />
-            <span>Restaurant is Currently Closed</span>
-          </div>
-          <p className="text-amber-950 font-medium">
-            {operatingHoursStatus.reason ||
-              'Online ordering is currently paused according to the restaurant operating hours schedule.'}
-          </p>
-          <div className="flex items-center gap-1.5 text-[11px] text-amber-800 pt-1">
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span>
-              Today ({operatingHoursStatus.currentDayName}):{' '}
-              {operatingHoursStatus.todaySchedule?.closed
-                ? 'Closed all day'
-                : `${operatingHoursStatus.todaySchedule?.open} to ${operatingHoursStatus.todaySchedule?.close}`}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Geofence Boundary Warning */}
-      {isOrderBlockedByGeofence && (
-        <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs">
-          <div className="flex items-center gap-2 text-rose-800 font-bold">
-            <MapPinOff className="w-4 h-4 text-rose-600" />
-            <span>Outside Restaurant Ordering Area</span>
-          </div>
-          <p className="text-rose-900 font-medium">
-            Visit restaurant to order food, or scan QR code if you are in a different restaurant.
-          </p>
-          <Link href="/" className="inline-block pt-1">
-            <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white text-xs gap-1.5 shadow-xs">
-              <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Scan QR Code</span>
-            </Button>
-          </Link>
-        </div>
-      )}
-
-      {/* Place Order CTA Button */}
-      <div>
-        <Button
-          onClick={() => setIsConfirmModalOpen(true)}
-          size="lg"
-          disabled={isOrderBlockedByGeofence || !isShopOpen}
-          className="w-full shadow-lg shadow-blue-500/20 justify-between py-4"
-        >
-          <div className="flex items-center gap-2">
-            <Utensils className="w-5 h-5" />
-            <span className="font-extrabold tracking-wide">
-              {!isShopOpen
-                ? 'Restaurant Closed • Ordering Paused'
-                : isOrderBlockedByGeofence
-                ? 'Outside Ordering Area'
-                : 'Review & Place Order'}
-            </span>
-          </div>
-          <span className="font-extrabold text-base">
-            {formatCurrency(cartTotals.totalAmount, currency)}
-          </span>
-        </Button>
+        </aside>
       </div>
 
       {/* Confirmation Modal */}
@@ -677,7 +707,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         onConfirmOrder={handlePlaceOrder}
         isSubmitting={isSubmitting}
       />
-    </div>
+    </main>
   );
 }
-
