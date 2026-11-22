@@ -1,21 +1,24 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, useMemo, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession } from '@/lib/guest-session';
-import { formatCurrency, formatDateTime } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import {
   Receipt,
+  QrCode,
   CreditCard,
   Banknote,
   CheckCircle2,
-  Users,
   ShieldCheck,
   RefreshCw,
   Plus,
-  ArrowRight,
   FileText,
+  Check,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -26,23 +29,25 @@ interface BillPageProps {
 export default function SharedTableBillPage({ params }: BillPageProps) {
   const resolvedParams = use(params);
   const sessionId = resolvedParams.sessionId;
+  const router = useRouter();
 
-  const { restaurant, table, orders } = useCustomer();
+  const { restaurant, table, orders, participant } = useCustomer();
   const [bill, setBill] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(orders.length > 0 ? true : false);
+  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'card' | 'counter'>('upi');
 
   const fetchBill = async () => {
     setIsLoading(true);
     try {
       const stored = getGuestSession();
-      const params = new URLSearchParams({ sessionId });
+      const queryParams = new URLSearchParams({ sessionId });
       if (table?.id || stored?.tableId) {
-        params.set('tableId', table?.id || stored?.tableId || '');
+        queryParams.set('tableId', table?.id || stored?.tableId || '');
       }
       if (restaurant?.id || stored?.restaurantId) {
-        params.set('restaurantId', restaurant?.id || stored?.restaurantId || '');
+        queryParams.set('restaurantId', restaurant?.id || stored?.restaurantId || '');
       }
-      const res = await fetch(`/api/bill?${params.toString()}`);
+      const res = await fetch(`/api/bill?${queryParams.toString()}`);
       const data = await res.json();
       if (data.success && data.bill) {
         setBill(data.bill);
@@ -60,225 +65,358 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
     });
   }, [sessionId]);
 
-  const currency = bill?.restaurantCurrency || restaurant?.currency || 'USD';
+  const currency = bill?.restaurantCurrency || restaurant?.currency || 'INR';
+
+  const isFullySettled = bill ? bill.outstandingBalance <= 0 : false;
+
+  const ordersCount = useMemo(() => {
+    if (!bill?.items) return 0;
+    return new Set(bill.items.map((i: any) => i.orderNumber)).size;
+  }, [bill?.items]);
+
+  const billNumber = bill?.id ? bill.id.slice(0, 6).toUpperCase() : sessionId.slice(0, 8).toUpperCase();
+  const tableNumberDisplay = table?.number || bill?.tableNumber || 'T-01';
+  const guestName = participant?.name || 'harshit';
 
   if (isLoading) {
     return (
-      <div className="py-24 text-center space-y-3">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
-        <h3 className="text-sm font-bold text-slate-800">Calculating Shared Table Bill...</h3>
-        <p className="text-xs text-slate-400">Aggregating historical order snapshots from Supabase</p>
-      </div>
+      <main className="flex-1 max-w-[960px] w-full mx-auto px-4 sm:px-6 pt-24 pb-36 text-center space-y-3">
+        <Loader2 className="w-8 h-8 text-light-primary animate-spin mx-auto" />
+        <h3 className="text-sm font-bold text-light-on-surface">Calculating Table Bill...</h3>
+        <p className="text-xs text-light-on-surface-variant">Aggregating historical order snapshots</p>
+      </main>
     );
   }
 
-  if (!bill || bill.items.length === 0) {
+  // Empty State
+  if (!bill || !bill.items || bill.items.length === 0) {
     return (
-      <div className="px-4 py-20 text-center space-y-5">
-        <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100 shadow-xs">
-          <Receipt className="w-9 h-9 stroke-[1.75]" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">No Bill Generated Yet</h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-            Once items are ordered by your table, the shared itemized bill and outstanding balance will appear here.
-          </p>
-        </div>
-        <div className="pt-2">
-          <Link href={`/table/${sessionId}`}>
-            <Button size="lg" className="shadow-md gap-2">
-              <Plus className="w-4 h-4" />
-              <span>Browse Menu & Order</span>
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const isFullySettled = bill.outstandingBalance <= 0;
-
-  return (
-    <div className="p-4 space-y-6 max-w-2xl mx-auto">
-      {/* Bill Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Shared Table Bill</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Table {bill.tableNumber} • Session #{sessionId.slice(0, 8)}
-          </p>
-        </div>
-
-        <button
-          onClick={fetchBill}
-          className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
-          title="Refresh bill"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Bill Status Banner */}
-      {isFullySettled ? (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 flex items-center gap-4 text-emerald-900 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-7 h-7" />
+      <main className="flex-1 max-w-[960px] w-full mx-auto px-4 sm:px-6 pt-12 pb-36 flex flex-col gap-8">
+        <section className="py-20 px-6 bg-light-surface-container-lowest border border-light-outline-variant/60 rounded-2xl flex flex-col items-center text-center gap-4 max-w-lg mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-light-secondary-container/70 text-light-primary flex items-center justify-center">
+            <Receipt className="w-8 h-8 stroke-[1.75]" />
           </div>
-          <div className="flex-1">
-            <h3 className="font-extrabold text-sm text-emerald-950">Bill Paid in Full</h3>
-            <p className="text-xs text-emerald-800 mt-0.5">
-              All charges for this table have been settled. You may view or download your digital receipt.
+          <div className="flex flex-col gap-1 max-w-md">
+            <h2 className="font-headline text-2xl text-light-on-surface">No Bill Generated Yet</h2>
+            <p className="font-body text-xs sm:text-sm text-light-on-surface-variant text-pretty">
+              Once items are ordered by your table, the shared itemized bill and outstanding balance will appear here.
             </p>
           </div>
-        </div>
-      ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-3xl p-5 flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 block">
-              Outstanding Table Balance
+          <Link
+            href={`/table/${sessionId}`}
+            className="mt-2 inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container px-6 py-3 rounded-full font-label text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Browse Menu &amp; Order</span>
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex-1 max-w-[960px] w-full mx-auto px-4 sm:px-6 pt-6 pb-36 flex flex-col gap-8">
+      {/* Page Header */}
+      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-light-outline-variant/60 pb-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-headline text-2xl sm:text-3xl text-light-on-surface">Table Bill</h1>
+            <span className="font-mono text-xs font-semibold bg-light-surface-container-low border border-light-outline-variant/70 text-light-on-surface-variant px-2.5 py-0.5 rounded-full tabular-nums">
+              #BILL-{billNumber}
             </span>
-            <div className="text-2xl font-black text-slate-900 mt-0.5">
-              {formatCurrency(bill.outstandingBalance, currency)}
-            </div>
           </div>
-          <Link href={`/table/${sessionId}/payment`}>
-            <Button size="lg" className="shadow-md gap-2 bg-emerald-600 hover:bg-emerald-700">
-              <Banknote className="w-4 h-4" />
-              <span>Pay Bill / Pay to Waiter</span>
-            </Button>
-          </Link>
-        </div>
-      )}
-
-      {/* Itemized Order Snapshots */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h2 className="font-bold text-sm text-slate-900">Ordered Items Breakdown</h2>
-          <span className="text-xs text-slate-400">{bill.items.length} items</span>
+          <p className="font-body text-xs sm:text-sm text-light-on-surface-variant">
+            Live itemized ledger for Table {tableNumberDisplay} • Guest: {guestName}
+          </p>
         </div>
 
-        <div className="divide-y divide-slate-100">
-          {bill.items.map((item: any, idx: number) => (
-            <div key={`${item.id}-${idx}`} className="py-2.5 flex items-start justify-between text-xs">
-              <div className="flex-1 pr-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-900">
-                    {item.quantity}x {item.dishName}
-                  </span>
-                  {item.orderStatus && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                      item.orderStatus === 'served' || item.orderStatus === 'completed'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                        : item.orderStatus === 'ready'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                    }`}>
-                      {item.orderStatus === 'served' || item.orderStatus === 'completed' ? 'Served' : item.orderStatus === 'ready' ? 'Ready' : 'In Kitchen'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                  <span>Order #{item.orderNumber}</span>
-                  {item.participantName && (
-                    <>
-                      <span>•</span>
-                      <span className="text-blue-600 font-medium">{item.participantName}</span>
-                    </>
-                  )}
-                  {item.variantName && (
-                    <>
-                      <span>•</span>
-                      <span>{item.variantName}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="font-bold text-slate-900 text-right shrink-0">
-                {formatCurrency(item.totalPrice, currency)}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={fetchBill}
+            className="p-2 text-light-on-surface-variant hover:text-light-on-surface rounded-xl hover:bg-light-surface-container transition-colors cursor-pointer"
+            title="Refresh bill"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          {isFullySettled ? (
+            <span className="inline-flex items-center gap-1.5 bg-light-secondary-container text-light-on-secondary-container px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-label font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-light-primary" />
+              <span>Paid in Full</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 bg-amber-badge text-on-amber-badge px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-label font-semibold">
+              <span className="w-2 h-2 rounded-full bg-warning" aria-hidden="true" />
+              <span>Balance Due</span>
+            </span>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Financial Summary */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs space-y-3 text-xs">
-        <div className="flex justify-between text-slate-600">
-          <span>Items Subtotal</span>
-          <span>{formatCurrency(bill.subtotal, currency)}</span>
-        </div>
-        {bill.taxAmount > 0 && (
-          <div className="flex justify-between text-slate-600">
-            <span>{restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)</span>
-            <span>{formatCurrency(bill.taxAmount, currency)}</span>
-          </div>
-        )}
-        {restaurant?.settings?.serviceChargeEnabled === true && bill.serviceFee > 0 && (
-          <div className="flex justify-between text-slate-600">
-            <span>Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)</span>
-            <span>{formatCurrency(bill.serviceFee, currency)}</span>
-          </div>
-        )}
-        {bill.discountAmount > 0 && (
-          <div className="flex justify-between text-emerald-600 font-medium">
-            <span>Discounts</span>
-            <span>-{formatCurrency(bill.discountAmount, currency)}</span>
-          </div>
-        )}
-
-        <div className="pt-2 border-t border-slate-100 flex justify-between font-black text-slate-900 text-sm">
-          <span>Total Bill</span>
-          <span>{formatCurrency(bill.totalAmount, currency)}</span>
-        </div>
-
-        {bill.totalPaid > 0 && (
-          <div className="flex justify-between text-emerald-700 font-semibold pt-1">
-            <span>Payments Received</span>
-            <span>-{formatCurrency(bill.totalPaid, currency)}</span>
-          </div>
-        )}
-
-        <div className="pt-2 border-t border-slate-200 flex justify-between font-black text-base text-slate-900">
-          <span>Current Balance Due</span>
-          <span className={bill.outstandingBalance > 0 ? 'text-blue-600' : 'text-emerald-600'}>
-            {formatCurrency(bill.outstandingBalance, currency)}
+      {/* Itemized Order Ledger */}
+      <section
+        aria-label="Itemized table orders"
+        className="bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl overflow-hidden shadow-xs"
+      >
+        <header className="px-5 sm:px-6 py-4 bg-light-surface-container-low/60 border-b border-light-outline-variant/50 flex items-center justify-between gap-2">
+          <h2 className="font-title text-base sm:text-lg font-semibold text-light-on-surface">Ordered Items</h2>
+          <span className="font-label text-xs sm:text-sm text-light-on-surface-variant tabular-nums">
+            {bill.items.length} {bill.items.length === 1 ? 'item' : 'items'} across {ordersCount} {ordersCount === 1 ? 'order' : 'orders'}
           </span>
-        </div>
-      </div>
+        </header>
 
-      {/* Security notice */}
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-        <span>Historical order-item price snapshots locked at time of order</span>
-      </div>
+        <ul className="divide-y divide-light-surface-container">
+          {bill.items.map((item: any, idx: number) => {
+            const isItemServed = item.orderStatus === 'served' || item.orderStatus === 'completed';
+            const isItemReady = item.orderStatus === 'ready';
 
-      {/* Actions */}
-      <div className="pt-2 flex items-center gap-3">
-        {!isFullySettled ? (
-          <>
-            <Link href={`/table/${sessionId}`} className="flex-1">
-              <Button variant="outline" size="lg" className="w-full gap-2">
-                <Plus className="w-4 h-4" />
-                <span>Add More Dishes</span>
-              </Button>
-            </Link>
-            <Link href={`/table/${sessionId}/payment`} className="flex-1">
-              <Button size="lg" className="w-full gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700">
-                <Banknote className="w-4 h-4" />
-                <span>Pay {formatCurrency(bill.outstandingBalance, currency)}</span>
-              </Button>
-            </Link>
-          </>
-        ) : (
-          <Link href={`/table/${sessionId}/receipt/${sessionId}`} className="w-full">
-            <Button size="lg" className="w-full gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700">
-              <FileText className="w-4 h-4" />
-              <span>View Digital Receipt</span>
-            </Button>
-          </Link>
-        )}
+            return (
+              <li key={`${item.id}-${idx}`} className="px-5 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-title text-sm sm:text-base font-semibold text-light-on-surface">
+                      {item.quantity}x {item.dishName}
+                      {item.variantName && (
+                        <span className="text-xs font-normal text-light-on-surface-variant ml-1">
+                          ({item.variantName})
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`font-label text-xs px-2 py-0.5 rounded-full ${
+                        isItemServed
+                          ? 'bg-light-surface-container-low text-light-on-surface-variant'
+                          : isItemReady
+                          ? 'bg-light-secondary-container text-light-on-secondary-container font-semibold'
+                          : 'bg-light-secondary-container/50 text-light-primary'
+                      }`}
+                    >
+                      {isItemServed ? 'Served' : isItemReady ? 'Ready' : 'In Kitchen'}
+                    </span>
+                  </div>
+                  <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
+                    Order #{item.orderNumber} {item.participantName && `• ${item.participantName}`}
+                  </span>
+                </div>
+
+                <span className="font-title text-sm sm:text-base font-semibold text-light-on-surface tabular-nums shrink-0">
+                  {formatCurrency(item.totalPrice, currency)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* Bill Breakdown & Payment Method */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Totals Card */}
+        <section
+          aria-label="Bill breakdown"
+          className="lg:col-span-7 bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-6 flex flex-col gap-4 shadow-xs"
+        >
+          <h2 className="font-headline text-lg sm:text-xl text-light-on-surface border-b border-light-surface-container pb-3">
+            Bill Summary
+          </h2>
+
+          <dl className="flex flex-col gap-2.5 text-xs sm:text-sm">
+            <div className="flex items-center justify-between">
+              <dt className="font-body text-light-on-surface-variant">Items Subtotal</dt>
+              <dd className="font-body text-light-on-surface tabular-nums">
+                {formatCurrency(bill.subtotal, currency)}
+              </dd>
+            </div>
+
+            {bill.discountAmount > 0 && (
+              <div className="flex items-center justify-between text-light-primary font-medium">
+                <dt className="font-body">Discounts</dt>
+                <dd className="font-body tabular-nums">
+                  -{formatCurrency(bill.discountAmount, currency)}
+                </dd>
+              </div>
+            )}
+
+            {bill.taxAmount > 0 && (
+              <div className="flex items-center justify-between">
+                <dt className="font-body text-light-on-surface-variant">
+                  {restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)
+                </dt>
+                <dd className="font-body text-light-on-surface tabular-nums">
+                  {formatCurrency(bill.taxAmount, currency)}
+                </dd>
+              </div>
+            )}
+
+            {restaurant?.settings?.serviceChargeEnabled === true && bill.serviceFee > 0 && (
+              <div className="flex items-center justify-between">
+                <dt className="font-body text-light-on-surface-variant">
+                  Service Charge ({restaurant?.settings?.serviceChargePercentage ?? 5}%)
+                </dt>
+                <dd className="font-body text-light-on-surface tabular-nums">
+                  {formatCurrency(bill.serviceFee, currency)}
+                </dd>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-light-surface-container">
+              <dt className="font-title text-sm sm:text-base font-semibold text-light-on-surface">Total Bill</dt>
+              <dd className="font-title text-sm sm:text-base font-semibold text-light-on-surface tabular-nums">
+                {formatCurrency(bill.totalAmount, currency)}
+              </dd>
+            </div>
+
+            {bill.totalPaid > 0 && (
+              <div className="flex items-center justify-between text-veg font-medium">
+                <dt className="font-body">Payments Received</dt>
+                <dd className="font-body tabular-nums">
+                  -{formatCurrency(bill.totalPaid, currency)}
+                </dd>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-light-outline-variant/60">
+              <dt className="font-title text-base font-semibold text-light-on-surface">Balance Due</dt>
+              <dd className="font-headline text-2xl font-bold text-light-primary tabular-nums">
+                {formatCurrency(bill.outstandingBalance, currency)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-1 flex items-center gap-2 bg-light-surface-container-low px-3.5 py-2.5 rounded-xl text-light-on-surface-variant text-xs">
+            <ShieldCheck className="w-4 h-4 text-veg shrink-0" />
+            <span className="font-body text-xs">
+              Historical order-item price snapshots locked at time of order
+            </span>
+          </div>
+        </section>
+
+        {/* Right Column: Payment Method & Settle Actions */}
+        <aside
+          aria-label="Settle table bill"
+          className="lg:col-span-5 bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-6 flex flex-col gap-5 shadow-xs"
+        >
+          {!isFullySettled ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <h2 className="font-headline text-lg sm:text-xl text-light-on-surface">Payment Method</h2>
+                <p className="font-body text-xs text-light-on-surface-variant">
+                  Choose how you would like to pay the remaining balance.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Select payment method">
+                {/* Option 1: UPI */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedMethod('upi')}
+                  aria-pressed={selectedMethod === 'upi'}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-xs sm:text-sm font-label transition-colors cursor-pointer ${
+                    selectedMethod === 'upi'
+                      ? 'border-light-primary bg-light-secondary-container/40 text-light-on-surface'
+                      : 'border-light-outline-variant bg-light-surface-container-lowest hover:border-light-primary text-light-on-surface'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <QrCode className="w-5 h-5 text-light-primary" />
+                    <span className="font-semibold">UPI / QR Pay</span>
+                  </span>
+                  {selectedMethod === 'upi' && (
+                    <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
+                  )}
+                </button>
+
+                {/* Option 2: Card */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedMethod('card')}
+                  aria-pressed={selectedMethod === 'card'}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-xs sm:text-sm font-label transition-colors cursor-pointer ${
+                    selectedMethod === 'card'
+                      ? 'border-light-primary bg-light-secondary-container/40 text-light-on-surface'
+                      : 'border-light-outline-variant bg-light-surface-container-lowest hover:border-light-primary text-light-on-surface'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <CreditCard className="w-5 h-5 text-light-on-surface-variant" />
+                    <span className="font-semibold">Credit / Debit Card</span>
+                  </span>
+                  {selectedMethod === 'card' && (
+                    <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
+                  )}
+                </button>
+
+                {/* Option 3: Counter / Waiter */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedMethod('counter')}
+                  aria-pressed={selectedMethod === 'counter'}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-xs sm:text-sm font-label transition-colors cursor-pointer ${
+                    selectedMethod === 'counter'
+                      ? 'border-light-primary bg-light-secondary-container/40 text-light-on-surface'
+                      : 'border-light-outline-variant bg-light-surface-container-lowest hover:border-light-primary text-light-on-surface'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Banknote className="w-5 h-5 text-light-on-surface-variant" />
+                    <span className="font-semibold">Pay at Counter / Waiter</span>
+                  </span>
+                  {selectedMethod === 'counter' && (
+                    <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <Link
+                  href={`/table/${sessionId}/payment?method=${selectedMethod}`}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container active:scale-[0.99] px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md shadow-light-primary/20 cursor-pointer"
+                >
+                  <Banknote className="w-4 h-4" />
+                  <span>Pay {formatCurrency(bill.outstandingBalance, currency)}</span>
+                </Link>
+
+                <Link
+                  href={`/table/${sessionId}`}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-light-surface-container-lowest text-light-on-surface border border-light-outline-variant hover:border-light-primary hover:text-light-primary px-5 py-2.5 rounded-full font-label text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add More Dishes</span>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-4 text-center py-4">
+              <div className="w-12 h-12 rounded-full bg-light-secondary-container text-light-primary flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <h2 className="font-headline text-lg sm:text-xl text-light-on-surface">Bill Settled</h2>
+                <p className="font-body text-xs text-light-on-surface-variant">
+                  All charges for Table {tableNumberDisplay} have been settled in full.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <Link
+                  href={`/table/${sessionId}/receipt/${sessionId}`}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container px-5 py-3 rounded-full font-label text-sm font-semibold transition-colors shadow-xs"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>View Digital Receipt</span>
+                </Link>
+
+                <Link
+                  href={`/table/${sessionId}`}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-light-surface-container-lowest text-light-on-surface border border-light-outline-variant hover:border-light-primary hover:text-light-primary px-5 py-2.5 rounded-full font-label text-sm font-semibold transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Order More Food</span>
+                </Link>
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
-    </div>
+    </main>
   );
 }
-
