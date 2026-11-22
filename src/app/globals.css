@@ -1,37 +1,57 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-black: #09090b;
-  --color-primary: #0f172a;
-  --color-accent: #d97706;
+  --color-brand-black: #1A110B;
+  --color-primary: #3D1C0B;
+  --color-accent: #D0803C;
 
   --color-veg: #146C43;
-  --color-warning: #D97706;
-  --color-amber-badge: #FEF3C7;
-  --color-on-amber-badge: #78350F;
-  --color-light-primary: #005230;
+  --color-warning: #D0803C;
+  --color-amber-badge: #FDEED9;
+  --color-on-amber-badge: #7A3508;
+
+  /* Barista Brand Colors from Official Logo */
+  --color-light-primary: #3D1C0B;
   --color-light-on-primary: #FFFFFF;
-  --color-light-primary-container: #146C43;
-  --color-light-on-primary-container: #98EAB7;
-  --color-light-secondary: #476551;
+  --color-light-primary-container: #542810;
+  --color-light-on-primary-container: #F8E7D8;
+
+  --color-light-secondary: #D0803C;
   --color-light-on-secondary: #FFFFFF;
-  --color-light-secondary-container: #C9EBD2;
-  --color-light-on-secondary-container: #4D6B57;
-  --color-light-tertiary: #782E35;
-  --color-light-background: #F7FAF4;
-  --color-light-on-background: #181D19;
-  --color-light-surface: #F7FAF4;
+  --color-light-secondary-container: #F4E2D2;
+  --color-light-on-secondary-container: #542810;
+
+  --color-light-tertiary: #E86010;
+  --color-light-on-tertiary: #FFFFFF;
+  --color-light-tertiary-container: #8A370A;
+  --color-light-on-tertiary-container: #FDEBDD;
+
+  --color-light-error: #BA1A1A;
+  --color-light-on-error: #FFFFFF;
+  --color-light-error-container: #FFDAD6;
+  --color-light-on-error-container: #93000A;
+
+  --color-light-background: #FAF6F0;
+  --color-light-on-background: #26150B;
+
+  --color-light-surface: #FAF6F0;
+  --color-light-surface-dim: #EFE7DE;
+  --color-light-surface-bright: #FAF6F0;
   --color-light-surface-container-lowest: #FFFFFF;
-  --color-light-surface-container-low: #F1F5EE;
-  --color-light-surface-container: #EBEFE9;
-  --color-light-surface-container-high: #E5E9E3;
-  --color-light-on-surface: #181D19;
-  --color-light-on-surface-variant: #3F4941;
-  --color-light-outline: #6F7A71;
-  --color-light-outline-variant: #BFC9BF;
-  --color-light-inverse-surface: #2D312E;
-  --color-light-inverse-on-surface: #EEF2EC;
-  --color-light-inverse-primary: #86D8A5;
+  --color-light-surface-container-low: #F5EFE8;
+  --color-light-surface-container: #EFE7DE;
+  --color-light-surface-container-high: #E7DDD2;
+  --color-light-surface-container-highest: #DFD3C6;
+
+  --color-light-on-surface: #26150B;
+  --color-light-surface-variant: #EFE7DE;
+  --color-light-on-surface-variant: #6E5648;
+  --color-light-outline: #8C7364;
+  --color-light-outline-variant: #DFD3C6;
+
+  --color-light-inverse-surface: #26150B;
+  --color-light-inverse-on-surface: #FDFBF7;
+  --color-light-inverse-primary: #E8A26A;
 
   --font-display: var(--font-alata), 'Alata', sans-serif;
   --font-headline: var(--font-alata), 'Alata', sans-serif;
@@ -42,19 +62,19 @@
 }
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --primary: #0f172a;
-  --primary-hover: #1e293b;
-  --color-brand-black: #09090b;
-  --color-primary: #0f172a;
-  --color-accent: #d97706;
+  --background: #FAF6F0;
+  --foreground: #26150B;
+  --primary: #3D1C0B;
+  --primary-hover: #542810;
+  --color-brand-black: #1A110B;
+  --color-primary: #3D1C0B;
+  --color-accent: #D0803C;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -77,112 +97,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #DFD3C6;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Safe Area Inset Support for modern smartphones (iPhone Home Bar) */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 1rem);
-}
-
-/* Print optimizations for Digital Receipts */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  .print-only {
-    display: block !important;
-  }
-  body {
-    background: white !important;
-    color: black !important;
-  }
-}
-
-/* ==========================================================================
-   Ceova Micro-Interaction & Animation Engine
-   ========================================================================== */
-
-@keyframes ceovaFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes ceovaScaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes ceovaSlideInBottom {
-  from { opacity: 0; transform: translateY(0.5rem); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ceovaSlideInTop {
-  from { opacity: 0; transform: translateY(-0.5rem); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes enter {
-  from {
-    opacity: var(--tw-enter-opacity, 1);
-    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
-               scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
-  }
-}
-
-.animate-in {
-  animation-name: enter;
-  animation-duration: var(--tw-duration, 150ms);
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-  animation-fill-mode: both;
-  --tw-enter-opacity: 1;
-  --tw-enter-scale: 1;
-  --tw-enter-translate-x: 0;
-  --tw-enter-translate-y: 0;
-}
-
-.fade-in { --tw-enter-opacity: 0; }
-.zoom-in-95 { --tw-enter-scale: 0.95; }
-.zoom-in-75 { --tw-enter-scale: 0.75; }
-.zoom-in-50 { --tw-enter-scale: 0.5; }
-.slide-in-from-bottom { --tw-enter-translate-y: 100%; }
-.slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
-.slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
-.slide-in-from-top-2 { --tw-enter-translate-y: -0.5rem; }
-
-.duration-75 { --tw-duration: 75ms; animation-duration: 75ms; }
-.duration-100 { --tw-duration: 100ms; animation-duration: 100ms; }
-.duration-150 { --tw-duration: 150ms; animation-duration: 150ms; }
-.duration-200 { --tw-duration: 200ms; animation-duration: 200ms; }
-.duration-300 { --tw-duration: 300ms; animation-duration: 300ms; }
-.duration-500 { --tw-duration: 500ms; animation-duration: 500ms; }
-.duration-700 { --tw-duration: 700ms; animation-duration: 700ms; }
-.duration-1000 { --tw-duration: 1000ms; animation-duration: 1000ms; }
-
-/* Direct Ceova Animation Utilities */
-.ceova-fade-in { animation: ceovaFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.ceova-scale-in { animation: ceovaScaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.ceova-slide-in-bottom { animation: ceovaSlideInBottom 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.ceova-slide-in-top { animation: ceovaSlideInTop 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-
-/* Aspect Ratio & Typography Utilities */
-.aspect-logo { aspect-ratio: 1 / 1; }
-.aspect-banner { aspect-ratio: 3 / 1; }
-.tabular-nums { font-variant-numeric: tabular-nums; }
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-in,
-  .ceova-fade-in,
-  .ceova-scale-in,
-  .ceova-slide-in-bottom,
-  .ceova-slide-in-top {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+  background: #8C7364;
 }

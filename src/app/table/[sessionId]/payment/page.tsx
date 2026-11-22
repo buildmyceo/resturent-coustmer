@@ -552,17 +552,17 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
             onClick={() => setPaymentMethod('upi')}
             className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
               paymentMethod === 'upi'
-                ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
+                ? 'border-light-primary bg-light-secondary-container/40 shadow-xs'
                 : 'border-slate-200 hover:border-slate-300 bg-white'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+              <div className="w-8 h-8 rounded-xl bg-light-primary text-light-on-primary flex items-center justify-center font-bold text-xs">
                 UPI
               </div>
               <div
                 className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'upi' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'
+                  paymentMethod === 'upi' ? 'border-light-primary bg-light-primary' : 'border-slate-300'
                 }`}
               >
                 {paymentMethod === 'upi' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -578,17 +578,17 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
             onClick={() => setPaymentMethod('waiter')}
             className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
               paymentMethod === 'waiter'
-                ? 'border-blue-600 bg-blue-50/60 shadow-xs'
+                ? 'border-light-primary bg-light-secondary-container/40 shadow-xs'
                 : 'border-slate-200 hover:border-slate-300 bg-white'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-light-primary text-light-on-primary flex items-center justify-center">
                 <Banknote className="w-4 h-4" />
               </div>
               <div
                 className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'waiter' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                  paymentMethod === 'waiter' ? 'border-light-primary bg-light-primary' : 'border-slate-300'
                 }`}
               >
                 {paymentMethod === 'waiter' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -707,11 +707,7 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
           size="lg"
           isLoading={isProcessing}
           disabled={outstandingBalance <= 0}
-          className={`w-full py-4 font-extrabold text-base gap-2 shadow-lg ${
-            paymentMethod === 'waiter'
-              ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20 text-white'
-              : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white'
-          }`}
+          className="w-full py-4 font-extrabold text-base gap-2 shadow-lg bg-light-primary hover:bg-light-primary-container shadow-light-primary/20 text-light-on-primary rounded-full transition-all"
         >
           {paymentMethod === 'waiter' ? (
             <span>✓ Confirm Paid to Waiter • {formatCurrency(outstandingBalance, currency)}</span>

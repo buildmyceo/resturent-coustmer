@@ -141,22 +141,22 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
   return (
     <div className="p-4 space-y-6 max-w-lg mx-auto">
       {/* Session Invalidation Notice */}
-      <div className="no-print bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left shadow-xs">
+      <div className="no-print bg-light-secondary-container/80 border border-light-secondary rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-light-primary text-light-on-primary flex items-center justify-center shrink-0 shadow-xs">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
+            <h4 className="text-xs font-bold text-light-on-surface uppercase tracking-wide">
               Bill Paid • Dining Session Closed
             </h4>
-            <p className="text-xs text-emerald-800 mt-0.5">
+            <p className="text-xs text-light-on-surface-variant mt-0.5">
               Active table ordering data has been cleared. To order more dishes, please scan the table QR code.
             </p>
           </div>
         </div>
         <Link href="/" className="shrink-0 w-full sm:w-auto">
-          <Button size="sm" className="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white gap-2 text-xs shadow-xs">
+          <Button size="sm" className="w-full sm:w-auto bg-light-primary hover:bg-light-primary-container text-light-on-primary gap-2 text-xs shadow-xs">
             <QrCode className="w-4 h-4" />
             <span>Scan QR Code</span>
           </Button>
