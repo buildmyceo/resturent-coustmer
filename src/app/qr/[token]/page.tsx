@@ -221,11 +221,11 @@ export default function QRScanResolverPage({ params }: PageProps) {
   const isExistingSession = !!resolvedTableData?.activeSessionId;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between p-4 sm:p-6">
+    <div className="min-h-screen bg-light-surface flex flex-col justify-between p-4 sm:p-6 font-body">
       <div className="max-w-md w-full mx-auto my-auto pt-6 pb-8 space-y-6">
         {/* Welcome Card */}
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
-          <div className="relative w-16 h-16 rounded-2xl bg-black border border-slate-200 text-white flex items-center justify-center mx-auto shadow-md font-black text-2xl overflow-hidden p-1.5">
+        <div className="bg-light-surface-container-lowest text-light-on-surface rounded-3xl p-6 shadow-xl border border-light-outline-variant/60 text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
+          <div className="relative w-16 h-16 rounded-2xl bg-light-surface-container-low border border-light-outline-variant text-light-on-surface flex items-center justify-center mx-auto shadow-md font-black text-2xl overflow-hidden p-1.5">
             <Image src="/ceova-logo.png" alt="Ceova Restaurant" fill className="object-contain p-1.5" />
           </div>
 
@@ -234,39 +234,39 @@ export default function QRScanResolverPage({ params }: PageProps) {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Verified Table QR Code</span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="font-display text-2xl font-black text-light-on-surface tracking-tight">
               {resolvedTableData?.restaurantName}
             </h1>
-            <p className="text-xs text-slate-500 mt-1">Welcome! Your digital dining table is ready.</p>
+            <p className="text-xs text-light-on-surface-variant font-medium mt-1">Welcome! Your digital dining table is ready.</p>
           </div>
 
           {/* Table Details Pill */}
-          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-center justify-around text-xs">
+          <div className="bg-light-surface-container-low rounded-2xl p-4 border border-light-outline-variant/60 flex items-center justify-around text-xs">
             <div className="text-center">
-              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+              <span className="text-light-on-surface-variant/80 block text-[10px] uppercase font-bold tracking-wider">
                 Table
               </span>
-              <span className="font-bold text-slate-900 text-sm">
+              <span className="font-display font-bold text-light-on-surface text-sm">
                 {resolvedTableData?.tableNumber}
               </span>
             </div>
-            <div className="h-8 w-px bg-slate-200" />
+            <div className="h-8 w-px bg-light-outline-variant" />
             <div className="text-center">
-              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+              <span className="text-light-on-surface-variant/80 block text-[10px] uppercase font-bold tracking-wider">
                 Section / Area
               </span>
-              <span className="font-semibold text-slate-700 text-xs">
+              <span className="font-semibold text-light-on-surface text-xs">
                 {resolvedTableData?.tableName}
               </span>
             </div>
-            <div className="h-8 w-px bg-slate-200" />
+            <div className="h-8 w-px bg-light-outline-variant" />
             <div className="text-center">
-              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+              <span className="text-light-on-surface-variant/80 block text-[10px] uppercase font-bold tracking-wider">
                 Session
               </span>
               <span
                 className={`font-bold text-xs ${
-                  isExistingSession ? 'text-amber-600' : 'text-emerald-600'
+                  isExistingSession ? 'text-warning' : 'text-veg'
                 }`}
               >
                 {isExistingSession ? 'Active Session' : 'New Table'}
@@ -276,9 +276,9 @@ export default function QRScanResolverPage({ params }: PageProps) {
 
           {/* Shared Table Notification if Session Exists */}
           {isExistingSession && (
-            <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-2xl text-left flex items-start gap-3">
-              <Users className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-900 leading-relaxed">
+            <div className="p-3 bg-amber-badge text-on-amber-badge border border-amber-badge/80 rounded-2xl text-left flex items-start gap-3">
+              <Users className="w-5 h-5 text-on-amber-badge shrink-0 mt-0.5" />
+              <div className="text-xs leading-relaxed font-medium">
                 <strong>Shared Table Session:</strong> Guests are already dining at this table. You will
                 join their shared bill and can add dishes to the table order.
               </div>
@@ -288,7 +288,7 @@ export default function QRScanResolverPage({ params }: PageProps) {
           {/* Guest Name Form */}
           <form onSubmit={handleJoinSession} className="space-y-4 pt-2 text-left">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-light-on-surface mb-1.5">
                 Your Name (Optional)
               </label>
               <input
@@ -297,9 +297,9 @@ export default function QRScanResolverPage({ params }: PageProps) {
                 onChange={(e) => setGuestName(e.target.value)}
                 placeholder="e.g. Alex, Maya (or leave blank as Guest)"
                 maxLength={30}
-                className="w-full text-sm p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 bg-white"
+                className="w-full text-sm p-3.5 rounded-xl border border-light-outline-variant focus:outline-none focus:ring-2 focus:ring-light-primary/20 focus:border-light-primary transition-all placeholder:text-light-on-surface-variant/50 bg-light-surface-container-lowest text-light-on-surface"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-light-on-surface-variant/70 mt-1">
                 Helps your friends at the table and the waiter identify who ordered each dish.
               </p>
             </div>
@@ -308,7 +308,7 @@ export default function QRScanResolverPage({ params }: PageProps) {
               type="submit"
               size="lg"
               isLoading={isJoining}
-              className="w-full shadow-lg shadow-slate-900/20 gap-2"
+              className="w-full shadow-lg shadow-light-primary/20 gap-2"
             >
               <span>{isExistingSession ? 'Join Table & View Menu' : 'Start Table Session'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -316,8 +316,8 @@ export default function QRScanResolverPage({ params }: PageProps) {
           </form>
         </div>
 
-        <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+        <div className="text-center text-[11px] text-light-on-surface-variant flex items-center justify-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-light-primary" />
           <span>Powered by Ceova Restaurant Experience</span>
         </div>
       </div>

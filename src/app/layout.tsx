@@ -4,6 +4,7 @@ import './globals.css';
 import { CustomerProvider } from '@/context/CustomerContext';
 import { ToastContainer } from '@/components/ui/Toast';
 import { CallWaiterModal } from '@/components/service/CallWaiterModal';
+import { ThemeApplier } from '@/components/theme/ThemeApplier';
 
 const alata = Alata({
   weight: '400',
@@ -66,6 +67,7 @@ export default function RootLayout({
     <html lang="en" className={`${alata.variable} ${instrumentSans.variable} ${redHatMono.variable}`}>
       <body className="min-h-screen bg-light-surface text-light-on-surface font-body antialiased selection:bg-amber-500/20 selection:text-amber-900">
         <CustomerProvider>
+          <ThemeApplier />
           {children}
           <ToastContainer />
           <CallWaiterModal />

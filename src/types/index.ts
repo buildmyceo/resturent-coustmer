@@ -281,6 +281,15 @@ export interface RestaurantSettings {
   openingHours?: Record<string, { open: string; close: string; closed: boolean }>;
   geofence?: GeofenceSettings;
   coupons?: Coupon[];
+  primaryColor?: string;
+  secondaryColor?: string;
+  landingPageConfig?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    themePreset?: string;
+    heroHeadline?: string;
+    subheadline?: string;
+  };
 }
 
 export interface Coupon {
@@ -308,7 +317,12 @@ export interface RestaurantProfile {
   slug: string;
   description?: string;
   logoUrl?: string;
+  logo?: string;
   coverImageUrl?: string;
+  coverImage?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  landingPage?: any;
   restaurantType?: string;
   phone?: string;
   email?: string;

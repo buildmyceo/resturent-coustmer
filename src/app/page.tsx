@@ -31,7 +31,7 @@ import { useCustomer } from '@/context/CustomerContext';
 
 export default function CustomerPortalLandingPage() {
   const router = useRouter();
-  const { isInsideGeofence } = useCustomer();
+  const { isInsideGeofence, setRestaurant: setGlobalRestaurant } = useCustomer();
 
   // Active Dining Session
   const [activeSession, setActiveSession] = useState<GuestSessionState | null>(null);
@@ -62,6 +62,7 @@ export default function CustomerPortalLandingPage() {
       const data = await res.json();
       if (data.success && data.restaurant) {
         setRestaurant(data.restaurant);
+        setGlobalRestaurant(data.restaurant);
       }
     } catch (err) {
       console.warn('Failed to fetch restaurant info:', err);
