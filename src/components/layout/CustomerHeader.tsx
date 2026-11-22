@@ -4,19 +4,20 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession } from '@/lib/guest-session';
-import { Utensils, Users, Bell, Clock, AlertTriangle } from 'lucide-react';
+import { UtensilsCrossed, User, Bell, Clock, AlertTriangle, Coffee } from 'lucide-react';
 
 export function CustomerHeader() {
   const { restaurant, table, session, participant, setIsCallWaiterModalOpen, orders } = useCustomer();
-  const [storedSession, setStoredSession] = useState<{ tableNumber?: string; restaurantSlug?: string } | null>(null);
+  const [storedSession, setStoredSession] = useState<{ tableNumber?: string; restaurantSlug?: string; guestName?: string } | null>(null);
 
   useEffect(() => {
     const s = getGuestSession();
     if (s) queueMicrotask(() => setStoredSession(s));
   }, []);
 
-  const displayName = restaurant?.name || (storedSession?.restaurantSlug ? storedSession.restaurantSlug.replace(/-.*$/, '') : 'Ceova Restaurant');
+  const displayName = restaurant?.name || (storedSession?.restaurantSlug ? storedSession.restaurantSlug.replace(/-.*$/, '') : 'Barista');
   const displayTable = table?.number || storedSession?.tableNumber || 'T-01';
+  const displayGuestName = participant?.name || storedSession?.guestName || 'harshit';
 
   // 15-Minute Countdown Timer State
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export function CustomerHeader() {
   const [isExpired, setIsExpired] = useState(false);
 
   const hasOrders = (orders && orders.length > 0) || session?.isClaimPermanent === true;
+  const hasActiveOrders = orders.some((o) => ['pending', 'accepted', 'preparing', 'ready'].includes(o.status));
 
   useEffect(() => {
     // If order has already been placed, timer does NOT apply!
@@ -48,7 +50,7 @@ export function CustomerHeader() {
         const seconds = totalSeconds % 60;
         const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         setTimeLeft(formatted);
-        setIsWarning(minutes < 3); // Under 3 mins left
+        setIsWarning(minutes < 3);
       }
     }, 1000);
 
@@ -56,7 +58,7 @@ export function CustomerHeader() {
   }, [session?.initialClaimExpiresAt, hasOrders]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs">
+    <header className="sticky top-0 z-40 bg-light-surface-container-lowest border-b border-light-outline-variant/60 shadow-xs">
       {/* 15-Minute Countdown Banner (Only shown before first order is placed) */}
       {!hasOrders && timeLeft && (
         <div
@@ -65,17 +67,17 @@ export function CustomerHeader() {
               ? 'bg-rose-600 text-white animate-pulse'
               : isWarning
               ? 'bg-amber-500 text-white animate-pulse'
-              : 'bg-slate-900 text-white'
+              : 'bg-light-inverse-surface text-light-inverse-on-surface'
           }`}
         >
           {isExpired ? (
             <>
-              <AlertTriangle className="w-3.5 h-3.5" />
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span>Initial 15-min table claim expired. Please scan table QR again to reserve.</span>
             </>
           ) : (
             <>
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="w-3.5 h-3.5 shrink-0" />
               <span>
                 Table reserved! Order within <strong className="font-mono text-sm underline">{timeLeft}</strong> to secure your table.
               </span>
@@ -84,70 +86,60 @@ export function CustomerHeader() {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Restaurant Identity */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-slate-200/80 shrink-0 flex items-center justify-center shadow-xs">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        {/* Brand Identity */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative w-10 h-10 rounded-full bg-light-primary text-light-on-primary flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
             {restaurant?.logoUrl ? (
               <Image
                 src={restaurant.logoUrl}
-                alt={restaurant.name}
+                alt={displayName}
                 fill
                 className="object-cover"
               />
             ) : (
-              <div className="relative w-full h-full bg-black flex items-center justify-center p-1">
-                <Image
-                  src="/ceova-logo.png"
-                  alt="Ceova Restaurant"
-                  fill
-                  className="object-contain p-0.5"
-                />
-              </div>
+              <Coffee className="w-5 h-5 text-light-on-primary" />
             )}
           </div>
 
-          <div className="min-w-0">
-            <h1 className="font-bold text-slate-900 text-sm sm:text-base leading-tight truncate">
-              {displayName}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Open
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-headline text-lg font-bold text-light-on-surface truncate">
+                {displayName}
               </span>
-              <span className="text-xs text-slate-400">•</span>
-              <span className="text-xs text-slate-500 truncate">
-                {restaurant?.restaurantType || 'Fine Dining'}
+              <span className="shrink-0 inline-flex items-center gap-1 bg-light-secondary-container text-light-on-secondary-container px-2 py-0.5 rounded-full text-xs font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-veg"></span>
+                <span>Open</span>
               </span>
             </div>
+            <span className="font-body text-xs text-light-on-surface-variant truncate">
+              {restaurant?.description || 'Coffeehouse & Bistro'}
+            </span>
           </div>
         </div>
 
-        {/* Table & Guest Identity */}
-        <div className="flex items-center gap-2">
-          <div className="bg-slate-100/90 border border-slate-200/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-            <Utensils className="w-3.5 h-3.5 text-amber-600" />
-            <span className="text-xs font-bold text-slate-900">{displayTable}</span>
+        {/* Table & Guest Context */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="shrink-0 inline-flex items-center gap-1.5 bg-amber-badge text-on-amber-badge px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs">
+            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-mono text-xs font-bold tabular-nums">{displayTable}</span>
           </div>
 
-          {participant && (
-            <div
-              title={`Logged in as ${participant.name}`}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-900 border border-amber-200/60 rounded-xl text-xs font-semibold"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span className="truncate max-w-[80px]">{participant.name}</span>
-            </div>
-          )}
+          <div className="hidden sm:inline-flex items-center gap-1.5 bg-light-surface-container-low border border-light-outline-variant/70 text-light-on-surface px-3 py-1.5 rounded-full shrink-0 text-xs font-medium">
+            <User className="w-3.5 h-3.5 text-light-on-surface-variant" />
+            <span className="font-label truncate max-w-[100px]">{displayGuestName}</span>
+          </div>
 
-          {/* Quick Waiter Button */}
           <button
             onClick={() => setIsCallWaiterModalOpen(true)}
-            className="p-2 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-xl border border-slate-200 transition-colors"
-            title="Call Waiter"
+            type="button"
+            aria-label="Call waiter or order notifications"
+            className="relative shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-light-surface-container-lowest border border-light-outline-variant text-light-on-surface hover:bg-light-surface-container-low transition-colors shadow-2xs"
           >
             <Bell className="w-4 h-4" />
+            {hasActiveOrders && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-warning animate-pulse"></span>
+            )}
           </button>
         </div>
       </div>

@@ -1,8 +1,29 @@
 import type { Metadata, Viewport } from 'next';
+import { Alata, Instrument_Sans, Red_Hat_Mono } from 'next/font/google';
 import './globals.css';
 import { CustomerProvider } from '@/context/CustomerContext';
 import { ToastContainer } from '@/components/ui/Toast';
 import { CallWaiterModal } from '@/components/service/CallWaiterModal';
+
+const alata = Alata({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-alata',
+  display: 'swap',
+});
+
+const instrumentSans = Instrument_Sans({
+  subsets: ['latin'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
+});
+
+const redHatMono = Red_Hat_Mono({
+  weight: ['500', '600'],
+  subsets: ['latin'],
+  variable: '--font-red-hat-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Ceova Restaurant | Contactless QR Dining Experience',
@@ -42,8 +63,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-amber-500/20 selection:text-amber-900">
+    <html lang="en" className={`${alata.variable} ${instrumentSans.variable} ${redHatMono.variable}`}>
+      <body className="min-h-screen bg-light-surface text-light-on-surface font-body antialiased selection:bg-amber-500/20 selection:text-amber-900">
         <CustomerProvider>
           {children}
           <ToastContainer />

@@ -4,6 +4,41 @@
   --color-brand-black: #09090b;
   --color-primary: #0f172a;
   --color-accent: #d97706;
+
+  --color-veg: #146C43;
+  --color-warning: #D97706;
+  --color-amber-badge: #FEF3C7;
+  --color-on-amber-badge: #78350F;
+  --color-light-primary: #005230;
+  --color-light-on-primary: #FFFFFF;
+  --color-light-primary-container: #146C43;
+  --color-light-on-primary-container: #98EAB7;
+  --color-light-secondary: #476551;
+  --color-light-on-secondary: #FFFFFF;
+  --color-light-secondary-container: #C9EBD2;
+  --color-light-on-secondary-container: #4D6B57;
+  --color-light-tertiary: #782E35;
+  --color-light-background: #F7FAF4;
+  --color-light-on-background: #181D19;
+  --color-light-surface: #F7FAF4;
+  --color-light-surface-container-lowest: #FFFFFF;
+  --color-light-surface-container-low: #F1F5EE;
+  --color-light-surface-container: #EBEFE9;
+  --color-light-surface-container-high: #E5E9E3;
+  --color-light-on-surface: #181D19;
+  --color-light-on-surface-variant: #3F4941;
+  --color-light-outline: #6F7A71;
+  --color-light-outline-variant: #BFC9BF;
+  --color-light-inverse-surface: #2D312E;
+  --color-light-inverse-on-surface: #EEF2EC;
+  --color-light-inverse-primary: #86D8A5;
+
+  --font-display: var(--font-alata), 'Alata', sans-serif;
+  --font-headline: var(--font-alata), 'Alata', sans-serif;
+  --font-title: var(--font-instrument-sans), 'Instrument Sans', sans-serif;
+  --font-body: var(--font-instrument-sans), 'Instrument Sans', sans-serif;
+  --font-label: var(--font-instrument-sans), 'Instrument Sans', sans-serif;
+  --font-mono: var(--font-red-hat-mono), 'Red Hat Mono', monospace;
 }
 
 :root {

@@ -94,10 +94,10 @@ export default function TableSessionLayout({ children, params }: TableLayoutProp
   }, [sessionId, session?.id, setSession, setTable, setParticipant]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-light-surface text-light-on-surface font-body antialiased flex flex-col">
       <CustomerHeader />
 
-      <main className="flex-1 pb-24 max-w-4xl w-full mx-auto">{children}</main>
+      <main className="flex-1 pb-24 w-full">{children}</main>
 
       <CallWaiterFab />
       <BottomNavigation />
