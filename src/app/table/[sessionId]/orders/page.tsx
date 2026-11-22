@@ -1,23 +1,23 @@
 'use client';
 
-import React, { use, useState, useEffect } from 'react';
+import React, { use, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
 import { formatCurrency, formatTime } from '@/lib/format';
 import { OrderProgressStepper } from '@/components/orders/OrderProgressStepper';
 import {
   Clock,
-  UtensilsCrossed,
+  Sparkles,
   Receipt,
   Plus,
   RefreshCw,
-  Users,
+  User,
   CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  ArrowRight,
-  Hourglass,
-  Timer,
+  FileText,
+  ShoppingBag,
+  UtensilsCrossed,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -30,7 +30,7 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
   const sessionId = resolvedParams.sessionId;
 
   const { orders, refreshOrders, isOrdersLoading, restaurant, table } = useCustomer();
-  const currency = restaurant?.currency || 'USD';
+  const currency = restaurant?.currency || 'INR';
 
   // Live timer tick every 10 seconds to update countdowns smoothly
   const [now, setNow] = useState(Date.now());
@@ -39,161 +39,154 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
     return () => clearInterval(timer);
   }, []);
 
+  const totalTableBill = useMemo(() => {
+    return orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  }, [orders]);
+
+  const tableNumberDisplay = table?.number || 'T-01';
+
+  // Empty State
   if (orders.length === 0 && !isOrdersLoading) {
     return (
-      <div className="px-4 py-20 text-center space-y-5">
-        <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100 shadow-xs">
-          <Clock className="w-9 h-9 stroke-[1.75]" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">No Orders Placed Yet</h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-            Dishes placed by anyone at {table?.number || 'this table'} will appear here in real time.
-          </p>
-        </div>
-        <div className="pt-2">
-          <Link href={`/table/${sessionId}`}>
-            <Button size="lg" className="shadow-md gap-2">
-              <Plus className="w-4 h-4" />
-              <span>Browse Menu & Order</span>
-            </Button>
+      <main className="flex-1 max-w-[960px] w-full mx-auto px-4 sm:px-6 pt-12 pb-36 flex flex-col gap-8">
+        <section className="py-20 px-6 bg-light-surface-container-lowest border border-light-outline-variant/60 rounded-2xl flex flex-col items-center text-center gap-4 max-w-lg mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-light-secondary-container/70 text-light-primary flex items-center justify-center">
+            <Clock className="w-8 h-8 stroke-[1.75]" />
+          </div>
+          <div className="flex flex-col gap-1 max-w-md">
+            <h2 className="font-headline text-2xl text-light-on-surface">No Orders Placed Yet</h2>
+            <p className="font-body text-xs sm:text-sm text-light-on-surface-variant text-pretty">
+              Dishes placed by anyone at Table {tableNumberDisplay} will appear here in real time.
+            </p>
+          </div>
+          <Link
+            href={`/table/${sessionId}`}
+            className="mt-2 inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container px-6 py-3 rounded-full font-label text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Browse Menu &amp; Order</span>
           </Link>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   }
 
-  // Active vs Served orders count
-  const activeOrders = orders.filter((o) =>
-    ['pending', 'accepted', 'preparing', 'ready'].includes(o.status)
-  );
-
   return (
-    <div className="p-4 space-y-6 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Live Table Orders</h1>
-            {activeOrders.length > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                {activeOrders.length} Preparing
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Realtime synchronization with Kitchen Display System & Waiter staff
-          </p>
-        </div>
-
-        <button
-          onClick={() => refreshOrders()}
-          disabled={isOrdersLoading}
-          className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
-          title="Refresh orders"
-        >
-          <RefreshCw className={`w-4 h-4 ${isOrdersLoading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
-      {/* Bill & Payment Prompt Card */}
+    <main className="flex-1 max-w-[960px] w-full mx-auto px-4 sm:px-6 pt-6 pb-36 flex flex-col gap-8">
+      {/* Table Bill Generated Banner */}
       {orders.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-3xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+        <section
+          aria-label="Table bill status"
+          className="bg-light-primary text-light-on-primary rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-md"
+        >
+          <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-blue-200" />
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-200">
+              <Receipt className="w-4 h-4 text-light-on-primary-container" />
+              <span className="font-label text-xs uppercase tracking-wider text-light-on-primary-container font-semibold">
                 Table Bill Generated
               </span>
             </div>
-            <h3 className="text-lg font-black text-white mt-1">
-              {formatCurrency(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0), currency)} Total
-            </h3>
-            <p className="text-xs text-blue-100 mt-0.5">
-              {orders.every(o => o.paymentStatus === 'paid')
-                ? 'All orders have been paid & settled! Enjoy your meal.'
-                : 'Food is being prepared & served! You can review items and settle your bill anytime.'}
+            <h1 className="font-headline text-2xl sm:text-3xl text-light-on-primary tabular-nums">
+              {formatCurrency(totalTableBill, currency)} Total
+            </h1>
+            <p className="font-body text-xs sm:text-sm text-light-on-primary/90 text-pretty max-w-prose">
+              Food is being prepared and served! You can review items and settle your bill anytime.
             </p>
           </div>
-          <Link href={`/table/${sessionId}/bill`} className="shrink-0">
-            <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md gap-2 w-full sm:w-auto">
-              <span>{orders.every(o => o.paymentStatus === 'paid') ? 'View Settled Receipt' : 'View & Pay Bill'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Button>
+
+          <Link
+            href={`/table/${sessionId}/bill`}
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-light-on-primary text-light-primary hover:bg-light-secondary-container px-5 py-3 rounded-full transition-colors whitespace-nowrap font-label text-xs sm:text-sm font-semibold shadow-xs"
+          >
+            <Receipt className="w-4 h-4" />
+            <span>View Table Bill</span>
           </Link>
-        </div>
+        </section>
       )}
 
-      {/* Orders List */}
-      <div className="space-y-4">
+      {/* Active Orders List */}
+      <div className="flex flex-col gap-6">
         {orders.map((order) => {
-          const isPending = order.status === 'pending';
           const isReady = order.status === 'ready';
           const isServed = order.status === 'served' || order.status === 'completed';
+          const isPreparing = order.status === 'preparing';
+          const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
 
           return (
-            <div
+            <section
               key={order.id}
-              className={`bg-white rounded-3xl p-5 border shadow-xs transition-all duration-300 space-y-4 ${
-                isReady
-                  ? 'border-emerald-300 ring-2 ring-emerald-500/10 shadow-md'
-                  : 'border-slate-100'
-              }`}
+              aria-label={`Order #${order.orderNumber}`}
+              className="bg-light-surface-container-lowest border border-light-outline-variant/70 rounded-2xl p-6 flex flex-col gap-6 shadow-xs"
             >
               {/* Order Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-slate-900">
+              <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-light-surface-container pb-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-headline text-xl sm:text-2xl text-light-on-surface tabular-nums">
                       Order #{order.orderNumber}
-                    </span>
+                    </h2>
                     {order.participantName && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-md font-medium">
-                        <Users className="w-3 h-3" />
-                        {order.participantName}
+                      <span className="inline-flex items-center gap-1 bg-amber-badge text-on-amber-badge px-2.5 py-0.5 rounded-full text-xs font-label font-medium">
+                        <User className="w-3 h-3" />
+                        <span>{order.participantName}</span>
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                  <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
                     Placed at {formatTime(order.orderTime || order.createdAt)}
                   </span>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-sm font-black text-slate-900 block">
+                <div className="flex sm:flex-col items-center sm:items-end justify-between gap-0.5">
+                  <span className="font-title text-lg font-bold text-light-on-surface tabular-nums">
                     {formatCurrency(order.totalAmount, currency)}
                   </span>
-                  <span className="text-[10px] text-slate-400">
-                    {order.items.reduce((sum, i) => sum + i.quantity, 0)} items
+                  <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
+                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
                   </span>
                 </div>
+              </header>
+
+              {/* Live Kitchen Status Callout */}
+              <div
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium ${
+                  isReady
+                    ? 'bg-light-secondary-container/70 border border-light-primary/30 text-light-on-secondary-container'
+                    : isPreparing
+                    ? 'bg-amber-badge/60 border border-warning/30 text-on-amber-badge'
+                    : isServed
+                    ? 'bg-light-surface-container-low border border-light-outline-variant/60 text-light-on-surface'
+                    : 'bg-light-secondary-container/40 border border-light-primary/20 text-light-on-secondary-container'
+                }`}
+              >
+                <Sparkles className="w-5 h-5 text-light-primary shrink-0" />
+                <p className="font-body">
+                  {isReady
+                    ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`
+                    : isPreparing
+                    ? 'Preparing! Our kitchen chefs are actively crafting your order.'
+                    : isServed
+                    ? `Served! All items have been delivered to Table ${tableNumberDisplay}. Enjoy your meal!`
+                    : 'Submitted! Order received and sent for table confirmation.'}
+                </p>
               </div>
 
-              {/* Ready Food Highlight Banner */}
-              {isReady && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-semibold animate-in zoom-in-95">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Ready! Staff is currently serving your fresh food to the table.</span>
-                </div>
-              )}
-
-              {/* Visual Progress Stepper */}
+              {/* 7-Step Order Progress Stepper */}
               <OrderProgressStepper
                 status={order.status}
                 rejectionReason={order.rejectionReason}
                 assignedWaiterName={order.assignedWaiterName}
               />
 
-              {/* Itemized Dish List with Live Dish Preparation Timings */}
-              <div className="pt-2 border-t border-slate-50 space-y-2.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              {/* Ordered Dishes List */}
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex items-center justify-between text-light-on-surface-variant pb-1.5 border-b border-light-surface-container text-xs font-label uppercase tracking-wider font-semibold">
                   <span>Ordered Dishes</span>
-                  <span>Estimated Time</span>
+                  <span>Kitchen Status</span>
                 </div>
 
                 {order.items.map((item) => {
-                  const prepMins = item.prepTime || 15;
+                  const prepMins = item.prepTime || 12;
                   const orderPlacedEpoch = new Date(order.orderTime || order.createdAt || Date.now()).getTime();
                   const targetFinishEpoch = orderPlacedEpoch + prepMins * 60 * 1000;
                   const remainingMinutes = Math.max(0, Math.ceil((targetFinishEpoch - now) / 60000));
@@ -202,86 +195,85 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                   const isItemReady = isReady || item.status === 'ready';
 
                   return (
-                    <div
+                    <article
                       key={item.id}
-                      className="p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between gap-3 text-xs"
+                      className="bg-light-surface-container-low/60 border border-light-outline-variant/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-slate-900">
-                            {item.quantity}x {item.dishName}
-                          </span>
-                          {item.variantName && (
-                            <span className="text-slate-500 font-normal">({item.variantName})</span>
-                          )}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-lg bg-light-surface-container flex items-center justify-center text-light-primary shrink-0 border border-light-outline-variant/30">
+                          <UtensilsCrossed className="w-5 h-5" />
                         </div>
-                        {item.notes && (
-                          <div className="text-[11px] text-amber-700 italic mt-0.5">
-                            &quot;{item.notes}&quot;
-                          </div>
-                        )}
-                        <div className="font-semibold text-slate-500 text-[11px] mt-0.5">
-                          {formatCurrency(item.unitPrice * item.quantity, currency)}
+                        <div className="flex flex-col min-w-0">
+                          <h3 className="font-title text-sm sm:text-base font-semibold text-light-on-surface truncate">
+                            {item.quantity}x {item.dishName}
+                            {item.variantName && (
+                              <span className="text-light-on-surface-variant font-normal text-xs ml-1">
+                                ({item.variantName})
+                              </span>
+                            )}
+                          </h3>
+                          <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
+                            {formatCurrency(item.unitPrice * item.quantity, currency)}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Timing status badge */}
-                      <div className="shrink-0 text-right">
+                      {/* Status pill on right */}
+                      <div className="shrink-0 sm:text-right">
                         {isItemServed ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100/70 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            Served
+                          <span className="inline-flex items-center gap-1 bg-light-surface-container-high text-light-on-surface px-3 py-1 rounded-full whitespace-nowrap text-xs font-label font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-light-primary" />
+                            <span>Served</span>
                           </span>
                         ) : isItemReady ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 animate-bounce">
-                            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                            Ready to Serve
+                          <span className="inline-flex items-center gap-1 bg-light-secondary-container text-light-on-secondary-container px-3 py-1 rounded-full whitespace-nowrap text-xs font-label font-semibold">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-light-primary" />
+                            <span>Ready to Serve</span>
                           </span>
                         ) : (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                            <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                            <div className="leading-tight text-right">
-                              <span className="text-[11px] font-bold text-slate-800 block">
-                                {remainingMinutes > 0 ? `~${remainingMinutes} mins` : 'Any moment'}
-                              </span>
-                              <span className="text-[9px] text-slate-400">
-                                {prepMins}m kitchen prep
-                              </span>
-                            </div>
-                          </div>
+                          <span className="inline-flex items-center gap-1.5 bg-light-surface-container text-light-on-surface-variant px-3 py-1 rounded-full whitespace-nowrap text-xs font-label">
+                            <Clock className="w-3.5 h-3.5 text-light-primary animate-pulse" />
+                            <span>{remainingMinutes > 0 ? `~${remainingMinutes}m prep` : 'Preparing'}</span>
+                          </span>
                         )}
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
 
+                {/* Customer Order Note */}
                 {order.customerNote && (
-                  <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <strong>Note:</strong> {order.customerNote}
+                  <div className="bg-light-surface-container-low border border-light-outline-variant/50 rounded-xl px-3.5 py-2.5 flex items-center gap-2 mt-1">
+                    <FileText className="w-4 h-4 text-light-on-surface-variant shrink-0" />
+                    <p className="font-body text-xs text-light-on-surface-variant">
+                      <strong>Note:</strong> {order.customerNote}
+                    </p>
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
 
-      {/* Navigation Actions */}
-      <div className="pt-4 flex items-center gap-3">
-        <Link href={`/table/${sessionId}`} className="flex-1">
-          <Button variant="outline" size="lg" className="w-full gap-2">
-            <Plus className="w-4 h-4" />
-            <span>Order More Dishes</span>
-          </Button>
+      {/* Bottom Action Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link
+          href={`/table/${sessionId}`}
+          className="inline-flex items-center justify-center gap-2 bg-light-surface-container-lowest text-light-on-surface border border-light-outline-variant hover:border-light-primary hover:text-light-primary px-5 py-3 rounded-full font-label text-sm font-semibold transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Order More Dishes</span>
         </Link>
-        <Link href={`/table/${sessionId}/bill`} className="flex-1">
-          <Button size="lg" className="w-full gap-2 shadow-md">
-            <Receipt className="w-4 h-4" />
-            <span>View Table Bill</span>
-          </Button>
+
+        <Link
+          href={`/table/${sessionId}/bill`}
+          className="inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container px-5 py-3 rounded-full font-label text-sm font-semibold transition-colors shadow-xs"
+        >
+          <Receipt className="w-4 h-4" />
+          <span>View Table Bill</span>
         </Link>
       </div>
-    </div>
+    </main>
   );
 }
-

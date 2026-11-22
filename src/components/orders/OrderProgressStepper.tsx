@@ -6,11 +6,11 @@ import {
   Clock,
   UserCheck,
   Send,
-  ChefHat,
+  UtensilsCrossed,
   Sparkles,
   CheckCircle2,
-  AlertCircle,
   XCircle,
+  ConciergeBell,
 } from 'lucide-react';
 
 interface OrderProgressStepperProps {
@@ -21,12 +21,12 @@ interface OrderProgressStepperProps {
 
 const steps = [
   { key: 'submitted', label: 'Submitted', icon: Clock },
-  { key: 'waiting_for_waiter', label: 'Waiting for Waiter', icon: UserCheck },
+  { key: 'waiting_for_waiter', label: 'Waiter', icon: UserCheck },
   { key: 'order_confirmed', label: 'Confirmed', icon: CheckCircle2 },
-  { key: 'sent_to_kitchen', label: 'Sent to Kitchen', icon: Send },
-  { key: 'preparing', label: 'Preparing', icon: ChefHat },
+  { key: 'sent_to_kitchen', label: 'In Kitchen', icon: Send },
+  { key: 'preparing', label: 'Preparing', icon: UtensilsCrossed },
   { key: 'ready', label: 'Ready', icon: Sparkles },
-  { key: 'served', label: 'Served', icon: CheckCircle2 },
+  { key: 'served', label: 'Served', icon: ConciergeBell },
 ];
 
 export function OrderProgressStepper({
@@ -36,13 +36,13 @@ export function OrderProgressStepper({
 }: OrderProgressStepperProps) {
   if (status === 'cancelled' || status === 'rejected') {
     return (
-      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold space-y-1">
-        <div className="flex items-center gap-1.5 text-rose-700">
+      <div className="p-3 bg-light-error-container/40 border border-light-error text-light-on-error-container rounded-xl text-xs font-semibold space-y-1">
+        <div className="flex items-center gap-1.5 text-light-error">
           <XCircle className="w-4 h-4 shrink-0" />
           <span className="font-bold">Order Declined or Cancelled</span>
         </div>
         {rejectionReason && (
-          <p className="text-[11px] text-rose-600 pl-5">
+          <p className="text-[11px] text-light-error pl-5">
             Reason: &quot;{rejectionReason}&quot;
           </p>
         )}
@@ -78,56 +78,51 @@ export function OrderProgressStepper({
   const currentIndex = getStatusIndex(status);
 
   return (
-    <div className="w-full py-3 space-y-3">
-      {/* Waiter assignment status pill */}
+    <div className="w-full py-2 space-y-3">
+      {/* Waiter assignment status pill (if assigned) */}
       {assignedWaiterName && (
-        <div className="flex items-center justify-between text-[11px] px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-slate-600">
+        <div className="flex items-center justify-between text-xs px-3 py-1.5 bg-light-surface-container-low border border-light-outline-variant/60 rounded-xl text-light-on-surface-variant">
           <span className="flex items-center gap-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+            <UserCheck className="w-3.5 h-3.5 text-light-primary" />
             <span>Assigned Waiter:</span>
-            <strong className="text-slate-900">{assignedWaiterName}</strong>
+            <strong className="text-light-on-surface font-semibold">{assignedWaiterName}</strong>
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-light-primary bg-light-secondary-container px-2 py-0.5 rounded-md">
             {status === 'waiting_for_waiter' ? 'Awaiting Review' : 'Validated'}
           </span>
         </div>
       )}
 
-      {/* Stepper Timeline Bar */}
-      <div className="relative flex items-center justify-between">
-        {/* Background Connecting Line */}
-        <div className="absolute top-4 left-3 right-3 h-0.5 bg-slate-200 -z-0" />
-        {/* Progress Line */}
-        <div
-          className="absolute top-4 left-3 h-0.5 bg-blue-600 transition-all duration-500 -z-0"
-          style={{ width: `${(currentIndex / (steps.length - 1)) * 94}%` }}
-        />
-
+      {/* 7-Step Grid Stepper matching mockup */}
+      <div
+        aria-label="Order progress"
+        className="grid grid-cols-4 sm:grid-cols-7 gap-2 sm:gap-3 pt-1"
+      >
         {steps.map((step, idx) => {
           const Icon = step.icon;
           const isCompleted = idx < currentIndex;
           const isCurrent = idx === currentIndex;
 
           return (
-            <div key={step.key} className="flex flex-col items-center z-10">
-              <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isCompleted
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : isCurrent
-                    ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-md animate-pulse'
-                    : 'bg-white text-slate-400 border-2 border-slate-200'
+            <div key={step.key} className="flex flex-col items-center text-center gap-1.5">
+              <span
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                  isCurrent
+                    ? 'bg-light-primary text-light-on-primary ring-4 ring-light-secondary-container shadow-sm animate-pulse'
+                    : isCompleted
+                    ? 'bg-light-primary text-light-on-primary shadow-2xs'
+                    : 'bg-light-surface-container-low border border-light-outline-variant text-light-on-surface-variant'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </div>
+                <Icon className="w-4 h-4" />
+              </span>
               <span
-                className={`text-[9px] sm:text-[10px] mt-1.5 font-semibold text-center select-none max-w-[50px] leading-tight ${
+                className={`font-label text-[11px] sm:text-xs select-none ${
                   isCurrent
-                    ? 'text-blue-600 font-bold'
+                    ? 'text-light-primary font-bold'
                     : isCompleted
-                    ? 'text-slate-800'
-                    : 'text-slate-400'
+                    ? 'text-light-on-surface font-medium'
+                    : 'text-light-on-surface-variant'
                 }`}
               >
                 {step.label}
