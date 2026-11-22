@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -42,8 +40,8 @@ export async function GET(request: Request) {
     const resolvedTableNumber = realTable?.table_number || 'T-01';
     const resolvedTableName = realTable?.table_name || 'Table 1';
 
-    // 2. Fetch all orders for this table (excluding cancelled)
-    let ordersData: any[] = [];
+    // 2. Fetch all orders strictly for this table (excluding cancelled)
+    let rawOrders: any[] = [];
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -53,30 +51,111 @@ export async function GET(request: Request) {
         .order('created_at', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        ordersData = data;
+        rawOrders = data;
       }
     } catch {
       // Fallback
     }
 
-    // Fallback: If query by tableId yielded 0, try querying by restaurantId
-    if (ordersData.length === 0) {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*, order_items(*)')
-          .eq('restaurant_id', resolvedRestId)
-          .neq('status', 'cancelled')
-          .order('created_at', { ascending: true })
-          .limit(10);
+    // Extract any ORDER_STATUS:* notes to overlay on real orders
+    const stateMap = new Map<string, string>();
+    const statusRank: Record<string, number> = {
+      pending: 0,
+      waiting_for_waiter: 1,
+      confirmed: 2,
+      accepted: 3,
+      sent_to_kitchen: 3,
+      accepted_by_kitchen: 3,
+      preparing: 4,
+      ready: 5,
+      served: 6,
+      completed: 7,
+      cancelled: -1,
+    };
 
-        if (!error && data) ordersData = data;
-      } catch {
-        // Fallback
+    rawOrders.forEach((o: any) => {
+      const note = o.customer_note || '';
+      if (note.startsWith('ORDER_STATUS:')) {
+        const parts = note.split(':');
+        if (parts.length >= 3) {
+          const ordId = parts[1];
+          const st = parts[2];
+          const currentBest = stateMap.get(ordId);
+          const currentRank = currentBest ? (statusRank[currentBest] ?? 0) : -1;
+          const newRank = statusRank[st] ?? 0;
+          if (newRank >= currentRank) {
+            stateMap.set(ordId, st);
+          }
+        }
+      }
+    });
+
+    // Parse session timestamp if available
+    let sessionStartTime: number | null = null;
+    if (sessionId) {
+      const match = sessionId.match(/^sess_(\d+)/);
+      if (match) {
+        const parsed = parseInt(match[1], 10);
+        if (!isNaN(parsed) && parsed > 1700000000000) {
+          sessionStartTime = parsed;
+        }
       }
     }
 
-    // 3. Aggregate item breakdown & totals
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    // 3. Filter to ONLY authentic food orders placed during this dining session / today
+    const sessionFoodOrders = rawOrders.filter((order: any) => {
+      const orderNum = order.order_number || '';
+      const note = order.customer_note || '';
+
+      // Strictly exclude service requests, status markers, test rows, and empty tickets
+      if (
+        orderNum.startsWith('CALL-') ||
+        orderNum.startsWith('SR_STATE-') ||
+        orderNum.startsWith('ORD_STATE-') ||
+        orderNum.startsWith('ACK-') ||
+        orderNum.startsWith('TEST-') ||
+        note.startsWith('SR_STATUS:') ||
+        note.startsWith('ORDER_STATUS:') ||
+        note.startsWith('CALL_WAITER:') ||
+        note.startsWith('ACK:') ||
+        !order.order_items ||
+        order.order_items.length === 0
+      ) {
+        return false;
+      }
+
+      const orderCreatedTime = new Date(order.created_at).getTime();
+
+      // Explicit session tag match
+      if (sessionId && (note.includes(`[SESS:${sessionId}]`) || note.includes(`SESSION:${sessionId}`))) {
+        return true;
+      }
+
+      // If session start time is known, exclude orders placed before this session started
+      if (sessionStartTime) {
+        if (orderCreatedTime < sessionStartTime - 2 * 60 * 1000) {
+          return false;
+        }
+      }
+
+      // Exclude orders from previous calendar days (e.g. Nov 15, Nov 19)
+      if (orderCreatedTime < todayMidnight) {
+        return false;
+      }
+
+      // Exclude old completed & paid orders from previous meals
+      const effStatus = stateMap.get(order.id) || order.status;
+      if (effStatus === 'completed' && order.payment_status === 'paid' && sessionStartTime && orderCreatedTime < sessionStartTime) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // 4. Aggregate item breakdown & totals from authentic dish items
     const allItems: any[] = [];
     let itemsSubtotal = 0;
     let ordersSubtotal = 0;
@@ -85,7 +164,7 @@ export async function GET(request: Request) {
     let ordersTotal = 0;
     let totalPaid = 0;
 
-    for (const order of ordersData) {
+    for (const order of sessionFoodOrders) {
       ordersSubtotal += Number(order.subtotal || 0);
       ordersTax += Number(order.tax_amount || 0);
       ordersServiceFee += Number(order.service_fee || 0);
@@ -96,39 +175,20 @@ export async function GET(request: Request) {
       }
 
       const orderItems = order.order_items || [];
-      if (orderItems.length > 0) {
-        for (const item of orderItems) {
-          const itemTotal = Number(item.unit_price) * (item.quantity || 1);
-          itemsSubtotal += itemTotal;
-          allItems.push({
-            id: item.id,
-            orderId: order.id,
-            orderNumber: order.order_number,
-            orderTime: order.created_at,
-            orderStatus: order.status,
-            dishName: item.dish_name,
-            quantity: item.quantity || 1,
-            unitPrice: Number(item.unit_price),
-            totalPrice: itemTotal,
-            notes: item.notes,
-            paymentStatus: order.payment_status || 'pending',
-          });
-        }
-      } else {
-        // If order had no order_items rows, create synthetic item from order summary
-        const orderAmt = Number(order.subtotal || order.total_amount || 0);
-        itemsSubtotal += orderAmt;
+      for (const item of orderItems) {
+        const itemTotal = Number(item.unit_price) * (item.quantity || 1);
+        itemsSubtotal += itemTotal;
         allItems.push({
-          id: `item_${order.id}`,
+          id: item.id,
           orderId: order.id,
           orderNumber: order.order_number,
           orderTime: order.created_at,
-          orderStatus: order.status,
-          dishName: `Order #${order.order_number}`,
-          quantity: 1,
-          unitPrice: orderAmt,
-          totalPrice: orderAmt,
-          notes: order.customer_note,
+          orderStatus: stateMap.get(order.id) || order.status,
+          dishName: item.dish_name,
+          quantity: item.quantity || 1,
+          unitPrice: Number(item.unit_price),
+          totalPrice: itemTotal,
+          notes: item.notes,
           paymentStatus: order.payment_status || 'pending',
         });
       }
@@ -174,7 +234,7 @@ export async function GET(request: Request) {
     const effectiveTotal = ordersTotal > 0 ? ordersTotal : Number((effectiveSubtotal + effectiveTax + effectiveServiceFee).toFixed(2));
 
     const outstandingBalance = Math.max(0, Number((effectiveTotal - totalPaid).toFixed(2)));
-    const isFullyPaid = outstandingBalance <= 0 && allItems.length > 0;
+    const isFullyPaid = outstandingBalance <= 0;
 
     return NextResponse.json({
       success: true,
@@ -188,7 +248,7 @@ export async function GET(request: Request) {
         tableNumber: resolvedTableNumber,
         tableName: resolvedTableName,
         guestCount: 1,
-        openedAt: ordersData[0]?.created_at || new Date().toISOString(),
+        openedAt: sessionFoodOrders[0]?.created_at || (sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString()),
         items: allItems,
         subtotal: effectiveSubtotal,
         taxAmount: effectiveTax,
@@ -197,8 +257,8 @@ export async function GET(request: Request) {
         totalAmount: effectiveTotal,
         totalPaid,
         outstandingBalance,
-        isFullyPaid,
-        ordersCount: ordersData.length,
+        isFullyPaid: isFullyPaid && allItems.length > 0,
+        ordersCount: sessionFoodOrders.length,
         hasPendingPayment: outstandingBalance > 0 && allItems.length > 0,
       },
     });

@@ -36,18 +36,64 @@ export async function POST(request: Request) {
 
     const resolvedTableId = realTable?.id || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
 
-    // 2. Fetch all unpaid table orders
+    // 2. Fetch unpaid table orders strictly for this session/today
     let totalOutstanding = 0;
     try {
       const { data: orders } = await supabase
         .from('orders')
-        .select('total_amount, payment_status, status')
+        .select('id, order_number, total_amount, payment_status, status, customer_note, created_at, order_items(id)')
         .eq('table_id', resolvedTableId)
         .neq('status', 'cancelled');
 
+      let sessionStartTime: number | null = null;
+      if (sessionId) {
+        const match = sessionId.match(/^sess_(\d+)/);
+        if (match) {
+          const parsed = parseInt(match[1], 10);
+          if (!isNaN(parsed) && parsed > 1700000000000) {
+            sessionStartTime = parsed;
+          }
+        }
+      }
+
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
       if (orders && orders.length > 0) {
         for (const o of orders) {
-          if (o.payment_status !== 'paid') {
+          const num = o.order_number || '';
+          const note = o.customer_note || '';
+
+          // Exclude ghost tickets, status markers, and empty tickets
+          if (
+            num.startsWith('CALL-') ||
+            num.startsWith('SR_STATE-') ||
+            num.startsWith('ORD_STATE-') ||
+            num.startsWith('ACK-') ||
+            num.startsWith('TEST-') ||
+            note.startsWith('SR_STATUS:') ||
+            note.startsWith('ORDER_STATUS:') ||
+            note.startsWith('CALL_WAITER:') ||
+            note.startsWith('ACK:') ||
+            !o.order_items ||
+            o.order_items.length === 0
+          ) {
+            continue;
+          }
+
+          const orderCreatedTime = new Date(o.created_at).getTime();
+
+          // Exclude orders from previous days
+          if (orderCreatedTime < todayMidnight) {
+            continue;
+          }
+
+          // Exclude orders created before this session
+          if (sessionStartTime && orderCreatedTime < sessionStartTime - 2 * 60 * 1000) {
+            continue;
+          }
+
+          if (o.payment_status !== 'paid' && o.status !== 'completed') {
             totalOutstanding += Number(o.total_amount || 0);
           }
         }
@@ -56,8 +102,8 @@ export async function POST(request: Request) {
       // Fallback
     }
 
-    // Fallback if 0: default to ₹1.00 minimum
-    const finalAmount = Math.max(0, Number(totalOutstanding.toFixed(2))) || 1.0;
+    // Amount to charge
+    const finalAmount = Math.max(0, Number(totalOutstanding.toFixed(2)));
     const gatewayOrderId = `order_zv_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
 
     // Read saved payment settings from Supabase if configured by restaurant owner

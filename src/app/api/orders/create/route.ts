@@ -448,11 +448,12 @@ export async function POST(request: Request) {
     // 7. Insert Order into Supabase
     // We only use standard verified database columns:
     // id, restaurant_id, table_id, order_number, order_source, subtotal, tax_amount, service_fee, total_amount, status, customer_note, payment_status
+    const sessionTag = tableSessionId ? `[SESS:${tableSessionId}]` : '';
     const noteWithCoupon = validatedCouponCode
-      ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})`
+      ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})${sessionTag ? ` ${sessionTag}` : ''}`
       : customerNote
-      ? String(customerNote).slice(0, 500)
-      : null;
+      ? `${String(customerNote).slice(0, 450)}${sessionTag ? ` ${sessionTag}` : ''}`
+      : sessionTag || null;
 
     const baseOrderPayload = {
       restaurant_id: restaurantId,

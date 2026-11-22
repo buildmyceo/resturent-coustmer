@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,7 +13,7 @@ export async function GET(request: Request) {
 
     let ordersData: any[] = [];
 
-    // 1. If explicit orderId
+    // 1. If explicit orderId is requested
     if (orderId) {
       try {
         const { data } = await supabase
@@ -46,7 +44,7 @@ export async function GET(request: Request) {
       } catch {}
     }
 
-    // 2. Query by table_id (most reliable for physical table dining)
+    // 2. Query strictly by table_id for physical table dining
     if (ordersData.length === 0) {
       const targetTableId = tableId || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
       try {
@@ -71,66 +69,7 @@ export async function GET(request: Request) {
       } catch {}
     }
 
-    // 3. Fallback: Query by restaurant_id
-    if (ordersData.length === 0) {
-      const targetRestId = restaurantId || 'a9feec11-8dee-4202-be6e-a097e45266e6';
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*, order_items(*, dishes(preparation_time, image_url))')
-          .eq('restaurant_id', targetRestId)
-          .neq('status', 'cancelled')
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (!error && data && data.length > 0) {
-          ordersData = data;
-        } else {
-          const { data: fallbackData } = await supabase
-            .from('orders')
-            .select('*, order_items(*)')
-            .eq('restaurant_id', targetRestId)
-            .neq('status', 'cancelled')
-            .order('created_at', { ascending: false })
-            .limit(10);
-          if (fallbackData) ordersData = fallbackData;
-        }
-      } catch {}
-    }
-
-    // Filter out internal service request / call marker rows
-    // Only return actual food orders
-    const foodOrders = (ordersData || []).filter((o: any) => {
-      const orderNum = o.order_number || '';
-      const note = o.customer_note || '';
-
-      // Exclude service requests & status markers
-      if (
-        orderNum.startsWith('CALL-') ||
-        orderNum.startsWith('SR_STATE-') ||
-        orderNum.startsWith('ORD_STATE-') ||
-        orderNum.startsWith('ACK-') ||
-        orderNum.startsWith('TEST-') ||
-        note.startsWith('SR_STATUS:') ||
-        note.startsWith('ORDER_STATUS:') ||
-        note.startsWith('CALL_WAITER:') ||
-        note.startsWith('ACK:')
-      ) {
-        return false;
-      }
-
-      // If an order is completed OR marked paid, do NOT show it to new table visitors
-      // unless specifically requested by exact orderId
-      if (!orderId) {
-        if (o.status === 'completed' || o.payment_status === 'paid') {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    // Check status markers (ORD_STATE-*) to overlay live order progress
+    // Extract status markers (ORD_STATE-*) to overlay live order progress
     const statusRank: Record<string, number> = {
       pending: 0,
       waiting_for_waiter: 1,
@@ -141,7 +80,8 @@ export async function GET(request: Request) {
       preparing: 4,
       ready: 5,
       served: 6,
-      completed: 6,
+      completed: 7,
+      cancelled: -1,
     };
 
     const stateMap = new Map<string, string>();
@@ -160,6 +100,78 @@ export async function GET(request: Request) {
           }
         }
       }
+    });
+
+    // Parse session timestamp if available
+    let sessionStartTime: number | null = null;
+    if (sessionId) {
+      const match = sessionId.match(/^sess_(\d+)/);
+      if (match) {
+        const parsed = parseInt(match[1], 10);
+        if (!isNaN(parsed) && parsed > 1700000000000) {
+          sessionStartTime = parsed;
+        }
+      }
+    }
+
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    // Filter out internal service request / call marker rows
+    // Only return authentic food orders belonging to the current dining session
+    const foodOrders = (ordersData || []).filter((o: any) => {
+      const orderNum = o.order_number || '';
+      const note = o.customer_note || '';
+
+      // Exclude service requests & status markers & empty tickets
+      if (
+        orderNum.startsWith('CALL-') ||
+        orderNum.startsWith('SR_STATE-') ||
+        orderNum.startsWith('ORD_STATE-') ||
+        orderNum.startsWith('ACK-') ||
+        orderNum.startsWith('TEST-') ||
+        note.startsWith('SR_STATUS:') ||
+        note.startsWith('ORDER_STATUS:') ||
+        note.startsWith('CALL_WAITER:') ||
+        note.startsWith('ACK:') ||
+        !o.order_items ||
+        o.order_items.length === 0
+      ) {
+        return false;
+      }
+
+      // If specific orderId requested, return it
+      if (orderId && o.id === orderId) {
+        return true;
+      }
+
+      // Check explicit session tag match
+      if (sessionId && (note.includes(`[SESS:${sessionId}]`) || note.includes(`SESSION:${sessionId}`))) {
+        return true;
+      }
+
+      const orderCreatedTime = new Date(o.created_at).getTime();
+
+      // Exclude orders created before this session started
+      if (sessionStartTime && orderCreatedTime < sessionStartTime - 2 * 60 * 1000) {
+        return false;
+      }
+
+      // Exclude orders from previous calendar days (e.g. from Nov 15, Nov 19)
+      if (orderCreatedTime < todayMidnight) {
+        return false;
+      }
+
+      // If an order is completed OR marked paid, do NOT show it to new table visitors
+      // unless it was placed during this current active session
+      const effectiveStatus = stateMap.get(o.id) || o.status;
+      if (effectiveStatus === 'completed' || o.status === 'completed' || o.payment_status === 'paid') {
+        if (!sessionId || (sessionStartTime && orderCreatedTime < sessionStartTime)) {
+          return false;
+        }
+      }
+
+      return true;
     });
 
     const formattedOrders = foodOrders.map((o: any) => {
