@@ -308,10 +308,8 @@ export function CustomerProvider({
           return [...prevCart, newItem];
         }
       });
-
-      showToast(`Added to cart`, `${quantity}x ${dish.name}`, 'success');
     },
-    [showToast]
+    []
   );
 
   const updateCartQuantity = useCallback((cartItemId: string, newQuantity: number) => {

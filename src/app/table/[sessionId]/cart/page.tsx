@@ -558,7 +558,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                         type="button"
                         onClick={() => {
                           addToCart(dish);
-                          showToast('Added to Cart', `${dish.name} was added`, 'success');
                           customerAudio.playTap();
                         }}
                         className="shrink-0 bg-light-surface-container-lowest text-light-primary border border-light-primary hover:bg-light-primary hover:text-light-on-primary px-3 py-1.5 rounded-lg font-label text-xs font-semibold transition-colors cursor-pointer"
