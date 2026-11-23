@@ -31,7 +31,6 @@ import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatDistance } from '@/lib/geofence';
 import { formatCurrency } from '@/lib/format';
-import { getCategoryEmoji } from '@/lib/category-helpers';
 
 interface MenuPageProps {
   params: Promise<{ sessionId: string }>;
@@ -554,14 +553,13 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategoryId(cat.id)}
-                className={`category-pill shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                className={`category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   activeCategoryId === cat.id
                     ? 'bg-light-primary text-light-on-primary shadow-xs'
                     : 'bg-light-surface-container-lowest border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
                 }`}
               >
-                <span className="text-sm leading-none select-none">{getCategoryEmoji(cat)}</span>
-                <span>{cat.name}</span>
+                <span>{cat.name.replace(/^[\p{Emoji}\u200d\uFE0F\s]+/u, '').trim() || cat.name}</span>
               </button>
             ))}
           </div>
@@ -598,14 +596,9 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             <section key={group.category.id} className="menu-section space-y-4 scroll-mt-36">
               <div className="flex items-baseline justify-between gap-3 border-b border-light-outline-variant/50 pb-2">
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl sm:text-2xl leading-none select-none">
-                      {getCategoryEmoji(group.category)}
-                    </span>
-                    <h2 className="font-headline text-xl sm:text-2xl font-semibold text-light-on-surface">
-                      {group.category.name}
-                    </h2>
-                  </div>
+                  <h2 className="font-headline text-xl sm:text-2xl font-semibold text-light-on-surface">
+                    {group.category.name.replace(/^[\p{Emoji}\u200d\uFE0F\s]+/u, '').trim() || group.category.name}
+                  </h2>
                   {(group.category as any)?.description && (
                     <p className="font-body text-xs sm:text-sm text-light-on-surface-variant mt-0.5">
                       {(group.category as any).description}
