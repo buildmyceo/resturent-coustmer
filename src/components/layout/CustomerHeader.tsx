@@ -7,8 +7,8 @@ import { getGuestSession } from '@/lib/guest-session';
 import { UtensilsCrossed, User, Bell, Clock, AlertTriangle, Coffee } from 'lucide-react';
 
 export function CustomerHeader() {
-  const { restaurant, table, session, participant, setIsCallWaiterModalOpen, orders } = useCustomer();
-  const [storedSession, setStoredSession] = useState<{ tableNumber?: string; restaurantSlug?: string; guestName?: string } | null>(null);
+  const { restaurant, table, session, participant, setIsCallWaiterModalOpen, orders, deactivateSession } = useCustomer();
+  const [storedSession, setStoredSession] = useState<{ tableNumber?: string; restaurantSlug?: string; guestName?: string; lastActiveTimestamp?: number } | null>(null);
 
   useEffect(() => {
     const s = getGuestSession();
@@ -19,7 +19,7 @@ export function CustomerHeader() {
   const displayTable = table?.number || storedSession?.tableNumber || 'T-01';
   const displayGuestName = participant?.name || storedSession?.guestName || 'harshit';
 
-  // 15-Minute Countdown Timer State
+  // 1-Hour Temporary Customer Session Timeout State
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const [isWarning, setIsWarning] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
@@ -28,13 +28,22 @@ export function CustomerHeader() {
   const hasActiveOrders = orders.some((o) => ['pending', 'accepted', 'preparing', 'ready'].includes(o.status));
 
   useEffect(() => {
-    // If order has already been placed, timer does NOT apply!
-    if (hasOrders || !session?.initialClaimExpiresAt) {
+    // If an order has been placed, 1-hour temporary expiration does NOT apply!
+    if (hasOrders) {
       queueMicrotask(() => setTimeLeft(null));
       return;
     }
 
-    const expiresTimestamp = new Date(session.initialClaimExpiresAt).getTime();
+    // Determine target expiration: 1 hour (60 min) from session claim or opening
+    const expiresTimestamp = session?.initialClaimExpiresAt
+      ? new Date(session.initialClaimExpiresAt).getTime()
+      : session?.openedAt
+      ? new Date(session.openedAt).getTime() + 60 * 60 * 1000
+      : storedSession?.lastActiveTimestamp
+      ? storedSession.lastActiveTimestamp + 60 * 60 * 1000
+      : null;
+
+    if (!expiresTimestamp) return;
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -44,22 +53,28 @@ export function CustomerHeader() {
         setTimeLeft('00:00');
         setIsExpired(true);
         clearInterval(interval);
+        // Automatically deactivate session & reload page per user request
+        deactivateSession('1 hour online without placing an order');
       } else {
         const totalSeconds = Math.floor(diffMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        const formatted =
+          hours > 0
+            ? `${hours}h ${String(minutes).padStart(2, '0')}m`
+            : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         setTimeLeft(formatted);
-        setIsWarning(minutes < 3);
+        setIsWarning(hours === 0 && minutes < 5);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [session?.initialClaimExpiresAt, hasOrders]);
+  }, [session?.initialClaimExpiresAt, session?.openedAt, storedSession?.lastActiveTimestamp, hasOrders, deactivateSession]);
 
   return (
     <header className="sticky top-0 z-40 bg-light-surface-container-lowest border-b border-light-outline-variant/60 shadow-xs">
-      {/* 15-Minute Countdown Banner (Only shown before first order is placed) */}
+      {/* 1-Hour Countdown Banner (Only shown before first order is placed) */}
       {!hasOrders && timeLeft && (
         <div
           className={`px-4 py-1.5 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
@@ -73,13 +88,13 @@ export function CustomerHeader() {
           {isExpired ? (
             <>
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span>Initial 15-min table claim expired. Please scan table QR again to reserve.</span>
+              <span>Session expired after 1 hour without ordering. Deactivating and reloading page...</span>
             </>
           ) : (
             <>
               <Clock className="w-3.5 h-3.5 shrink-0" />
               <span>
-                Table reserved! Order within <strong className="font-mono text-sm underline">{timeLeft}</strong> to secure your table.
+                Table reserved! Order within <strong className="font-mono text-sm underline">{timeLeft}</strong> or table session will automatically deactivate.
               </span>
             </>
           )}

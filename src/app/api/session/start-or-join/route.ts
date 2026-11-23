@@ -146,7 +146,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (existingSession) {
-        // Enforce 15-minute expiration before first order
+        // Enforce 1-hour expiration before first order is placed
         const isExpired =
           !existingSession.is_claim_permanent &&
           existingSession.initial_claim_expires_at &&
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
           sessionId = existingSession.id;
           initialClaimExpiresAt =
             existingSession.initial_claim_expires_at ||
-            (existingSession.is_claim_permanent ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString());
+            (existingSession.is_claim_permanent ? null : new Date(Date.now() + 60 * 60 * 1000).toISOString());
           isClaimPermanent = Boolean(existingSession.is_claim_permanent);
 
           await supabase
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
 
     if (!sessionId) {
       isHost = true;
-      initialClaimExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      initialClaimExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       isClaimPermanent = false;
       sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 

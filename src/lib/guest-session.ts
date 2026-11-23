@@ -18,7 +18,7 @@ export interface GuestSessionState {
 }
 
 const STORAGE_KEY = 'zovo_guest_session';
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour (60 minutes) temporary customer timeout
 
 export function generateGuestToken(): string {
   const randomBytes = new Uint8Array(16);
@@ -74,9 +74,9 @@ export function getGuestSession(): GuestSessionState | null {
 
     const now = Date.now();
 
-    // Check 15-minute inactivity policy
+    // Check 1-hour inactivity policy
     if (now - session.lastActiveTimestamp > INACTIVITY_TIMEOUT_MS) {
-      console.info('Guest session expired due to 15 minutes of inactivity.');
+      console.info('Guest session expired due to 1 hour of inactivity.');
       return {
         ...session,
         // Mark as expired so UI can prompt to rejoin via QR scan

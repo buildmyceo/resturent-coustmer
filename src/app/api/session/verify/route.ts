@@ -77,7 +77,7 @@ export async function POST(request: Request) {
           serviceFee: 0,
           totalAmount: 0,
           totalPaid: 0,
-          initialClaimExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          initialClaimExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           isClaimPermanent: false,
         },
         participant: {
@@ -92,8 +92,11 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: false,
         isClosed: true,
+        isDeactivated: true,
         sessionStatus: session.status,
-        error: 'This dining session has ended. Please scan a new QR code.',
+        error: session.status === 'cancelled'
+          ? 'This table session has been deactivated. Please scan the table QR code to start.'
+          : 'This dining session has ended. Please scan a new QR code.',
       });
     }
 
@@ -117,11 +120,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 15-minute expiration applies ONLY before first order is submitted
+    // 1-hour expiration applies ONLY before first order is submitted
     if (!hasSubmittedOrders) {
       const expiresAt = session.initial_claim_expires_at
         ? new Date(session.initial_claim_expires_at).getTime()
-        : new Date(session.opened_at || session.created_at).getTime() + 15 * 60 * 1000;
+        : new Date(session.opened_at || session.created_at).getTime() + 60 * 60 * 1000;
 
       if (Date.now() > expiresAt) {
         isExpired = true;
@@ -134,7 +137,8 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: false,
           isExpired: true,
-          error: 'Your initial 15-minute table claim has expired. Please scan the QR code again.',
+          isDeactivated: true,
+          error: 'Your temporary table session was deactivated after 1 hour without placing an order. Please scan the QR code again.',
         });
       }
     } else {
@@ -172,6 +176,7 @@ export async function POST(request: Request) {
         tableName: session.restaurant_tables?.table_name || 'Dining Table',
         status: session.status,
         guestCount: session.guest_count,
+        openedAt: session.opened_at || session.created_at || new Date().toISOString(),
         subtotal: Number(session.subtotal || 0),
         taxAmount: Number(session.tax_amount || 0),
         serviceFee: Number(session.service_fee || 0),

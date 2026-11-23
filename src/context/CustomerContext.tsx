@@ -78,6 +78,9 @@ interface CustomerContextType {
   toasts: ToastMessage[];
   showToast: (title: string, description?: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
+  isSessionDeactivated: boolean;
+  setIsSessionDeactivated: (v: boolean) => void;
+  deactivateSession: (reason?: string) => Promise<void>;
   isSessionActive: boolean;
   customerLocation: { latitude: number; longitude: number } | null;
   isInsideGeofence: boolean | null;
@@ -121,6 +124,7 @@ export function CustomerProvider({
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [selectedDishModal, setSelectedDishModal] = useState<Dish | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isSessionDeactivated, setIsSessionDeactivated] = useState(false);
 
   // Toast Notification Manager
   const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -355,6 +359,35 @@ export function CustomerProvider({
       } catch {}
     }
   }, []);
+
+  const deactivateSession = useCallback(
+    async (reason?: string) => {
+      setIsSessionDeactivated(true);
+      try {
+        if (session?.id) {
+          await fetch('/api/session/deactivate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: session.id,
+              reason: reason || '1 hour temporary customer inactivity without ordering',
+            }),
+          });
+        }
+      } catch (err) {
+        console.warn('Deactivate session error:', err);
+      }
+
+      clearSessionState();
+
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
+    },
+    [session?.id, clearSessionState]
+  );
 
   // Auto-hydrate restaurant from Supabase if missing from context
   useEffect(() => {
@@ -773,6 +806,9 @@ export function CustomerProvider({
         toasts,
         showToast,
         dismissToast,
+        isSessionDeactivated,
+        setIsSessionDeactivated,
+        deactivateSession,
         isSessionActive,
         customerLocation,
         isInsideGeofence,

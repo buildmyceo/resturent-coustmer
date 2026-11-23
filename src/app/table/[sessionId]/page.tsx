@@ -59,6 +59,8 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
     updateCartQuantity,
     isShopOpen,
     operatingHoursStatus,
+    setIsSessionDeactivated,
+    clearSessionState,
   } = useCustomer();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -106,6 +108,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             }),
           });
           const data = await res.json();
+          if (data.isExpired || data.isDeactivated || data.sessionStatus === 'cancelled' || !data.success) {
+            clearSessionState();
+            setIsSessionDeactivated(true);
+            setIsLoading(false);
+            return;
+          }
           if (data.success && data.session) {
             if (data.session.restaurantId && !data.session.restaurantId.startsWith('11111111')) {
               targetRestId = data.session.restaurantId;
