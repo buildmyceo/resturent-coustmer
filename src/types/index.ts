@@ -49,6 +49,9 @@ export interface Dish {
   spiceLevel?: 'none' | 'mild' | 'medium' | 'hot' | 'extra_hot';
   sweetnessLevel?: 'none' | 'low' | 'regular' | 'extra';
   temperature?: 'normal' | 'hot' | 'warm' | 'iced' | 'extra_cold';
+  allowSpiceLevel?: boolean;
+  allowTemperature?: boolean;
+  allowSweetnessLevel?: boolean;
   ordersCount?: number;
   createdAt?: string;
 }

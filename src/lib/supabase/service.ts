@@ -435,6 +435,9 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         spiceLevel: meta.spiceLevel || undefined,
         sweetnessLevel: meta.sweetnessLevel || undefined,
         temperature: meta.temperature || undefined,
+        allowSpiceLevel: meta.allowSpiceLevel !== undefined ? Boolean(meta.allowSpiceLevel) : undefined,
+        allowTemperature: meta.allowTemperature !== undefined ? Boolean(meta.allowTemperature) : undefined,
+        allowSweetnessLevel: meta.allowSweetnessLevel !== undefined ? Boolean(meta.allowSweetnessLevel) : undefined,
         variants: (d.dish_variants || [])
           .filter((v: any) => v.is_active)
           .map((v: any) => ({

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Dish, DishVariant, DishAddon } from '@/types';
 import { DietaryBadge } from './DietaryBadge';
 import { formatCurrency } from '@/lib/format';
+import { getEffectiveDishPreferences } from '@/lib/dish-preferences';
 import { X, Clock, AlertTriangle, Plus, Minus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -40,6 +41,13 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
   const [specialInstructions, setSpecialInstructions] = useState('');
 
   // Taste & Temperature customization
+  const prefs = useMemo(() => {
+    if (!dish) return { allowSpiceLevel: false, allowTemperature: false, allowSweetnessLevel: false };
+    return getEffectiveDishPreferences(dish);
+  }, [dish]);
+
+  const hasAnyPreferences = prefs.allowSpiceLevel || prefs.allowTemperature || prefs.allowSweetnessLevel;
+
   const [selectedSpice, setSelectedSpice] = useState<string>(dish?.spiceLevel || '');
   const [selectedTemp, setSelectedTemp] = useState<string>(dish?.temperature || '');
   const [selectedSweet, setSelectedSweet] = useState<string>(dish?.sweetnessLevel || '');
@@ -68,7 +76,7 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
       .map((a) => ({ id: a.id, name: a.name, additionalPrice: Number(a.additionalPrice) }));
 
     const tastePreferences: string[] = [];
-    if (selectedSpice) {
+    if (prefs.allowSpiceLevel && selectedSpice) {
       const spiceLabels: Record<string, string> = {
         none: 'No Spice',
         mild: 'Mild 🌶️',
@@ -78,7 +86,7 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
       };
       tastePreferences.push(spiceLabels[selectedSpice] || selectedSpice);
     }
-    if (selectedTemp) {
+    if (prefs.allowTemperature && selectedTemp) {
       const tempLabels: Record<string, string> = {
         normal: 'Normal Temp',
         iced: 'Iced / Cold 🧊',
@@ -88,7 +96,7 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
       };
       tastePreferences.push(tempLabels[selectedTemp] || selectedTemp);
     }
-    if (selectedSweet) {
+    if (prefs.allowSweetnessLevel && selectedSweet) {
       const sweetLabels: Record<string, string> = {
         none: 'Sugar Free 🚫',
         low: 'Low Sweet 🍯',
@@ -275,90 +283,98 @@ export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: Dish
           )}
 
           {/* Optional Taste & Temperature Preferences */}
-          <div className="space-y-3.5 pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Custom Preferences</h3>
-              <span className="text-[11px] text-slate-400 font-medium">Optional</span>
-            </div>
-
-            {/* Spice Level Selection */}
-            <div className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-700 block">Spice Level</span>
-              <div className="grid grid-cols-4 gap-1.5 text-xs">
-                {[
-                  { value: 'mild', label: 'Mild 🌶️' },
-                  { value: 'medium', label: 'Medium 🌶️🌶️' },
-                  { value: 'hot', label: 'Hot 🌶️🌶️🌶️' },
-                  { value: 'extra_hot', label: 'Extra 🔥' },
-                ].map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => setSelectedSpice(selectedSpice === s.value ? '' : s.value)}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
-                      selectedSpice === s.value
-                        ? 'border-amber-500 bg-amber-50 text-amber-900 font-bold shadow-2xs'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+          {hasAnyPreferences && (
+            <div className="space-y-3.5 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">Custom Preferences</h3>
+                <span className="text-[11px] text-slate-400 font-medium">Optional</span>
               </div>
-            </div>
 
-            {/* Temperature / Cold Level */}
-            <div className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-700 block">Temperature / Cold</span>
-              <div className="grid grid-cols-4 gap-1.5 text-xs">
-                {[
-                  { value: 'normal', label: 'Normal' },
-                  { value: 'iced', label: 'Iced 🧊' },
-                  { value: 'extra_cold', label: 'Extra ❄️' },
-                  { value: 'hot', label: 'Hot ♨️' },
-                ].map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => setSelectedTemp(selectedTemp === t.value ? '' : t.value)}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
-                      selectedTemp === t.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-900 font-bold shadow-2xs'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+              {/* Spice Level Selection */}
+              {prefs.allowSpiceLevel && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-slate-700 block">Spice Level</span>
+                  <div className="grid grid-cols-4 gap-1.5 text-xs">
+                    {[
+                      { value: 'mild', label: 'Mild 🌶️' },
+                      { value: 'medium', label: 'Medium 🌶️🌶️' },
+                      { value: 'hot', label: 'Hot 🌶️🌶️🌶️' },
+                      { value: 'extra_hot', label: 'Extra 🔥' },
+                    ].map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => setSelectedSpice(selectedSpice === s.value ? '' : s.value)}
+                        className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                          selectedSpice === s.value
+                            ? 'border-amber-500 bg-amber-50 text-amber-900 font-bold shadow-2xs'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* Sweetness Level */}
-            <div className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-700 block">Sweetness Level</span>
-              <div className="grid grid-cols-4 gap-1.5 text-xs">
-                {[
-                  { value: 'none', label: 'No Sugar 🚫' },
-                  { value: 'low', label: 'Low 🍯' },
-                  { value: 'regular', label: 'Regular 🍬' },
-                  { value: 'extra', label: 'Extra 🧁' },
-                ].map((sw) => (
-                  <button
-                    key={sw.value}
-                    type="button"
-                    onClick={() => setSelectedSweet(selectedSweet === sw.value ? '' : sw.value)}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
-                      selectedSweet === sw.value
-                        ? 'border-pink-500 bg-pink-50 text-pink-900 font-bold shadow-2xs'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    {sw.label}
-                  </button>
-                ))}
-              </div>
+              {/* Temperature / Cold Level */}
+              {prefs.allowTemperature && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-slate-700 block">Temperature / Cold</span>
+                  <div className="grid grid-cols-4 gap-1.5 text-xs">
+                    {[
+                      { value: 'normal', label: 'Normal' },
+                      { value: 'iced', label: 'Iced 🧊' },
+                      { value: 'extra_cold', label: 'Extra ❄️' },
+                      { value: 'hot', label: 'Hot ♨️' },
+                    ].map((t) => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setSelectedTemp(selectedTemp === t.value ? '' : t.value)}
+                        className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                          selectedTemp === t.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-900 font-bold shadow-2xs'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sweetness Level */}
+              {prefs.allowSweetnessLevel && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-slate-700 block">Sweetness Level</span>
+                  <div className="grid grid-cols-4 gap-1.5 text-xs">
+                    {[
+                      { value: 'none', label: 'No Sugar 🚫' },
+                      { value: 'low', label: 'Low 🍯' },
+                      { value: 'regular', label: 'Regular 🍬' },
+                      { value: 'extra', label: 'Extra 🧁' },
+                    ].map((sw) => (
+                      <button
+                        key={sw.value}
+                        type="button"
+                        onClick={() => setSelectedSweet(selectedSweet === sw.value ? '' : sw.value)}
+                        className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-medium text-[11px] ${
+                          selectedSweet === sw.value
+                            ? 'border-pink-500 bg-pink-50 text-pink-900 font-bold shadow-2xs'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        {sw.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* 3. Special Instructions */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
