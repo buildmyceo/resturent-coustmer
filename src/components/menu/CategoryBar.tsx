@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Category } from '@/types';
+import { getCategoryEmoji, isEmoji } from '@/lib/category-helpers';
 
 interface CategoryBarProps {
   categories: Category[];
@@ -20,7 +21,7 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
         {/* Categories Tiles */}
         {categories.map((cat) => {
           const isActive = activeCategoryId === cat.id;
-          const hasImage = Boolean(cat.image && cat.image.trim() !== '');
+          const emoji = getCategoryEmoji(cat);
 
           return (
             <button
@@ -31,25 +32,15 @@ export function CategoryBar({ categories, activeCategoryId, onSelectCategory }: 
               <div
                 className={`relative w-14 h-14 rounded-2xl overflow-hidden transition-all bg-slate-50 flex items-center justify-center ${
                   isActive
-                    ? 'border-2 border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
+                    ? 'border-2 border-light-primary bg-light-secondary-container/20 shadow-xs ring-2 ring-light-primary/20'
                     : 'border border-slate-200/70 group-hover:border-slate-300'
                 }`}
               >
-                {hasImage ? (
-                  <Image
-                    src={cat.image!}
-                    alt={cat.name}
-                    fill
-                    sizes="56px"
-                    className="object-cover group-hover:scale-105 transition-transform"
-                  />
-                ) : (
-                  <span className="text-xl">☕</span>
-                )}
+                <span className="text-2xl select-none">{emoji}</span>
               </div>
               <span
                 className={`text-[11px] text-center font-bold tracking-tight max-w-[64px] line-clamp-2 leading-tight ${
-                  isActive ? 'text-emerald-700 font-extrabold' : 'text-slate-700'
+                  isActive ? 'text-light-primary font-extrabold' : 'text-slate-700'
                 }`}
               >
                 {cat.name}
