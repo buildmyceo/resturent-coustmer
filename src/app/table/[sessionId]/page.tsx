@@ -533,13 +533,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
             <button
               onClick={() => setActiveCategoryId('all')}
-              className={`category-pill shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              className={`category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                 activeCategoryId === 'all'
                   ? 'bg-light-primary text-light-on-primary shadow-xs'
                   : 'bg-light-surface-container-lowest border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
               }`}
             >
-              <UtensilsCrossed className="w-3.5 h-3.5" />
               <span>All Items</span>
             </button>
             {categories.map((cat) => (
