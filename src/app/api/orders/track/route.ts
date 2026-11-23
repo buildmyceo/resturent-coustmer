@@ -102,6 +102,16 @@ export async function GET(request: Request) {
       }
     });
 
+    const getEffectiveStatus = (baseStatus: string, ordId: string): string => {
+      const base = baseStatus || 'pending';
+      if (base === 'completed' || base === 'cancelled') return base;
+      const overlay = stateMap.get(ordId);
+      if (!overlay) return base;
+      const baseRank = statusRank[base] ?? 0;
+      const overlayRank = statusRank[overlay] ?? 0;
+      return overlayRank > baseRank ? overlay : base;
+    };
+
     // Parse session timestamp if available
     let sessionStartTime: number | null = null;
     if (sessionId) {
@@ -164,7 +174,7 @@ export async function GET(request: Request) {
 
       // If an order is completed OR marked paid, do NOT show it to new table visitors
       // unless it was placed during this current active session
-      const effectiveStatus = stateMap.get(o.id) || o.status;
+      const effectiveStatus = getEffectiveStatus(o.status, o.id);
       if (effectiveStatus === 'completed' || o.status === 'completed' || o.payment_status === 'paid') {
         if (!sessionId || (sessionStartTime && orderCreatedTime < sessionStartTime)) {
           return false;
@@ -175,7 +185,7 @@ export async function GET(request: Request) {
     });
 
     const formattedOrders = foodOrders.map((o: any) => {
-      const effectiveStatus = stateMap.get(o.id) || o.status;
+      const effectiveStatus = getEffectiveStatus(o.status, o.id);
       return {
         id: o.id,
         restaurantId: o.restaurant_id,

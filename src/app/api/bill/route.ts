@@ -90,6 +90,16 @@ export async function GET(request: Request) {
       }
     });
 
+    const getEffectiveStatus = (baseStatus: string, ordId: string): string => {
+      const base = baseStatus || 'pending';
+      if (base === 'completed' || base === 'cancelled') return base;
+      const overlay = stateMap.get(ordId);
+      if (!overlay) return base;
+      const baseRank = statusRank[base] ?? 0;
+      const overlayRank = statusRank[overlay] ?? 0;
+      return overlayRank > baseRank ? overlay : base;
+    };
+
     // Parse session timestamp if available
     let sessionStartTime: number | null = null;
     if (sessionId) {
@@ -147,7 +157,7 @@ export async function GET(request: Request) {
       }
 
       // Exclude old completed & paid orders from previous meals
-      const effStatus = stateMap.get(order.id) || order.status;
+      const effStatus = getEffectiveStatus(order.status, order.id);
       if (effStatus === 'completed' && order.payment_status === 'paid' && sessionStartTime && orderCreatedTime < sessionStartTime) {
         return false;
       }
@@ -183,7 +193,7 @@ export async function GET(request: Request) {
           orderId: order.id,
           orderNumber: order.order_number,
           orderTime: order.created_at,
-          orderStatus: stateMap.get(order.id) || order.status,
+          orderStatus: getEffectiveStatus(order.status, order.id),
           dishName: item.dish_name,
           quantity: item.quantity || 1,
           unitPrice: Number(item.unit_price),
