@@ -89,6 +89,7 @@ interface CustomerContextType {
   checkCustomerLocation: () => Promise<void>;
   operatingHoursStatus: OperatingHoursCheck;
   isShopOpen: boolean;
+  broadcastOrderCreated: (orderData: any) => void;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
@@ -769,6 +770,34 @@ export function CustomerProvider({
     return operatingHoursStatus.isOpen;
   }, [restaurant, operatingHoursStatus]);
 
+  const broadcastOrderCreated = useCallback((orderData: any) => {
+    try {
+      const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;
+      if (!activeRestId) return;
+
+      let channel = realtimeChannelRef.current;
+      if (!channel) {
+        channel = supabase.channel(`restaurant:${activeRestId}`, {
+          config: { broadcast: { self: true } },
+        });
+        channel.subscribe();
+      }
+
+      channel.send({
+        type: 'broadcast',
+        event: 'ORDER_CREATED',
+        payload: orderData,
+      });
+      channel.send({
+        type: 'broadcast',
+        event: 'new_order',
+        payload: orderData,
+      });
+    } catch (err) {
+      console.warn('broadcastOrderCreated error:', err);
+    }
+  }, [restaurant?.id, supabase]);
+
   return (
     <CustomerContext.Provider
       value={{
@@ -817,6 +846,7 @@ export function CustomerProvider({
         checkCustomerLocation,
         operatingHoursStatus,
         isShopOpen,
+        broadcastOrderCreated,
       }}
     >
       {children}

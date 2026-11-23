@@ -60,6 +60,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     menuDishes,
     isShopOpen,
     operatingHoursStatus,
+    broadcastOrderCreated,
   } = useCustomer();
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -241,6 +242,20 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         });
       } catch {
         // non-blocking
+      }
+
+      // Instant client broadcast to staff and kitchen portals via active websocket
+      if (broadcastOrderCreated && restaurant?.id && table?.id) {
+        broadcastOrderCreated({
+          id: data.orderId,
+          order_number: data.orderNumber,
+          restaurant_id: restaurant.id,
+          table_id: table.id,
+          table_number: (table as any)?.table_number || table.number || 'T-01',
+          status: 'pending',
+          total_amount: data.totalAmount,
+          created_at: new Date().toISOString(),
+        });
       }
 
       showToast(

@@ -576,35 +576,32 @@ export async function POST(request: Request) {
       const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
       });
-      await rtChannel.subscribe();
-      await rtChannel.send({
-        type: 'broadcast',
-        event: 'ORDER_CREATED',
-        payload: {
-          id: createdOrder.id,
-          order_number: createdOrder.order_number,
-          restaurant_id: restaurantId,
-          table_id: tableId,
-          status: 'pending',
-          total_amount: createdOrder.total_amount,
-          created_at: new Date().toISOString(),
-        },
+      rtChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          const payloadData = {
+            id: createdOrder.id,
+            order_number: createdOrder.order_number,
+            restaurant_id: restaurantId,
+            table_id: tableId,
+            status: 'pending',
+            total_amount: createdOrder.total_amount,
+            created_at: new Date().toISOString(),
+          };
+          await rtChannel.send({
+            type: 'broadcast',
+            event: 'ORDER_CREATED',
+            payload: payloadData,
+          });
+          await rtChannel.send({
+            type: 'broadcast',
+            event: 'new_order',
+            payload: payloadData,
+          });
+          setTimeout(() => {
+            supabase.removeChannel(rtChannel);
+          }, 1500);
+        }
       });
-      // Also send new_order event for backward compatibility
-      await rtChannel.send({
-        type: 'broadcast',
-        event: 'new_order',
-        payload: {
-          id: createdOrder.id,
-          order_number: createdOrder.order_number,
-          restaurant_id: restaurantId,
-          table_id: tableId,
-          status: 'pending',
-          total_amount: createdOrder.total_amount,
-          created_at: new Date().toISOString(),
-        },
-      });
-      supabase.removeChannel(rtChannel);
     } catch {
       // Non-blocking
     }
