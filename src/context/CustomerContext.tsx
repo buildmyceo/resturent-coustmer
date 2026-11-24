@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   RestaurantProfile,
   RestaurantTable,
@@ -687,13 +687,12 @@ export function CustomerProvider({
           clearGuestSession();
           clearCart();
           setOrders([]);
-          showToast('Bill Settled & Table Closed', 'Thank you for dining with us! The table has been refreshed.', 'info');
+          showToast('Bill Settled & Table Closed', 'Thank you for dining with us! Refreshing table...', 'info');
           debouncedRefresh();
-          // Optionally refresh table page if on orders or bill
-          if (typeof window !== 'undefined' && (window.location.pathname.includes('/orders') || window.location.pathname.includes('/bill'))) {
+          if (typeof window !== 'undefined') {
             setTimeout(() => {
               window.location.reload();
-            }, 800);
+            }, 1200);
           }
         }
       }
@@ -775,6 +774,66 @@ export function CustomerProvider({
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [restaurant?.id, table?.id, orders, refreshOrders]);
+
+  // Auto-refresh when bill is paid AND food is served
+  const lastCompletedOrderIdsRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!orders || orders.length === 0) return;
+
+    // Filter to active dining orders (excluding cancelled/rejected)
+    const validOrders = orders.filter(
+      (o) => o.status !== 'cancelled' && o.status !== 'rejected'
+    );
+    if (validOrders.length === 0) return;
+
+    // Condition 1: All food served (or completed)
+    const allFoodServed = validOrders.every(
+      (o) => o.status === 'served' || o.status === 'completed'
+    );
+
+    // Condition 2: Bill is paid
+    const allBillPaid = validOrders.every(
+      (o) => o.paymentStatus === 'paid'
+    );
+
+    if (allFoodServed && allBillPaid) {
+      // Create a unique fingerprint of the order IDs and statuses to prevent duplicate refresh loops
+      const ordersFingerprint = validOrders
+        .map((o) => `${o.id}_${o.status}_${o.paymentStatus}`)
+        .sort()
+        .join('|');
+
+      const storedFingerprint =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('zovo_last_completed_refresh')
+          : null;
+
+      if (
+        lastCompletedOrderIdsRef.current !== ordersFingerprint &&
+        storedFingerprint !== ordersFingerprint
+      ) {
+        lastCompletedOrderIdsRef.current = ordersFingerprint;
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('zovo_last_completed_refresh', ordersFingerprint);
+        }
+
+        showToast(
+          'Dining Complete ✨',
+          'Your food has been served and bill is settled. Refreshing page...',
+          'success'
+        );
+
+        const timer = setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        }, 2200);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [orders, showToast]);
 
   const isSessionActive = useMemo(() => {
     return !!session && session.status !== 'completed' && session.status !== 'cancelled';
