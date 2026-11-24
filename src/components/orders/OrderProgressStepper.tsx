@@ -31,11 +31,11 @@ const standardSteps = [
 ];
 
 const counterSteps = [
-  { key: 'pending', label: 'Pay at Counter', icon: Clock },
-  { key: 'confirmed', label: 'Paid & Confirmed', icon: CheckCircle2 },
-  { key: 'preparing', label: 'Cooking in Kitchen', icon: UtensilsCrossed },
-  { key: 'ready', label: 'Ready for Pickup', icon: Sparkles },
-  { key: 'served', label: 'Order Taken', icon: ConciergeBell },
+  { key: 'pending', label: 'Show Receipt', icon: Clock },
+  { key: 'confirmed', label: 'Approved', icon: CheckCircle2 },
+  { key: 'preparing', label: 'In Kitchen', icon: UtensilsCrossed },
+  { key: 'ready', label: 'Food Ready', icon: Sparkles },
+  { key: 'served', label: 'Served', icon: ConciergeBell },
 ];
 
 export function OrderProgressStepper({

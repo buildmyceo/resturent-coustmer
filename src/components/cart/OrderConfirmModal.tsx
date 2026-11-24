@@ -43,14 +43,14 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
               }`}
             >
               <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>{isPayFirst ? 'Counter Payment • Direct Kitchen' : 'Waiter Confirmation Queue'}</span>
+              <span>{isPayFirst ? 'Pay First • Cashier Approval' : 'Waiter Confirmation Queue'}</span>
             </div>
             <h2 className="text-xl font-bold text-slate-900 mt-2">
-              {isPayFirst ? 'Pay at Counter & Confirm' : 'Confirm Your Table Order'}
+              {isPayFirst ? 'Pay & Submit Order' : 'Confirm Your Table Order'}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
               {isPayFirst
-                ? 'Please visit the cashier counter with your Order ID to pay via Cash or UPI. Once confirmed by the cashier, your order is prepared directly by the kitchen.'
+                ? 'Please pay via Cash or UPI and show your receipt to the cashier. Once approved, the kitchen begins preparation, and both you and your waiter will be notified when food is ready!'
                 : 'Your order will be sent to the floor waiter for validation before kitchen preparation begins.'}
             </p>
           </div>
@@ -129,7 +129,7 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
               className="w-full gap-2 shadow-md cursor-pointer"
               size="lg"
             >
-              <span>{isPayFirst ? 'Confirm & Pay at Counter' : 'Confirm Order'}</span>
+              <span>{isPayFirst ? 'Submit Order & Show Receipt' : 'Confirm Order'}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
 

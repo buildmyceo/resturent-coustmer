@@ -580,6 +580,30 @@ export function CustomerProvider({
   // Active orders state reference for transition sound/toast detection
   const previousOrdersRef = React.useRef<Order[]>([]);
 
+  useEffect(() => {
+    if (orders.length > 0 && previousOrdersRef.current.length > 0) {
+      orders.forEach((newOrder) => {
+        const prevOrder = previousOrdersRef.current.find((p) => p.id === newOrder.id);
+        if (prevOrder && prevOrder.status !== 'ready' && newOrder.status === 'ready') {
+          customerAudio.playFoodReady();
+          showToast(
+            'Order Prepared! 🍽️',
+            `Order #${newOrder.orderNumber} is freshly prepared! Waiter & kitchen notified.`,
+            'success'
+          );
+        } else if (prevOrder && prevOrder.status === 'pending' && newOrder.status === 'preparing') {
+          customerAudio.playTap();
+          showToast(
+            'Receipt Approved! 👨‍🍳',
+            `Cashier approved Order #${newOrder.orderNumber}! Kitchen has started preparing.`,
+            'info'
+          );
+        }
+      });
+    }
+    previousOrdersRef.current = orders;
+  }, [orders, showToast]);
+
   // Supabase Realtime Subscriptions for Live Order Tracking and Table Session Status
   useEffect(() => {
     const activeRestId = restaurant?.id || getGuestSession()?.restaurantId;

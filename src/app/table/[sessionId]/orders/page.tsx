@@ -163,10 +163,26 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-title text-sm font-bold text-amber-950">
-                      Action Required: Pay at Cashier Counter
+                      Step 1: Show Receipt to Cashier / Admin
                     </h3>
                     <p className="font-body text-xs text-amber-900 leading-relaxed">
-                      Please visit the counter with your Order ID <strong>#{order.orderNumber}</strong> to pay via Cash or UPI. As soon as payment is confirmed by the cashier, your order will be sent directly to the kitchen.
+                      Please show this screen or receipt for <strong>Order #{order.orderNumber}</strong> to the Cashier. Once approved by the cashier, your order is sent directly to the kitchen to begin preparing!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {isPreparing && isPayFirst && (
+                <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-start gap-3 shadow-xs">
+                  <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center shrink-0 font-bold">
+                    <UtensilsCrossed className="w-5 h-5 text-blue-700" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-title text-sm font-bold text-blue-950">
+                      Step 2: Receipt Approved • Cooking in Kitchen
+                    </h3>
+                    <p className="font-body text-xs text-blue-900 leading-relaxed">
+                      The cashier approved your order! Kitchen chefs are preparing your fresh food. You and your waiter will receive an alert once ready!
                     </p>
                   </div>
                 </div>
@@ -179,10 +195,10 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-title text-sm font-bold text-emerald-950">
-                      Food Ready for Pickup!
+                      Step 3: Food Prepared! Waiter &amp; Table Notified
                     </h3>
                     <p className="font-body text-xs text-emerald-900 leading-relaxed">
-                      Your dishes are prepared! Please head to the kitchen counter with your Order ID <strong>#{order.orderNumber}</strong> to collect your food.
+                      Your dishes are prepared! Both you and your waiter have been notified, and food is being delivered to Table {tableNumberDisplay}.
                     </p>
                   </div>
                 </div>
@@ -204,12 +220,12 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 <p className="font-body">
                   {isPayFirst ? (
                     isReady
-                      ? `Ready for Pickup! Present Order #${order.orderNumber} at the counter to collect your food.`
+                      ? `Food Prepared! Order #${order.orderNumber} is ready. Waiter notified to serve to Table ${tableNumberDisplay}.`
                       : isPreparing
-                      ? 'Preparing! Kitchen chefs are actively cooking your order.'
+                      ? 'Approved by cashier! Kitchen chefs are actively cooking your order.'
                       : isServed
-                      ? 'Order Taken! Hope you enjoy your meal.'
-                      : `Awaiting payment at the counter. Show Order #${order.orderNumber} to the cashier.`
+                      ? 'Order Delivered! Enjoy your meal.'
+                      : `Awaiting Cashier Approval. Please show Order #${order.orderNumber} receipt to the cashier.`
                   ) : (
                     isReady
                       ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`

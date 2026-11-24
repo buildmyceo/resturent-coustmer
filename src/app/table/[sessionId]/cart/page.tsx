@@ -653,9 +653,9 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
           {restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled ? (
             <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl space-y-1 text-xs">
-              <span className="font-bold text-amber-900 block">First Pay, Then Confirm Order</span>
+              <span className="font-bold text-amber-900 block">Pay First &amp; Show Receipt to Cashier</span>
               <p className="font-body text-amber-800 leading-relaxed">
-                Please pay at the cashier counter with your Order ID after placing. Kitchen preparation starts immediately once confirmed by the cashier.
+                Please complete payment and show your receipt to the cashier. The cashier will approve your order, sending it straight to the kitchen to begin cooking. Both you and your waiter will be notified when food is ready!
               </p>
             </div>
           ) : (
@@ -709,7 +709,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                   : isOrderBlockedByGeofence
                   ? 'Outside Ordering Area'
                   : (restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled)
-                  ? `Pay at Counter & Confirm • ${formatCurrency(cartTotals.totalAmount, currency)}`
+                  ? `Pay & Show Receipt • ${formatCurrency(cartTotals.totalAmount, currency)}`
                   : `Confirm Order • ${formatCurrency(cartTotals.totalAmount, currency)}`}
               </span>
             </button>
