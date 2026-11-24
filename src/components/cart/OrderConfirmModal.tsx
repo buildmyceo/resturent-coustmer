@@ -18,7 +18,7 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
 
   if (!isOpen) return null;
 
-  const currency = restaurant?.currency || 'USD';
+  const currency = restaurant?.currency || 'INR';
   const isPayFirst = Boolean(restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled);
 
   return (

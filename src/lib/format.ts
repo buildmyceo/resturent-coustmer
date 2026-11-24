@@ -2,20 +2,21 @@
  * Currency and Date Formatter Utilities
  */
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  const code = (currency || 'USD').toUpperCase();
+export function formatCurrency(amount: number, currency: string = 'INR'): string {
+  const code = (currency || 'INR').toUpperCase();
   const symbolMap: Record<string, string> = {
+    INR: '₹',
     USD: '$',
     EUR: '€',
     GBP: '£',
-    INR: '₹',
     CAD: 'CA$',
     AUD: 'AU$',
     JPY: '¥',
   };
 
-  const symbol = symbolMap[code] || '$';
-  const formattedNumber = (amount || 0).toLocaleString(undefined, {
+  const symbol = symbolMap[code] || '₹';
+  const locale = code === 'INR' ? 'en-IN' : undefined;
+  const formattedNumber = (amount || 0).toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

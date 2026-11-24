@@ -26,7 +26,7 @@ interface DishModalProps {
   ) => void;
 }
 
-export function DishModal({ dish, currency = 'USD', onClose, onAddToCart }: DishModalProps) {
+export function DishModal({ dish, currency = 'INR', onClose, onAddToCart }: DishModalProps) {
   // Variants selection (radio: single select)
   const defaultVariant = dish?.variants && dish.variants.length > 0 ? dish.variants[0] : null;
   const [selectedVariant, setSelectedVariant] = useState<DishVariant | null>(defaultVariant);

@@ -113,7 +113,7 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
     }
   };
 
-  const currency = restaurant?.currency || 'USD';
+  const currency = restaurant?.currency || 'INR';
 
   if (isLoading) {
     return (

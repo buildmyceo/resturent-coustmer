@@ -160,7 +160,7 @@ export default function TableSessionLayout({ children, params }: TableLayoutProp
       {/* Global Dish Customization Modal */}
       <DishModal
         dish={selectedDishModal}
-        currency={restaurant?.currency || 'USD'}
+        currency={restaurant?.currency || 'INR'}
         onClose={() => setSelectedDishModal(null)}
         onAddToCart={(dish, options) => {
           addToCart(dish, options);
