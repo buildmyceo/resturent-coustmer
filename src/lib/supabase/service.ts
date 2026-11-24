@@ -554,6 +554,27 @@ export async function fetchTableSessionOrdersDB(sessionId: string): Promise<Orde
 }
 
 /**
+ * CANCEL ORDER (Customer or Admin)
+ * Once approved, only Admin/Cashier can cancel.
+ */
+export async function cancelOrderDB(
+  orderId: string,
+  reason?: string,
+  isAdmin: boolean = false
+): Promise<{ success: boolean; error?: string; isApproved?: boolean }> {
+  try {
+    const res = await fetch('/api/orders/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, reason, isAdmin }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error while cancelling order.' };
+  }
+}
+
+/**
  * 5. CREATE SERVICE REQUEST (CALL WAITER, WATER, BILL)
  */
 export async function createServiceRequestDB(params: {

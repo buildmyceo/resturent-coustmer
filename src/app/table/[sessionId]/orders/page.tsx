@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { useCustomer } from '@/context/CustomerContext';
 import { formatCurrency, formatTime } from '@/lib/format';
 import { OrderProgressStepper } from '@/components/orders/OrderProgressStepper';
+import { cancelOrderDB } from '@/lib/supabase/service';
+import { Order } from '@/types';
 import {
   Clock,
   Sparkles,
@@ -18,6 +20,10 @@ import {
   ShoppingBag,
   UtensilsCrossed,
   Check,
+  XCircle,
+  AlertTriangle,
+  ShieldAlert,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -29,8 +35,13 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
   const resolvedParams = use(params);
   const sessionId = resolvedParams.sessionId;
 
-  const { orders, refreshOrders, isOrdersLoading, restaurant, table } = useCustomer();
+  const { orders, refreshOrders, isOrdersLoading, restaurant, table, showToast } = useCustomer();
   const currency = restaurant?.currency || 'INR';
+
+  // Order Cancellation State
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('Changed my mind');
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
 
   // Live timer tick every 10 seconds to update countdowns smoothly
   const [now, setNow] = useState(Date.now());
@@ -40,8 +51,45 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
   }, []);
 
   const totalTableBill = useMemo(() => {
-    return orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    return orders
+      .filter((o) => o.status !== 'cancelled' && o.status !== 'rejected')
+      .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
   }, [orders]);
+
+  const activeOrders = useMemo(() => {
+    return orders.filter((o) => o.status !== 'cancelled' && o.status !== 'rejected');
+  }, [orders]);
+
+  const handleConfirmCancel = async () => {
+    if (!cancellingOrder) return;
+    setIsCancelling(true);
+    try {
+      const res = await cancelOrderDB(cancellingOrder.id, cancelReason, false);
+      if (res.success) {
+        showToast(
+          'Order Cancelled',
+          `Order #${cancellingOrder.orderNumber} has been cancelled.`,
+          'info'
+        );
+        setCancellingOrder(null);
+        await refreshOrders();
+      } else {
+        showToast(
+          'Cannot Cancel Order',
+          res.error || 'Failed to cancel order.',
+          'error'
+        );
+        if (res.isApproved) {
+          setCancellingOrder(null);
+          await refreshOrders();
+        }
+      }
+    } catch (err: any) {
+      showToast('Error', err?.message || 'Failed to cancel order.', 'error');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const tableNumberDisplay = table?.number || 'T-01';
 
@@ -107,6 +155,21 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
       {/* Active Orders List */}
       <div className="flex flex-col gap-6">
         {orders.map((order) => {
+          const approvedStatuses = [
+            'accepted',
+            'confirmed',
+            'waiter_accepted',
+            'sent_to_kitchen',
+            'accepted_by_kitchen',
+            'preparing',
+            'ready',
+            'served',
+            'completed',
+          ];
+          const isCancelled = order.status === 'cancelled' || order.status === 'rejected';
+          const isApproved = approvedStatuses.includes(String(order.status).toLowerCase());
+          const canCustomerCancel = !isApproved && !isCancelled;
+
           const isPayFirst = Boolean(
             order.isPayFirst ||
             restaurant?.settings?.payFirstEnabled ||
@@ -139,6 +202,12 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                         <span>{order.participantName}</span>
                       </span>
                     )}
+                    {isCancelled && (
+                      <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 px-2.5 py-0.5 rounded-full text-xs font-label font-semibold">
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Cancelled</span>
+                      </span>
+                    )}
                   </div>
                   <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
                     Placed at {formatTime(order.orderTime || order.createdAt)}
@@ -146,7 +215,7 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 </div>
 
                 <div className="flex sm:flex-col items-center sm:items-end justify-between gap-0.5">
-                  <span className="font-title text-lg font-bold text-light-on-surface tabular-nums">
+                  <span className={`font-title text-lg font-bold tabular-nums ${isCancelled ? 'line-through text-slate-400' : 'text-light-on-surface'}`}>
                     {formatCurrency(order.totalAmount, currency)}
                   </span>
                   <span className="font-body text-xs text-light-on-surface-variant tabular-nums">
@@ -155,8 +224,8 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 </div>
               </header>
 
-              {/* Pay First: Prominent Callout Banners */}
-              {isPending && isPayFirst && (
+              {/* Pay First: Prominent Callout Banners (Only when active) */}
+              {!isCancelled && isPending && isPayFirst && (
                 <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-start gap-3 shadow-xs">
                   <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center shrink-0 font-bold">
                     <Receipt className="w-5 h-5 text-amber-700" />
@@ -172,7 +241,7 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 </div>
               )}
 
-              {isPreparing && isPayFirst && (
+              {!isCancelled && isPreparing && isPayFirst && (
                 <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-start gap-3 shadow-xs">
                   <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center shrink-0 font-bold">
                     <UtensilsCrossed className="w-5 h-5 text-blue-700" />
@@ -188,7 +257,7 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 </div>
               )}
 
-              {isReady && isPayFirst && (
+              {!isCancelled && isReady && isPayFirst && (
                 <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-xl flex items-start gap-3 shadow-xs animate-pulse">
                   <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0 font-bold">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -205,38 +274,47 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
               )}
 
               {/* Live Kitchen Status Callout */}
-              <div
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium ${
-                  isReady
-                    ? 'bg-light-secondary-container/70 border border-light-primary/30 text-light-on-secondary-container'
-                    : isPreparing
-                    ? 'bg-amber-badge/60 border border-warning/30 text-on-amber-badge'
-                    : isServed
-                    ? 'bg-light-surface-container-low border border-light-outline-variant/60 text-light-on-surface'
-                    : 'bg-light-secondary-container/40 border border-light-primary/20 text-light-on-secondary-container'
-                }`}
-              >
-                <Sparkles className="w-5 h-5 text-light-primary shrink-0" />
-                <p className="font-body">
-                  {isPayFirst ? (
+              {!isCancelled ? (
+                <div
+                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium ${
                     isReady
-                      ? `Food Prepared! Order #${order.orderNumber} is ready. Waiter notified to serve to Table ${tableNumberDisplay}.`
+                      ? 'bg-light-secondary-container/70 border border-light-primary/30 text-light-on-secondary-container'
                       : isPreparing
-                      ? 'Approved by cashier! Kitchen chefs are actively cooking your order.'
+                      ? 'bg-amber-badge/60 border border-warning/30 text-on-amber-badge'
                       : isServed
-                      ? 'Order Delivered! Enjoy your meal.'
-                      : `Awaiting Cashier Approval. Please show Order #${order.orderNumber} receipt to the cashier.`
-                  ) : (
-                    isReady
-                      ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`
-                      : isPreparing
-                      ? 'Preparing! Our kitchen chefs are actively crafting your order.'
-                      : isServed
-                      ? `Served! All items have been delivered to Table ${tableNumberDisplay}. Enjoy your meal!`
-                      : 'Submitted! Order received and sent for table confirmation.'
-                  )}
-                </p>
-              </div>
+                      ? 'bg-light-surface-container-low border border-light-outline-variant/60 text-light-on-surface'
+                      : 'bg-light-secondary-container/40 border border-light-primary/20 text-light-on-secondary-container'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5 text-light-primary shrink-0" />
+                  <p className="font-body">
+                    {isPayFirst ? (
+                      isReady
+                        ? `Food Prepared! Order #${order.orderNumber} is ready. Waiter notified to serve to Table ${tableNumberDisplay}.`
+                        : isPreparing
+                        ? 'Approved by cashier! Kitchen chefs are actively cooking your order.'
+                        : isServed
+                        ? 'Order Delivered! Enjoy your meal.'
+                        : `Awaiting Cashier Approval. Please show Order #${order.orderNumber} receipt to the cashier.`
+                    ) : (
+                      isReady
+                        ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`
+                        : isPreparing
+                        ? 'Preparing! Our kitchen chefs are actively crafting your order.'
+                        : isServed
+                        ? `Served! All items have been delivered to Table ${tableNumberDisplay}. Enjoy your meal!`
+                        : 'Submitted! Order received and sent for table confirmation.'
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium bg-rose-50 border border-rose-200 text-rose-800">
+                  <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  <p className="font-body">
+                    Order cancelled. Items have been removed from your dining bill.
+                  </p>
+                </div>
+              )}
 
               {/* Order Progress Stepper */}
               <OrderProgressStepper
@@ -245,6 +323,39 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 assignedWaiterName={order.assignedWaiterName}
                 isPayFirst={isPayFirst}
               />
+
+              {/* Customer Cancellation Option (Allowed only BEFORE approval) */}
+              {canCustomerCancel && (
+                <div className="p-3 sm:p-3.5 bg-rose-50/70 border border-rose-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-rose-900 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>
+                      Need to change dishes? You can cancel this order before cashier approval.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancellingOrder(order);
+                      setCancelReason('Changed my mind');
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-white hover:bg-rose-100 border border-rose-300 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Cancel Order</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Locked Notice (Once Approved: Only Admin / Cashier can cancel) */}
+              {isApproved && !isCancelled && (
+                <div className="p-3 sm:p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl flex items-center gap-2.5 text-xs text-amber-900">
+                  <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    <strong>Order Approved &amp; Sent to Kitchen:</strong> Once approved, orders can only be cancelled by the Cashier or Admin. Please speak with staff if you need assistance.
+                  </span>
+                </div>
+              )}
 
               {/* Ordered Dishes List */}
               <div className="flex flex-col gap-2 pt-1">
@@ -342,6 +453,90 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
           <span>View Table Bill</span>
         </Link>
       </div>
+
+      {/* Cancel Order Confirmation Modal */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-light-surface-container-lowest border border-light-outline-variant/80 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-headline text-lg font-bold text-light-on-surface">
+                  Cancel Order #{cancellingOrder.orderNumber}?
+                </h3>
+                <p className="font-body text-xs text-light-on-surface-variant">
+                  This order has not been approved yet. Cancelling will remove all items from your dining bill.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-light-surface-container">
+              <label className="font-label text-xs font-semibold text-light-on-surface">
+                Reason for cancellation:
+              </label>
+              <div className="flex flex-col gap-1.5">
+                {[
+                  'Changed my mind',
+                  'Ordered wrong dishes / duplicate',
+                  'Taking too long',
+                  'Leaving the table',
+                  'Other reason',
+                ].map((reason) => (
+                  <label
+                    key={reason}
+                    className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
+                      cancelReason === reason
+                        ? 'border-rose-400 bg-rose-50 text-rose-950 font-semibold'
+                        : 'border-light-outline-variant/60 bg-light-surface-container-low hover:bg-light-surface-container text-light-on-surface'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancelReason"
+                      value={reason}
+                      checked={cancelReason === reason}
+                      onChange={() => setCancelReason(reason)}
+                      className="text-rose-600 focus:ring-rose-500 accent-rose-600"
+                    />
+                    <span>{reason}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-light-surface-container">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isCancelling}
+                onClick={() => setCancellingOrder(null)}
+              >
+                Keep Order
+              </Button>
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={handleConfirmCancel}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Confirm Cancel</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
