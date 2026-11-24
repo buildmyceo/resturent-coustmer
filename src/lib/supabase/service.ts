@@ -350,12 +350,17 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
       let serviceChargePercentage = Number(s?.service_charge_percentage ?? 0);
       let payFirstEnabled = false;
 
+      let configTaxEnabled = true;
+
       // Re-apply payment config overrides if present in receipt_footer
       if (s?.receipt_footer) {
         const paymentConfigMatch = s.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
         if (paymentConfigMatch && paymentConfigMatch[1]) {
           try {
             const paymentConfig = JSON.parse(paymentConfigMatch[1]);
+            if (paymentConfig.taxEnabled !== undefined) {
+              configTaxEnabled = Boolean(paymentConfig.taxEnabled);
+            }
             if (paymentConfig.taxName) {
               taxName = paymentConfig.taxName;
             }
@@ -378,10 +383,10 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         }
       }
 
-      // Legal tax rule: vendor must add GST number to collect tax
+      // Legal tax rule: vendor must add GST number and have tax enabled to collect tax
       const hasGst = Boolean(gstNumber && gstNumber.length > 0);
-      const isTaxEnabled = hasGst && (s?.tax_enabled ?? true) && taxPercentage > 0;
-      if (!hasGst) {
+      const isTaxEnabled = configTaxEnabled && hasGst && (s?.tax_enabled ?? true) && taxPercentage > 0;
+      if (!isTaxEnabled) {
         taxPercentage = 0;
       }
 
