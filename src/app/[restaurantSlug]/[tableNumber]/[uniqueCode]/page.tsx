@@ -247,10 +247,6 @@ export default function TableLandingPage({ params }: PageProps) {
           </div>
 
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200/60 mb-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Verified Table QR Code</span>
-            </div>
             <h1 className="font-display text-2xl font-black text-light-on-surface tracking-tight">
               {resolvedTableData?.restaurantName}
             </h1>
@@ -316,9 +312,6 @@ export default function TableLandingPage({ params }: PageProps) {
                 maxLength={30}
                 className="w-full text-sm p-3.5 rounded-xl border border-light-outline-variant focus:outline-none focus:ring-2 focus:ring-light-primary/20 focus:border-light-primary transition-all placeholder:text-light-on-surface-variant/50 bg-light-surface-container-lowest text-light-on-surface"
               />
-              <p className="text-[11px] text-light-on-surface-variant/70 mt-1">
-                Helps your friends at the table and the waiter identify who ordered each dish.
-              </p>
             </div>
 
             <Button
@@ -327,15 +320,10 @@ export default function TableLandingPage({ params }: PageProps) {
               isLoading={isJoining}
               className="w-full shadow-lg shadow-light-primary/20 gap-2"
             >
-              <span>{isExistingSession ? 'Join Table & View Menu' : 'Start Table Session'}</span>
+              <span>Check Menu</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </form>
-        </div>
-
-        <div className="text-center text-[11px] text-light-on-surface-variant flex items-center justify-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-light-primary" />
-          <span>Powered by Ceova Restaurant Platform</span>
         </div>
       </div>
     </div>
