@@ -149,8 +149,11 @@ export async function POST(request: Request) {
           if (paymentConfigMatch && paymentConfigMatch[1]) {
             try {
               const paymentConfig = JSON.parse(paymentConfigMatch[1]);
-              if (paymentConfig.taxRate !== undefined) {
+              const hasGst = Boolean(paymentConfig.gstNumber && paymentConfig.gstNumber.trim().length > 0);
+              if (paymentConfig.taxRate !== undefined && hasGst) {
                 taxRate = Number(paymentConfig.taxRate);
+              } else if (!hasGst) {
+                taxRate = 0;
               }
               if (paymentConfig.serviceChargeRate !== undefined) {
                 serviceFeeRate = Number(paymentConfig.serviceChargeRate);

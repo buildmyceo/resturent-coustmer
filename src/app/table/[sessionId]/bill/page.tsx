@@ -238,8 +238,13 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
 
             {bill.taxAmount > 0 && (
               <div className="flex items-center justify-between">
-                <dt className="font-body text-light-on-surface-variant">
-                  {restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)
+                <dt className="font-body text-light-on-surface-variant flex items-center gap-1.5 flex-wrap">
+                  <span>{restaurant?.settings?.taxName || 'GST / Tax'} ({restaurant?.settings?.taxPercentage ?? 5}%)</span>
+                  {restaurant?.settings?.gstNumber && (
+                    <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-medium border border-slate-200">
+                      GSTIN: {restaurant.settings.gstNumber}
+                    </span>
+                  )}
                 </dt>
                 <dd className="font-body text-light-on-surface tabular-nums">
                   {formatCurrency(bill.taxAmount, currency)}

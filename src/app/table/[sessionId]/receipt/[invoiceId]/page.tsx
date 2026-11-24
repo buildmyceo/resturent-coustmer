@@ -205,6 +205,11 @@ export default function DigitalReceiptPage({ params }: ReceiptPageProps) {
           {receipt.restaurantPhone && (
             <p className="text-[11px] text-slate-400">Phone: {receipt.restaurantPhone}</p>
           )}
+          {restaurant?.settings?.gstNumber && (
+            <p className="text-[11px] font-mono font-semibold text-slate-700">
+              GSTIN: {restaurant.settings.gstNumber}
+            </p>
+          )}
 
           <div className="pt-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">

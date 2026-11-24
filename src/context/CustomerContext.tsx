@@ -407,7 +407,8 @@ export function CustomerProvider({
   // Server-matching Cart Totals Calculation with Coupon Discounts
   const { cartTotals, couponDiscountAmount } = useMemo(() => {
     const subtotal = Number(cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2));
-    const taxRate = restaurant?.settings?.taxEnabled !== false ? Number(restaurant?.settings?.taxPercentage ?? 5.0) : 0;
+    const hasGst = Boolean(restaurant?.settings?.gstNumber && restaurant.settings.gstNumber.trim().length > 0);
+    const taxRate = hasGst && restaurant?.settings?.taxEnabled !== false ? Number(restaurant?.settings?.taxPercentage ?? 5.0) : 0;
     const serviceFeeRate = restaurant?.settings?.serviceChargeEnabled === true ? Number(restaurant?.settings?.serviceChargePercentage ?? 0) : 0;
 
     // Calculate coupon discount

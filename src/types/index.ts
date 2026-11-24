@@ -277,6 +277,7 @@ export interface RestaurantSettings {
   taxEnabled: boolean;
   taxPercentage: number;
   taxName?: string;
+  gstNumber?: string;
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
   payFirstEnabled?: boolean;

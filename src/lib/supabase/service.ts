@@ -345,6 +345,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
 
       let taxPercentage = Number(s?.tax_percentage ?? 5.0);
       let taxName = 'GST / Tax';
+      let gstNumber = '';
       let serviceChargeEnabled = s?.service_charge_enabled ?? false;
       let serviceChargePercentage = Number(s?.service_charge_percentage ?? 0);
       let payFirstEnabled = false;
@@ -357,6 +358,9 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             const paymentConfig = JSON.parse(paymentConfigMatch[1]);
             if (paymentConfig.taxName) {
               taxName = paymentConfig.taxName;
+            }
+            if (paymentConfig.gstNumber) {
+              gstNumber = String(paymentConfig.gstNumber).trim();
             }
             if (paymentConfig.taxRate !== undefined) {
               taxPercentage = Number(paymentConfig.taxRate);
@@ -372,6 +376,13 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             }
           } catch { }
         }
+      }
+
+      // Legal tax rule: vendor must add GST number to collect tax
+      const hasGst = Boolean(gstNumber && gstNumber.length > 0);
+      const isTaxEnabled = hasGst && (s?.tax_enabled ?? true) && taxPercentage > 0;
+      if (!hasGst) {
+        taxPercentage = 0;
       }
 
       restaurant = {
@@ -394,9 +405,10 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         status: r.status,
         payFirstEnabled,
         settings: {
-          taxEnabled: s?.tax_enabled ?? true,
+          taxEnabled: isTaxEnabled,
           taxPercentage,
           taxName,
+          gstNumber,
           serviceChargeEnabled,
           serviceChargePercentage,
           payFirstEnabled,

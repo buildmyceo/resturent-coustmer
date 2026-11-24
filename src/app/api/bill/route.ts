@@ -225,7 +225,13 @@ export async function GET(request: Request) {
           if (paymentMatch && paymentMatch[1]) {
             try {
               const pConfig = JSON.parse(paymentMatch[1]);
-              if (pConfig.taxRate !== undefined) taxPercent = Number(pConfig.taxRate);
+              const hasGst = Boolean(pConfig.gstNumber && pConfig.gstNumber.trim().length > 0);
+              if (pConfig.taxRate !== undefined && hasGst) {
+                taxPercent = Number(pConfig.taxRate);
+              } else if (!hasGst) {
+                taxEnabled = false;
+                taxPercent = 0;
+              }
               if (pConfig.taxIncluded) taxEnabled = false;
               if (pConfig.serviceChargeRate !== undefined) serviceFeePercent = Number(pConfig.serviceChargeRate);
               if (pConfig.serviceChargeEnabled !== undefined) serviceFeeEnabled = Boolean(pConfig.serviceChargeEnabled);
