@@ -34,7 +34,7 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
   const { restaurant, table, orders, participant } = useCustomer();
   const [bill, setBill] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(orders.length > 0 ? true : false);
-  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'card' | 'counter'>('upi');
+  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'card'>('upi');
 
   const fetchBill = async () => {
     setIsLoading(true);
@@ -323,7 +323,7 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
                 >
                   <span className="flex items-center gap-2.5">
                     <QrCode className="w-5 h-5 text-light-primary" />
-                    <span className="font-semibold">UPI / QR Pay</span>
+                    <span className="font-semibold">UPI / QR Pay (Google Pay, PhonePe)</span>
                   </span>
                   {selectedMethod === 'upi' && (
                     <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
@@ -349,26 +349,14 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
                     <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
                   )}
                 </button>
+              </div>
 
-                {/* Option 3: Counter / Waiter */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedMethod('counter')}
-                  aria-pressed={selectedMethod === 'counter'}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-xs sm:text-sm font-label transition-colors cursor-pointer ${
-                    selectedMethod === 'counter'
-                      ? 'border-light-primary bg-light-secondary-container/40 text-light-on-surface'
-                      : 'border-light-outline-variant bg-light-surface-container-lowest hover:border-light-primary text-light-on-surface'
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <Banknote className="w-5 h-5 text-light-on-surface-variant" />
-                    <span className="font-semibold">Pay at Counter / Waiter</span>
-                  </span>
-                  {selectedMethod === 'counter' && (
-                    <Check className="w-4 h-4 text-light-primary stroke-[2.5]" />
-                  )}
-                </button>
+              {/* Informational Callout for Cash / Counter */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl flex items-start gap-2.5 text-xs text-slate-600">
+                <Banknote className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                <p className="font-body leading-relaxed">
+                  <strong>Paying with Cash?</strong> Please pay your waiter or cashier at the counter. Staff will record payment received and issue your official tax receipt.
+                </p>
               </div>
 
               <div className="flex flex-col gap-2 pt-1">

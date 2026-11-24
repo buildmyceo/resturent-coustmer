@@ -13,6 +13,7 @@ export async function POST(request: Request) {
       paymentMethod = 'online',
       customerDetails,
       upiUtr,
+      action,
     } = body;
 
     const supabase = await createServerSupabaseClient();
@@ -44,15 +45,88 @@ export async function POST(request: Request) {
     if (paidAmount <= 0) paidAmount = 1.0;
 
     // 3. Format structured customer contact info & review
+    const email = customerDetails?.email?.trim();
+    const phone = customerDetails?.phone?.trim();
+    const name = customerDetails?.name?.trim();
+
+    // Compulsory check: Email and Phone are required for online payment
+    if (!email || !email.includes('@') || !phone || phone.replace(/\D/g, '').length < 10) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'A valid email address and 10-digit phone number are compulsory before doing online payment.',
+        },
+        { status: 400 }
+      );
+    }
+
     const resolvedUtr = upiUtr || (gatewayPaymentId?.startsWith('upi_utr_') ? gatewayPaymentId.replace('upi_utr_', '') : undefined);
     const noteParts: string[] = [];
-    if (customerDetails?.name) noteParts.push(`Customer: ${customerDetails.name}`);
-    if (customerDetails?.phone) noteParts.push(`Phone: ${customerDetails.phone}`);
-    if (customerDetails?.email) noteParts.push(`Email: ${customerDetails.email}`);
+    if (name) noteParts.push(`Customer: ${name}`);
+    if (phone) noteParts.push(`Phone: ${phone}`);
+    if (email) noteParts.push(`Email: ${email}`);
     if (customerDetails?.rating) noteParts.push(`Rating: ${customerDetails.rating}★`);
     if (customerDetails?.review) noteParts.push(`Review: ${customerDetails.review}`);
     if (resolvedUtr) noteParts.push(`UTR: ${resolvedUtr}`);
     const customerNoteString = noteParts.length > 0 ? noteParts.join(' | ') : 'Customer: Valued Guest';
+
+    // Handle "submit_upi" action: Customer submits UPI payment proof to show cashier/waiter
+    if (action === 'submit_upi') {
+      try {
+        await supabase
+          .from('orders')
+          .update({
+            payment_method: 'UPI',
+            customer_note: customerNoteString,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('table_id', resolvedTableId)
+          .neq('status', 'cancelled');
+      } catch (err) {
+        console.warn('Could not update order customer note:', err);
+      }
+
+      try {
+        if (sessionId) {
+          await supabase
+            .from('table_sessions')
+            .update({
+              customer_name: name || undefined,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId);
+        }
+      } catch {}
+
+      // Broadcast UPI_PAYMENT_SUBMITTED so Cashier/Admin & Waiter terminals alert staff
+      try {
+        const channel = supabase.channel(`restaurant:${resolvedRestId}`);
+        await channel.subscribe();
+        await channel.send({
+          type: 'broadcast',
+          event: 'UPI_PAYMENT_SUBMITTED',
+          payload: {
+            table_id: resolvedTableId,
+            session_id: sessionId,
+            amount: paidAmount,
+            customer_name: name || 'Guest',
+            customer_email: email,
+            customer_phone: phone,
+            submitted_at: new Date().toISOString(),
+          },
+        });
+        setTimeout(() => supabase.removeChannel(channel), 1500);
+      } catch {}
+
+      return NextResponse.json({
+        success: true,
+        pendingVerification: true,
+        message: 'UPI payment submitted. Please show confirmation to Cashier or Waiter.',
+        customerEmail: email,
+        customerPhone: phone,
+        amount: paidAmount,
+      });
+    }
 
     // 4. Mark all pending orders for this table as PAID in Supabase and save customer details & review
     try {

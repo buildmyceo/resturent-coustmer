@@ -43,13 +43,16 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
 
   const { restaurant, table, participant, showToast, clearSessionState } = useCustomer();
 
-  // Simplified Payment Methods: Only 'upi' (Google Pay / PhonePe) or 'waiter' (Cash / Waiter)
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'waiter'>('upi');
+  // Payment Method: Direct UPI (Google Pay, PhonePe, Paytm, QR)
+  const paymentMethod = 'upi';
   const [outstandingBalance, setOutstandingBalance] = useState<number>(0);
   const [billDetails, setBillDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Awaiting Staff Confirmation state
+  const [isAwaitingStaffConfirmation, setIsAwaitingStaffConfirmation] = useState(false);
 
   // Success & Refresh state
   const [isPaidSuccess, setIsPaidSuccess] = useState(false);
@@ -62,10 +65,12 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
   const [upiQrSvg, setUpiQrSvg] = useState<string>('');
 
-  // Customer contact details for digital bill delivery & review
+  // Customer contact details - COMPULSORY EMAIL & PHONE
   const [customerName, setCustomerName] = useState(participant?.name || '');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [rating, setRating] = useState<number>(5);
   const [review, setReview] = useState<string>('');
 
@@ -174,18 +179,83 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  // 2. Submit payment settlement (No UTR verification required)
-  const handleProceedPayment = async () => {
+  const validateContacts = (): boolean => {
+    let isValid = true;
+    const trimmedEmail = customerEmail.trim();
+    const cleanPhone = customerPhone.trim().replace(/\D/g, '');
+
+    if (!trimmedEmail) {
+      setEmailError('Email ID is compulsory before doing online payment.');
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setEmailError('Please enter a valid email address (e.g. name@example.com).');
+      isValid = false;
+    } else {
+      setEmailError(null);
+    }
+
+    if (!cleanPhone) {
+      setPhoneError('Phone number is compulsory before doing online payment.');
+      isValid = false;
+    } else if (cleanPhone.length < 10) {
+      setPhoneError('Please enter a valid 10-digit mobile number.');
+      isValid = false;
+    } else {
+      setPhoneError(null);
+    }
+
+    return isValid;
+  };
+
+  const handleLaunchUpiApp = (e: React.MouseEvent) => {
+    if (!validateContacts()) {
+      e.preventDefault();
+      showToast('Contact Info Required', 'Email ID and Phone number are compulsory before doing online payment.', 'error');
+      const el = document.getElementById('contact-form-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleSettlementConfirmed = async () => {
+    setIsAwaitingStaffConfirmation(false);
+    setIsPaidSuccess(true);
+    showToast('Payment Verified! 🎉', 'Cashier / Waiter confirmed your payment. Receipt issued.', 'success');
+
+    // Trigger digital bill dispatch to compulsory email
+    if (customerEmail.trim()) {
+      try {
+        await fetch('/api/receipt/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: customerEmail.trim(),
+            invoiceId: sessionId,
+          }),
+        });
+      } catch {
+        // Non-blocking email dispatch
+      }
+    }
+
+    clearSessionState();
+    clearGuestSession();
+  };
+
+  // Submit UPI payment details & transition to awaiting cashier/waiter approval
+  const handleSubmitUpiProof = async () => {
+    if (!validateContacts()) {
+      showToast('Required Fields Missing', 'Please enter your compulsory Email and Phone number.', 'error');
+      const el = document.getElementById('contact-form-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
     setIsProcessing(true);
     setErrorMessage(null);
 
     const stored = getGuestSession();
     const activeTableId = table?.id || stored?.tableId;
     const activeRestId = restaurant?.id || stored?.restaurantId;
-
-    const gatewayOrderId = `ord_bill_${Date.now()}`;
-    const gatewayPaymentId = `pay_${paymentMethod}_${Date.now()}`;
-    const gatewaySignature = `sig_${Date.now()}`;
 
     try {
       const res = await fetch('/api/payment/verify', {
@@ -195,14 +265,12 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
           sessionId,
           tableId: activeTableId,
           restaurantId: activeRestId,
-          gatewayOrderId,
-          gatewayPaymentId,
-          gatewaySignature,
-          paymentMethod: paymentMethod === 'waiter' ? 'CASH' : 'UPI',
+          action: 'submit_upi',
+          paymentMethod: 'UPI',
           customerDetails: {
             name: customerName.trim() || undefined,
-            email: customerEmail.trim() || undefined,
-            phone: customerPhone.trim() || undefined,
+            email: customerEmail.trim(),
+            phone: customerPhone.trim(),
             rating,
             review: review.trim() || undefined,
           },
@@ -212,40 +280,55 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data?.error || 'Could not record bill payment.');
+        setErrorMessage(data?.error || 'Could not submit UPI payment.');
         setIsProcessing(false);
         return;
       }
 
-      // If customer provided an email address, trigger digital bill dispatch
-      if (customerEmail.trim()) {
-        try {
-          await fetch('/api/receipt/email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: customerEmail.trim(),
-              invoiceId: data.invoiceId || sessionId,
-              invoiceNumber: data.invoiceNumber,
-            }),
-          });
-        } catch {
-          // Non-blocking email dispatch
-        }
-      }
-
-      // Clear table session state & storage
-      clearSessionState();
-      clearGuestSession();
-
-      showToast('Bill Paid Successfully! 🎉', 'Thank you for your feedback.', 'success');
-      setIsPaidSuccess(true);
+      setIsAwaitingStaffConfirmation(true);
       setIsProcessing(false);
+      showToast('UPI Submitted', 'Please show your UPI payment screen to Cashier or Waiter.', 'info');
     } catch (err: any) {
       setErrorMessage(err?.message || 'Server error recording payment.');
       setIsProcessing(false);
     }
   };
+
+  // Active check if cashier or waiter clicked "Payment Received"
+  useEffect(() => {
+    if (!isAwaitingStaffConfirmation || isPaidSuccess) return;
+
+    let isMounted = true;
+
+    const checkSettlement = async () => {
+      try {
+        const stored = getGuestSession();
+        const activeTableId = table?.id || stored?.tableId;
+        const activeRestId = restaurant?.id || stored?.restaurantId;
+        const query = new URLSearchParams({ sessionId });
+        if (activeTableId) query.set('tableId', activeTableId);
+        if (activeRestId) query.set('restaurantId', activeRestId);
+
+        const res = await fetch(`/api/bill?${query.toString()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data?.success && data.bill) {
+          if (data.bill.outstandingBalance <= 0 || data.bill.isFullySettled) {
+            if (!isMounted) return;
+            handleSettlementConfirmed();
+          }
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(checkSettlement, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isAwaitingStaffConfirmation, isPaidSuccess, sessionId, table?.id, restaurant?.id]);
 
   // 3. Countdown & auto-refresh effect after bill paid
   useEffect(() => {
@@ -428,51 +511,89 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
         </div>
       </div>
 
-      {/* 2. Customer Contact & Review Form */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
+      {/* 2. Customer Contact & Delivery Form (Email & Phone COMPULSORY) */}
+      <div id="contact-form-section" className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
         <div>
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-blue-600" />
-            <span>Receive Bill on Email & Review</span>
-          </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Add your email to receive an instant copy of your online bill receipt.
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-blue-600" />
+              <span>Customer Contact Details</span>
+            </h2>
+            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+              Email &amp; Phone Required
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1">
+            Email ID and Phone number are compulsory before making online payment to deliver your official GST tax invoice.
           </p>
         </div>
 
         <div className="space-y-3">
-          {/* User Email */}
+          {/* User Email (COMPULSORY) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-              Your Email Address <span className="text-blue-600 font-normal">(for online bill delivery)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                Email Address <span className="text-rose-600 font-extrabold">*</span>
+              </label>
+              <span className="text-[10px] font-semibold text-rose-600">Compulsory</span>
+            </div>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
+                required
                 value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="your.email@example.com"
-                className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+                onChange={(e) => {
+                  setCustomerEmail(e.target.value);
+                  if (emailError) setEmailError(null);
+                }}
+                placeholder="customer@example.com"
+                className={`w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border text-slate-900 transition-colors ${
+                  emailError
+                    ? 'border-rose-400 bg-rose-50/50 focus:ring-2 focus:ring-rose-500/20'
+                    : 'border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20'
+                }`}
               />
             </div>
+            {emailError ? (
+              <p className="text-[11px] text-rose-600 mt-1 font-medium">{emailError}</p>
+            ) : (
+              <p className="text-[10px] text-slate-400 mt-0.5">Required for delivering your official GST tax receipt</p>
+            )}
           </div>
 
-          {/* User Phone */}
+          {/* User Phone (COMPULSORY) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-              Phone Number <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                Phone Number <span className="text-rose-600 font-extrabold">*</span>
+              </label>
+              <span className="text-[10px] font-semibold text-rose-600">Compulsory</span>
+            </div>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="tel"
+                required
+                maxLength={14}
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+                onChange={(e) => {
+                  setCustomerPhone(e.target.value);
+                  if (phoneError) setPhoneError(null);
+                }}
+                placeholder="10-digit mobile number (e.g. 9876543210)"
+                className={`w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border text-slate-900 transition-colors ${
+                  phoneError
+                    ? 'border-rose-400 bg-rose-50/50 focus:ring-2 focus:ring-rose-500/20'
+                    : 'border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20'
+                }`}
               />
             </div>
+            {phoneError ? (
+              <p className="text-[11px] text-rose-600 mt-1 font-medium">{phoneError}</p>
+            ) : (
+              <p className="text-[10px] text-slate-400 mt-0.5">Required for payment verification &amp; SMS receipt</p>
+            )}
           </div>
 
           {/* User Name */}
@@ -539,186 +660,179 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
         </div>
       </div>
 
-      {/* 3. Payment Method: ONLY Google Pay / PhonePe (UPI) OR Pay to Waiter */}
+      {/* 3. Direct UPI Payment: Google Pay, PhonePe, QR */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
-        <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-          Choose How to Pay
-        </h2>
-
-        <div className="grid grid-cols-2 gap-3">
-          {/* Method A: Google Pay / PhonePe */}
-          <button
-            type="button"
-            onClick={() => setPaymentMethod('upi')}
-            className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
-              paymentMethod === 'upi'
-                ? 'border-light-primary bg-light-secondary-container/40 shadow-xs'
-                : 'border-slate-200 hover:border-slate-300 bg-white'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-light-primary text-light-on-primary flex items-center justify-center font-bold text-xs">
-                UPI
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'upi' ? 'border-light-primary bg-light-primary' : 'border-slate-300'
-                }`}
-              >
-                {paymentMethod === 'upi' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-              </div>
-            </div>
-            <div className="font-bold text-xs text-slate-900">Google Pay / PhonePe</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Direct UPI App or QR</div>
-          </button>
-
-          {/* Method B: Pay to Waiter */}
-          <button
-            type="button"
-            onClick={() => setPaymentMethod('waiter')}
-            className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
-              paymentMethod === 'waiter'
-                ? 'border-light-primary bg-light-secondary-container/40 shadow-xs'
-                : 'border-slate-200 hover:border-slate-300 bg-white'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-light-primary text-light-on-primary flex items-center justify-center">
-                <Banknote className="w-4 h-4" />
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'waiter' ? 'border-light-primary bg-light-primary' : 'border-slate-300'
-                }`}
-              >
-                {paymentMethod === 'waiter' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-              </div>
-            </div>
-            <div className="font-bold text-xs text-slate-900">Paid to Waiter</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Cash / Card at table</div>
-          </button>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <QrCode className="w-4 h-4 text-light-primary" />
+            <span>UPI Online Payment</span>
+          </h2>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            Zero Extra Fee
+          </span>
         </div>
 
-        {/* UPI Details & Deep Links when 'upi' selected */}
-        {paymentMethod === 'upi' && (
-          <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3 mt-3 animate-in fade-in duration-150">
-            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-              1-Tap Payment on Mobile:
-            </span>
+        <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3 animate-in fade-in duration-150">
+          <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+            1-Tap UPI Apps (Opens Installed App):
+          </span>
 
-            {/* Direct App Redirect Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              {gpayDeepLink && (
-                <a
-                  href={gpayDeepLink}
-                  className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-white border border-emerald-300 hover:border-emerald-500 font-bold text-xs text-slate-800 shadow-xs transition-all active:scale-[0.98]"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Google Pay</span>
-                  <ExternalLink className="w-3 h-3 text-slate-400" />
-                </a>
-              )}
-
-              {phonepeDeepLink && (
-                <a
-                  href={phonepeDeepLink}
-                  className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-white border border-emerald-300 hover:border-emerald-500 font-bold text-xs text-slate-800 shadow-xs transition-all active:scale-[0.98]"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-purple-600" />
-                  <span>PhonePe</span>
-                  <ExternalLink className="w-3 h-3 text-slate-400" />
-                </a>
-              )}
-            </div>
-
-            {/* Any UPI App button */}
-            {standardUpiLink && (
+          {/* Direct App Redirect Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            {gpayDeepLink && (
               <a
-                href={standardUpiLink}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.98]"
+                href={gpayDeepLink}
+                onClick={handleLaunchUpiApp}
+                className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-white border border-emerald-300 hover:border-emerald-500 font-bold text-xs text-slate-800 shadow-xs transition-all active:scale-[0.98]"
               >
-                <span>Open Any UPI App (Paytm / BHIM)</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+                <span>Google Pay</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
               </a>
             )}
 
-            {/* Dynamic UPI QR Code Preview for Desktop / Other Device */}
-            {upiQrSvg && (
-              <div className="bg-white p-3 rounded-2xl border border-emerald-200 text-center space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Or Scan QR with any Banking App
-                </span>
-                <div
-                  className="flex justify-center items-center py-1 mx-auto"
-                  dangerouslySetInnerHTML={{ __html: upiQrSvg }}
-                />
-              </div>
-            )}
-
-            {/* UPI ID copy box */}
-            <div className="bg-white p-2.5 rounded-xl border border-emerald-200/70 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
-                  UPI ID
-                </span>
-                <span className="font-mono font-bold text-slate-900 text-xs truncate block">
-                  {upiId}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyUpi}
-                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+            {phonepeDeepLink && (
+              <a
+                href={phonepeDeepLink}
+                onClick={handleLaunchUpiApp}
+                className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-white border border-emerald-300 hover:border-emerald-500 font-bold text-xs text-slate-800 shadow-xs transition-all active:scale-[0.98]"
               >
-                {copiedUpi ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-600" />
-                    <span className="text-emerald-700">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
+                <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+                <span>PhonePe</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </a>
+            )}
           </div>
-        )}
 
-        {/* Waiter Details when 'waiter' selected */}
-        {paymentMethod === 'waiter' && (
-          <div className="p-4 bg-blue-50/70 rounded-2xl border border-blue-200/80 space-y-1.5 mt-3 animate-in fade-in duration-150">
-            <div className="flex items-center gap-2">
-              <Banknote className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-bold text-blue-900">Pay Directly to Staff</span>
+          {/* Any UPI App button */}
+          {standardUpiLink && (
+            <a
+              href={standardUpiLink}
+              onClick={handleLaunchUpiApp}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.98]"
+            >
+              <span>Open Any UPI App (Paytm / BHIM / Cred)</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+
+          {/* Dynamic UPI QR Code Preview for Desktop / Other Device */}
+          {upiQrSvg && (
+            <div className="bg-white p-3 rounded-2xl border border-emerald-200 text-center space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Or Scan QR with any Banking App
+              </span>
+              <div
+                className="flex justify-center items-center py-1 mx-auto"
+                dangerouslySetInnerHTML={{ __html: upiQrSvg }}
+              />
             </div>
-            <p className="text-xs text-blue-800 leading-relaxed">
-              Hand cash to your waiter or ask for the card machine. Click the button below to confirm you have paid or requested the waiter.
+          )}
+
+          {/* UPI ID copy box */}
+          <div className="bg-white p-2.5 rounded-xl border border-emerald-200/70 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
+                UPI ID
+              </span>
+              <span className="font-mono font-bold text-slate-900 text-xs truncate block">
+                {upiId}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyUpi}
+              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+            >
+              {copiedUpi ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  <span className="text-emerald-700">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Informational notice: Cash is only marked by staff */}
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-2 text-xs text-slate-600">
+          <Banknote className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong>Paying Cash at Table or Counter?</strong> Cash payments are updated and verified exclusively by your Cashier, Waiter, or Admin. Please hand cash to staff to settle.
+          </p>
+        </div>
+      </div>
+
+      {/* 4. Settlement Action & Staff Verification */}
+      {isAwaitingStaffConfirmation ? (
+        <div className="bg-white rounded-3xl p-6 border-2 border-amber-300 shadow-md space-y-5 text-center animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-inner animate-pulse">
+            <Zap className="w-8 h-8 text-amber-600" />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              Awaiting Staff Confirmation
+            </span>
+            <h2 className="text-xl font-black text-slate-900">
+              Show This Screen to Cashier or Waiter
+            </h2>
+            <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+              Please show your UPI payment success screen to your waiter or cashier.
+              Once staff clicks <strong>&ldquo;Payment Received&rdquo;</strong>, your official digital receipt will be unlocked and sent to <strong>{customerEmail}</strong>.
             </p>
           </div>
-        )}
-      </div>
 
-      {/* 4. Complete / Confirm Settlement Button (No Verification required) */}
-      <div>
-        <Button
-          onClick={handleProceedPayment}
-          size="lg"
-          isLoading={isProcessing}
-          disabled={outstandingBalance <= 0}
-          className="w-full py-4 font-extrabold text-base gap-2 shadow-lg bg-light-primary hover:bg-light-primary-container shadow-light-primary/20 text-light-on-primary rounded-full transition-all"
-        >
-          {paymentMethod === 'waiter' ? (
-            <span>✓ Confirm Paid to Waiter • {formatCurrency(outstandingBalance, currency)}</span>
-          ) : (
-            <span>✓ Confirm Paid via Google Pay / PhonePe • {formatCurrency(outstandingBalance, currency)}</span>
-          )}
-        </Button>
-        <p className="text-[11px] text-center text-slate-400 mt-2">
-          Page automatically refreshes and clears table session after confirmation
-        </p>
-      </div>
+          {/* Amount & Table summary */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+            <div className="text-left">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Table</span>
+              <span className="font-extrabold text-slate-800 text-sm">Table {table?.number || '1'}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">UPI Amount</span>
+              <span className="font-black text-emerald-600 text-base">{formatCurrency(outstandingBalance, currency)}</span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-xs text-blue-900 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+            <span>Listening for staff confirmation in real time...</span>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAwaitingStaffConfirmation(false)}
+              className="w-full text-xs"
+            >
+              Show UPI QR Code / Edit Payment Details
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <Button
+            onClick={handleSubmitUpiProof}
+            size="lg"
+            isLoading={isProcessing}
+            disabled={outstandingBalance <= 0}
+            className="w-full py-4 font-extrabold text-base gap-2 shadow-lg bg-light-primary hover:bg-light-primary-container shadow-light-primary/20 text-light-on-primary rounded-full transition-all cursor-pointer"
+          >
+            <span>✓ I Have Paid via UPI • Show to Staff ({formatCurrency(outstandingBalance, currency)})</span>
+          </Button>
+          <p className="text-[11px] text-center text-slate-400 mt-2">
+            After paying in your UPI app, click above and show your screen to the cashier or waiter
+          </p>
+        </div>
+      )}
     </div>
   );
 }
