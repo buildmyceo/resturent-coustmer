@@ -271,8 +271,8 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
   dishes: Dish[];
 }> {
   try {
-    // Parallel fetch for optimal latency
-    const [restRes, settingsRes, catsRes, dishesRes] = await Promise.all([
+    // Parallel fetch for optimal latency including credit balance check
+    const [restRes, settingsRes, catsRes, dishesRes, creditRes] = await Promise.all([
       supabase.from('restaurants').select('*').eq('id', restaurantId).single(),
       supabase.from('restaurant_settings').select('*').eq('restaurant_id', restaurantId).maybeSingle(),
       supabase
@@ -287,10 +287,17 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         .eq('restaurant_id', restaurantId)
         .eq('is_archived', false)
         .eq('is_available', true),
+      supabase
+        .from('credit_balances')
+        .select('balance')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle(),
     ]);
 
     const r = restRes.data;
     const s = settingsRes.data;
+    const creditBalance = creditRes.data ? Number(creditRes.data.balance) : null;
+    const isCreditsPaused = creditBalance !== null && creditBalance <= 0;
 
     let restaurant: RestaurantProfile | null = null;
     let dishMetaMap: Record<string, any> = {};
@@ -407,7 +414,8 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         postalCode: r.postal_code,
         currency: r.currency || 'INR',
         timezone: r.timezone || 'Asia/Kolkata',
-        status: r.status,
+        status: isCreditsPaused ? 'suspended' : r.status,
+        isCreditsPaused,
         payFirstEnabled,
         settings: {
           taxEnabled: isTaxEnabled,

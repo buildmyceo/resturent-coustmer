@@ -28,6 +28,7 @@ import { calculateDistanceMeters, formatDistance } from '@/lib/geofence';
 import { QRScannerModal } from '@/components/scanner/QRScannerModal';
 import { playTap } from '@/lib/audio';
 import { useCustomer } from '@/context/CustomerContext';
+import { CustomerWaitingPage } from '@/components/CustomerWaitingPage';
 
 export default function CustomerPortalLandingPage() {
   const router = useRouter();
@@ -133,6 +134,10 @@ export default function CustomerPortalLandingPage() {
     if (userCoords) return Boolean(isWithinGeofence);
     return false;
   }, [restaurant?.geofence?.enabled, isInsideGeofence, userCoords, isWithinGeofence]);
+
+  if (restaurant?.status === 'suspended' || restaurant?.isCreditsPaused) {
+    return <CustomerWaitingPage restaurantName={restaurant?.name} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-rose-500 selection:text-white relative overflow-x-hidden font-sans">

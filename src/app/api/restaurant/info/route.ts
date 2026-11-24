@@ -187,6 +187,22 @@ export async function GET(request: Request) {
     // Merge with any runtime overrides
     const cached = restaurantOverrides.get(r.id);
 
+    // Check credit balance: if credits <= 0, pause restaurant customer service
+    let isCreditsPaused = false;
+    try {
+      const { data: creditRow } = await supabase
+        .from('credit_balances')
+        .select('balance')
+        .eq('restaurant_id', r.id)
+        .maybeSingle();
+
+      if (creditRow && Number(creditRow.balance) <= 0) {
+        isCreditsPaused = true;
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+
     const merged = {
       id: r.id,
       name: cached?.name || r.name || 'Restaurant',
@@ -205,7 +221,8 @@ export async function GET(request: Request) {
       country: r.country || 'India',
       currency: r.currency || 'INR',
       timezone: r.timezone || 'Asia/Kolkata',
-      status: r.status,
+      status: isCreditsPaused ? 'suspended' : r.status,
+      isCreditsPaused,
       socialLinks: cached?.socialLinks || socialLinks,
       geofence: cached?.geofence || geofence,
       landingPage: cached?.landingPage || landingPage,

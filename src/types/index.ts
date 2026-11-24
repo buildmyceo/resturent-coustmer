@@ -340,6 +340,7 @@ export interface RestaurantProfile {
   currency: string;
   timezone: string;
   status: 'active' | 'inactive' | 'suspended';
+  isCreditsPaused?: boolean;
   payFirstEnabled?: boolean;
   settings?: RestaurantSettings;
 }

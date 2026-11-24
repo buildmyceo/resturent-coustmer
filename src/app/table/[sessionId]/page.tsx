@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/Button';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatDistance } from '@/lib/geofence';
 import { formatCurrency } from '@/lib/format';
+import { CustomerWaitingPage } from '@/components/CustomerWaitingPage';
 
 interface MenuPageProps {
   params: Promise<{ sessionId: string }>;
@@ -275,6 +276,11 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
         <p className="text-xs text-light-on-surface-variant">Fetching live dishes from restaurant</p>
       </div>
     );
+  }
+
+  // If restaurant operational credits are exhausted, show company waiting page
+  if (restaurant?.status === 'suspended' || (restaurant as any)?.isCreditsPaused) {
+    return <CustomerWaitingPage restaurantName={restaurant?.name} />;
   }
 
   const restaurantName = restaurant?.name || 'Barista';

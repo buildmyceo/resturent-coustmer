@@ -62,6 +62,24 @@ export async function POST(request: Request) {
           );
         }
 
+        // Check platform credit balance: strictly reject orders if credits are exhausted
+        const { data: creditBalanceRow } = await supabase
+          .from('credit_balances')
+          .select('balance')
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+
+        if (creditBalanceRow && Number(creditBalanceRow.balance) <= 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Digital ordering is temporarily paused for this restaurant. Please inform your server to order.',
+              isCreditsPaused: true,
+            },
+            { status: 402 }
+          );
+        }
+
         const { data: restSettings } = await supabase
           .from('restaurant_settings')
           .select('opening_hours, timezone')
