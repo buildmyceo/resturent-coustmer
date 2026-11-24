@@ -17,8 +17,8 @@ export async function POST(request: Request) {
       if (r) realRest = r;
     }
     if (!realRest) {
-      const { data: defaultRests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false }).limit(1);
-      if (defaultRests && defaultRests.length > 0) realRest = defaultRests[0];
+      const { data: defaultRests } = await supabase.from('restaurants').select('*').eq('id', 'a9feec11-8dee-4202-be6e-a097e45266e6').maybeSingle();
+      if (defaultRests) realRest = defaultRests;
     }
 
     const resolvedRestId = realRest?.id || 'a9feec11-8dee-4202-be6e-a097e45266e6';

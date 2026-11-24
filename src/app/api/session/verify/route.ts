@@ -41,8 +41,8 @@ export async function POST(request: Request) {
         if (rList && rList.length > 0) realRest = rList[0];
       }
       if (!realRest) {
-        const { data: defaultRests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false }).limit(1);
-        if (defaultRests && defaultRests.length > 0) realRest = defaultRests[0];
+        const { data: defaultRests } = await supabase.from('restaurants').select('*').eq('id', 'a9feec11-8dee-4202-be6e-a097e45266e6').maybeSingle();
+        if (defaultRests) realRest = defaultRests;
       }
 
       // Find table for this restaurant
