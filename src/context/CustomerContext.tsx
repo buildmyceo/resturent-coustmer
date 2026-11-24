@@ -24,7 +24,7 @@ export interface ToastMessage {
   id: string;
   title: string;
   description?: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
 }
 
 interface CustomerContextType {
@@ -76,7 +76,7 @@ interface CustomerContextType {
   selectedDishModal: Dish | null;
   setSelectedDishModal: (dish: Dish | null) => void;
   toasts: ToastMessage[];
-  showToast: (title: string, description?: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (title: string, description?: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   dismissToast: (id: string) => void;
   isSessionDeactivated: boolean;
   setIsSessionDeactivated: (v: boolean) => void;
@@ -128,7 +128,7 @@ export function CustomerProvider({
   const [isSessionDeactivated, setIsSessionDeactivated] = useState(false);
 
   // Toast Notification Manager
-  const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = useCallback((title: string, description?: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     setToasts((prev) => [...prev, { id, title, description, type }]);
     setTimeout(() => {
@@ -196,7 +196,7 @@ export function CustomerProvider({
       if (dist <= effectiveRadius) {
         setIsInsideGeofence(true);
         setLocationStatus('inside');
-        showToast('Location Verified', 'Welcome! You are within the restaurant dining area.', 'success');
+        // Location verified in background silently without intrusive toast popup
       } else {
         setIsInsideGeofence(false);
         setLocationStatus('outside');
