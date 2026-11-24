@@ -651,9 +651,18 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             </div>
           </dl>
 
-          <p className="font-body text-xs text-light-on-surface-variant leading-relaxed">
-            No immediate payment required. Items are added to your running table bill.
-          </p>
+          {restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled ? (
+            <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl space-y-1 text-xs">
+              <span className="font-bold text-amber-900 block">First Pay, Then Confirm Order</span>
+              <p className="font-body text-amber-800 leading-relaxed">
+                Please pay at the cashier counter with your Order ID after placing. Kitchen preparation starts immediately once confirmed by the cashier.
+              </p>
+            </div>
+          ) : (
+            <p className="font-body text-xs text-light-on-surface-variant leading-relaxed">
+              No immediate payment required. Items are added to your running table bill.
+            </p>
+          )}
 
           {/* Shop Closed Alert */}
           {!isShopOpen && (
@@ -699,6 +708,8 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                   ? 'Restaurant Closed'
                   : isOrderBlockedByGeofence
                   ? 'Outside Ordering Area'
+                  : (restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled)
+                  ? `Pay at Counter & Confirm • ${formatCurrency(cartTotals.totalAmount, currency)}`
                   : `Confirm Order • ${formatCurrency(cartTotals.totalAmount, currency)}`}
               </span>
             </button>

@@ -107,6 +107,14 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
       {/* Active Orders List */}
       <div className="flex flex-col gap-6">
         {orders.map((order) => {
+          const isPayFirst = Boolean(
+            order.isPayFirst ||
+            restaurant?.settings?.payFirstEnabled ||
+            (restaurant as any)?.payFirstEnabled ||
+            order.assignmentMethod === 'counter_pay' ||
+            (order.customerNote && order.customerNote.includes('[PAY_FIRST:COUNTER]'))
+          );
+          const isPending = order.status === 'pending';
           const isReady = order.status === 'ready';
           const isServed = order.status === 'served' || order.status === 'completed';
           const isPreparing = order.status === 'preparing';
@@ -147,6 +155,39 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
                 </div>
               </header>
 
+              {/* Pay First: Prominent Callout Banners */}
+              {isPending && isPayFirst && (
+                <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-start gap-3 shadow-xs">
+                  <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center shrink-0 font-bold">
+                    <Receipt className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-title text-sm font-bold text-amber-950">
+                      Action Required: Pay at Cashier Counter
+                    </h3>
+                    <p className="font-body text-xs text-amber-900 leading-relaxed">
+                      Please visit the counter with your Order ID <strong>#{order.orderNumber}</strong> to pay via Cash or UPI. As soon as payment is confirmed by the cashier, your order will be sent directly to the kitchen.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {isReady && isPayFirst && (
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-xl flex items-start gap-3 shadow-xs animate-pulse">
+                  <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0 font-bold">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-title text-sm font-bold text-emerald-950">
+                      Food Ready for Pickup!
+                    </h3>
+                    <p className="font-body text-xs text-emerald-900 leading-relaxed">
+                      Your dishes are prepared! Please head to the kitchen counter with your Order ID <strong>#{order.orderNumber}</strong> to collect your food.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Live Kitchen Status Callout */}
               <div
                 className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium ${
@@ -161,21 +202,32 @@ export default function OrderTrackingPage({ params }: OrdersPageProps) {
               >
                 <Sparkles className="w-5 h-5 text-light-primary shrink-0" />
                 <p className="font-body">
-                  {isReady
-                    ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`
-                    : isPreparing
-                    ? 'Preparing! Our kitchen chefs are actively crafting your order.'
-                    : isServed
-                    ? `Served! All items have been delivered to Table ${tableNumberDisplay}. Enjoy your meal!`
-                    : 'Submitted! Order received and sent for table confirmation.'}
+                  {isPayFirst ? (
+                    isReady
+                      ? `Ready for Pickup! Present Order #${order.orderNumber} at the counter to collect your food.`
+                      : isPreparing
+                      ? 'Preparing! Kitchen chefs are actively cooking your order.'
+                      : isServed
+                      ? 'Order Taken! Hope you enjoy your meal.'
+                      : `Awaiting payment at the counter. Show Order #${order.orderNumber} to the cashier.`
+                  ) : (
+                    isReady
+                      ? `Ready! Staff is currently serving your fresh food to Table ${tableNumberDisplay}.`
+                      : isPreparing
+                      ? 'Preparing! Our kitchen chefs are actively crafting your order.'
+                      : isServed
+                      ? `Served! All items have been delivered to Table ${tableNumberDisplay}. Enjoy your meal!`
+                      : 'Submitted! Order received and sent for table confirmation.'
+                  )}
                 </p>
               </div>
 
-              {/* 7-Step Order Progress Stepper */}
+              {/* Order Progress Stepper */}
               <OrderProgressStepper
                 status={order.status}
                 rejectionReason={order.rejectionReason}
                 assignedWaiterName={order.assignedWaiterName}
+                isPayFirst={isPayFirst}
               />
 
               {/* Ordered Dishes List */}

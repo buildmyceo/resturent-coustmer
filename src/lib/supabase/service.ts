@@ -347,6 +347,7 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
       let taxName = 'GST / Tax';
       let serviceChargeEnabled = s?.service_charge_enabled ?? false;
       let serviceChargePercentage = Number(s?.service_charge_percentage ?? 0);
+      let payFirstEnabled = false;
 
       // Re-apply payment config overrides if present in receipt_footer
       if (s?.receipt_footer) {
@@ -365,6 +366,9 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
             }
             if (paymentConfig.serviceChargeEnabled !== undefined) {
               serviceChargeEnabled = Boolean(paymentConfig.serviceChargeEnabled);
+            }
+            if (paymentConfig.payFirstEnabled !== undefined) {
+              payFirstEnabled = Boolean(paymentConfig.payFirstEnabled);
             }
           } catch { }
         }
@@ -388,12 +392,14 @@ export async function fetchRestaurantAndMenuDB(restaurantId: string): Promise<{
         currency: r.currency || 'USD',
         timezone: r.timezone || 'America/Los_Angeles',
         status: r.status,
+        payFirstEnabled,
         settings: {
           taxEnabled: s?.tax_enabled ?? true,
           taxPercentage,
           taxName,
           serviceChargeEnabled,
           serviceChargePercentage,
+          payFirstEnabled,
           currency: s?.currency || r.currency || 'USD',
           timezone: s?.timezone || r.timezone || 'America/Los_Angeles',
           receiptFooter: s?.receipt_footer || 'Thank you for dining with us!',
@@ -508,6 +514,7 @@ export async function fetchTableSessionOrdersDB(sessionId: string): Promise<Orde
       assignedAt: o.assigned_at || null,
       assignmentMethod: o.assignment_method || undefined,
       assignmentStatus: o.assignment_status || undefined,
+      isPayFirst: o.assignment_method === 'counter_pay' || Boolean(o.customer_note && o.customer_note.includes('[PAY_FIRST:COUNTER]')),
       rejectionReason: o.rejection_reason || null,
       rejectedAt: o.rejected_at || null,
       items: (o.order_items || []).map((i: any) => ({

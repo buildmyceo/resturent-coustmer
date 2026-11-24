@@ -131,6 +131,7 @@ export async function POST(request: Request) {
     let taxRate = 8.5;
     let serviceFeeRate = 10.0;
     let storedCoupons: any[] = [];
+    let isPayFirst = false;
     try {
       const { data: settingsData } = await supabase
         .from('restaurant_settings')
@@ -158,6 +159,9 @@ export async function POST(request: Request) {
                 if (paymentConfig.serviceChargeEnabled === false) {
                   serviceFeeRate = 0;
                 }
+              }
+              if (paymentConfig.payFirstEnabled !== undefined) {
+                isPayFirst = Boolean(paymentConfig.payFirstEnabled);
               }
             } catch {}
           }
@@ -390,70 +394,73 @@ export async function POST(request: Request) {
 
     const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 6. Equal-Distribution Waiter Assignment Algorithm
+    // 6. Equal-Distribution Waiter Assignment Algorithm (Bypassed if payFirstEnabled)
     let assignedWaiterId: string | null = null;
     let assignedWaiterName: string | null = null;
-    let assignmentStatus = 'unassigned';
+    let assignmentStatus = isPayFirst ? 'counter_pending' : 'unassigned';
 
-    try {
-      // Find active, approved waiters in this restaurant
-      const { data: waiters, error: wErr } = await supabase
-        .from('restaurant_members')
-        .select('user_id, profiles(id, full_name)')
-        .eq('restaurant_id', restaurantId)
-        .eq('role', 'waiter')
-        .eq('approval_status', 'approved')
-        .eq('is_active', true);
-
-      if (!wErr && waiters && waiters.length > 0) {
-        const waiterUserIds = waiters.map((w: any) => w.user_id);
-
-        // Count active workload per waiter
-        const { data: activeOrders } = await supabase
-          .from('orders')
-          .select('assigned_waiter_id')
+    if (!isPayFirst) {
+      try {
+        // Find active, approved waiters in this restaurant
+        const { data: waiters, error: wErr } = await supabase
+          .from('restaurant_members')
+          .select('user_id, profiles(id, full_name)')
           .eq('restaurant_id', restaurantId)
-          .in('assigned_waiter_id', waiterUserIds)
-          .in('status', ['waiting_for_waiter', 'waiter_accepted', 'sent_to_kitchen', 'accepted_by_kitchen', 'accepted', 'preparing', 'ready']);
+          .eq('role', 'waiter')
+          .eq('approval_status', 'approved')
+          .eq('is_active', true);
 
-        const workloadMap = new Map<string, number>();
-        waiterUserIds.forEach((id: string) => workloadMap.set(id, 0));
-        (activeOrders || []).forEach((o: any) => {
-          if (o.assigned_waiter_id) {
-            workloadMap.set(o.assigned_waiter_id, (workloadMap.get(o.assigned_waiter_id) || 0) + 1);
+        if (!wErr && waiters && waiters.length > 0) {
+          const waiterUserIds = waiters.map((w: any) => w.user_id);
+
+          // Count active workload per waiter
+          const { data: activeOrders } = await supabase
+            .from('orders')
+            .select('assigned_waiter_id')
+            .eq('restaurant_id', restaurantId)
+            .in('assigned_waiter_id', waiterUserIds)
+            .in('status', ['waiting_for_waiter', 'waiter_accepted', 'sent_to_kitchen', 'accepted_by_kitchen', 'accepted', 'preparing', 'ready']);
+
+          const workloadMap = new Map<string, number>();
+          waiterUserIds.forEach((id: string) => workloadMap.set(id, 0));
+          (activeOrders || []).forEach((o: any) => {
+            if (o.assigned_waiter_id) {
+              workloadMap.set(o.assigned_waiter_id, (workloadMap.get(o.assigned_waiter_id) || 0) + 1);
+            }
+          });
+
+          // Sort waiters: lowest workload first, rotating tie-breaker
+          const sortedWaiters = [...waiters].sort((a: any, b: any) => {
+            const countA = workloadMap.get(a.user_id) || 0;
+            const countB = workloadMap.get(b.user_id) || 0;
+            if (countA !== countB) return countA - countB;
+            return a.user_id.localeCompare(b.user_id);
+          });
+
+          const chosen: any = sortedWaiters[0];
+          if (chosen) {
+            assignedWaiterId = chosen.user_id;
+            const profiles = chosen.profiles;
+            const profileObj = Array.isArray(profiles) ? profiles[0] : profiles;
+            assignedWaiterName = profileObj?.full_name || 'Floor Waiter';
+            assignmentStatus = 'assigned';
           }
-        });
-
-        // Sort waiters: lowest workload first, rotating tie-breaker
-        const sortedWaiters = [...waiters].sort((a: any, b: any) => {
-          const countA = workloadMap.get(a.user_id) || 0;
-          const countB = workloadMap.get(b.user_id) || 0;
-          if (countA !== countB) return countA - countB;
-          return a.user_id.localeCompare(b.user_id);
-        });
-
-        const chosen: any = sortedWaiters[0];
-        if (chosen) {
-          assignedWaiterId = chosen.user_id;
-          const profiles = chosen.profiles;
-          const profileObj = Array.isArray(profiles) ? profiles[0] : profiles;
-          assignedWaiterName = profileObj?.full_name || 'Floor Waiter';
-          assignmentStatus = 'assigned';
         }
+      } catch (assignErr) {
+        console.warn('Waiter assignment error:', assignErr);
       }
-    } catch (assignErr) {
-      console.warn('Waiter assignment error:', assignErr);
     }
 
     // 7. Insert Order into Supabase
     // We only use standard verified database columns:
     // id, restaurant_id, table_id, order_number, order_source, subtotal, tax_amount, service_fee, total_amount, status, customer_note, payment_status
     const sessionTag = tableSessionId ? `[SESS:${tableSessionId}]` : '';
+    const counterTag = isPayFirst ? '[PAY_FIRST:COUNTER]' : '';
     const noteWithCoupon = validatedCouponCode
-      ? `${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})${sessionTag ? ` ${sessionTag}` : ''}`
+      ? `${counterTag ? `${counterTag} ` : ''}${customerNote ? `${customerNote} | ` : ''}Coupon: ${validatedCouponCode} (-${calculatedDiscount})${sessionTag ? ` ${sessionTag}` : ''}`
       : customerNote
-      ? `${String(customerNote).slice(0, 450)}${sessionTag ? ` ${sessionTag}` : ''}`
-      : sessionTag || null;
+      ? `${counterTag ? `${counterTag} ` : ''}${String(customerNote).slice(0, 450)}${sessionTag ? ` ${sessionTag}` : ''}`
+      : [counterTag, sessionTag].filter(Boolean).join(' ') || null;
 
     const baseOrderPayload = {
       restaurant_id: restaurantId,
@@ -474,11 +481,11 @@ export async function POST(request: Request) {
     // Try insert with optional fields first (in case migration added assigned_waiter_id)
     const extendedPayload = {
       ...baseOrderPayload,
-      status: 'waiting_for_waiter',
-      assigned_waiter_id: assignedWaiterId,
-      assigned_at: assignedWaiterId ? new Date().toISOString() : null,
-      assignment_method: 'equal_distribution',
-      assignment_status: assignmentStatus,
+      status: isPayFirst ? 'pending' : 'waiting_for_waiter',
+      assigned_waiter_id: isPayFirst ? null : assignedWaiterId,
+      assigned_at: (!isPayFirst && assignedWaiterId) ? new Date().toISOString() : null,
+      assignment_method: isPayFirst ? 'counter_pay' : 'equal_distribution',
+      assignment_status: isPayFirst ? 'counter_pending' : assignmentStatus,
       ...(tableSessionId ? { table_session_id: tableSessionId } : {}),
       ...(participantId ? { participant_id: participantId } : {}),
       ...(participantName ? { participant_name: participantName } : {}),
@@ -563,12 +570,15 @@ export async function POST(request: Request) {
       subtotal: calculatedSubtotal,
       taxAmount: calculatedTax,
       serviceFee: calculatedServiceFee,
-      status: 'waiting_for_waiter',
-      assignedWaiterId,
-      assignedWaiterName,
-      assignmentStatus,
+      status: isPayFirst ? 'pending' : 'waiting_for_waiter',
+      assignedWaiterId: isPayFirst ? null : assignedWaiterId,
+      assignedWaiterName: isPayFirst ? null : assignedWaiterName,
+      assignmentStatus: isPayFirst ? 'counter_pending' : assignmentStatus,
+      isPayFirst,
       itemsCount: validatedOrderItems.reduce((acc, i) => acc + i.quantity, 0),
-      message: 'Your order has been submitted. Please wait while our staff confirms it.',
+      message: isPayFirst
+        ? 'Please visit the cashier counter with your Order ID to pay. Once confirmed, your order will be prepared directly by the kitchen.'
+        : 'Your order has been submitted. Please wait while our staff confirms it.',
     };
 
     // Broadcast instant alert to all connected portals (Staff, Admin, Kitchen)
@@ -583,7 +593,9 @@ export async function POST(request: Request) {
             order_number: createdOrder.order_number,
             restaurant_id: restaurantId,
             table_id: tableId,
-            status: 'pending',
+            status: isPayFirst ? 'pending' : 'waiting_for_waiter',
+            assigned_waiter_id: isPayFirst ? null : assignedWaiterId,
+            is_pay_first: isPayFirst,
             total_amount: createdOrder.total_amount,
             created_at: new Date().toISOString(),
           };

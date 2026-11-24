@@ -180,6 +180,7 @@ export interface Order {
   assignmentStatus?: string;
   rejectionReason?: string | null;
   rejectedAt?: string | null;
+  isPayFirst?: boolean;
 }
 
 export interface CartItemAddon {
@@ -278,6 +279,7 @@ export interface RestaurantSettings {
   taxName?: string;
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
+  payFirstEnabled?: boolean;
   currency: string;
   timezone: string;
   receiptFooter: string;
@@ -337,6 +339,7 @@ export interface RestaurantProfile {
   currency: string;
   timezone: string;
   status: 'active' | 'inactive' | 'suspended';
+  payFirstEnabled?: boolean;
   settings?: RestaurantSettings;
 }
 

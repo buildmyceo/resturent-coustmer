@@ -19,6 +19,7 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
   if (!isOpen) return null;
 
   const currency = restaurant?.currency || 'USD';
+  const isPayFirst = Boolean(restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -34,13 +35,23 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
 
         <div className="space-y-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 text-[11px] font-bold rounded-lg border border-amber-200/60">
+            <div
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg border ${
+                isPayFirst
+                  ? 'bg-amber-50 text-amber-900 border-amber-300'
+                  : 'bg-amber-50 text-amber-800 border-amber-200/60'
+              }`}
+            >
               <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>Waiter Confirmation Queue</span>
+              <span>{isPayFirst ? 'Counter Payment • Direct Kitchen' : 'Waiter Confirmation Queue'}</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-2">Confirm Your Table Order</h2>
+            <h2 className="text-xl font-bold text-slate-900 mt-2">
+              {isPayFirst ? 'Pay at Counter & Confirm' : 'Confirm Your Table Order'}
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-              Your order will be sent to the floor waiter for validation before kitchen preparation begins.
+              {isPayFirst
+                ? 'Please visit the cashier counter with your Order ID to pay via Cash or UPI. Once confirmed by the cashier, your order is prepared directly by the kitchen.'
+                : 'Your order will be sent to the floor waiter for validation before kitchen preparation begins.'}
             </p>
           </div>
 
@@ -118,7 +129,7 @@ export function OrderConfirmModal({ isOpen, onClose, onConfirmOrder, isSubmittin
               className="w-full gap-2 shadow-md cursor-pointer"
               size="lg"
             >
-              <span>Confirm Order</span>
+              <span>{isPayFirst ? 'Confirm & Pay at Counter' : 'Confirm Order'}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
 

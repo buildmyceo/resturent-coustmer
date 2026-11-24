@@ -17,9 +17,10 @@ interface OrderProgressStepperProps {
   status: OrderStatus;
   rejectionReason?: string | null;
   assignedWaiterName?: string | null;
+  isPayFirst?: boolean;
 }
 
-const steps = [
+const standardSteps = [
   { key: 'submitted', label: 'Submitted', icon: Clock },
   { key: 'waiting_for_waiter', label: 'Waiter', icon: UserCheck },
   { key: 'order_confirmed', label: 'Confirmed', icon: CheckCircle2 },
@@ -29,10 +30,19 @@ const steps = [
   { key: 'served', label: 'Served', icon: ConciergeBell },
 ];
 
+const counterSteps = [
+  { key: 'pending', label: 'Pay at Counter', icon: Clock },
+  { key: 'confirmed', label: 'Paid & Confirmed', icon: CheckCircle2 },
+  { key: 'preparing', label: 'Cooking in Kitchen', icon: UtensilsCrossed },
+  { key: 'ready', label: 'Ready for Pickup', icon: Sparkles },
+  { key: 'served', label: 'Order Taken', icon: ConciergeBell },
+];
+
 export function OrderProgressStepper({
   status,
   rejectionReason,
   assignedWaiterName,
+  isPayFirst,
 }: OrderProgressStepperProps) {
   if (status === 'cancelled' || status === 'rejected') {
     return (
@@ -50,8 +60,29 @@ export function OrderProgressStepper({
     );
   }
 
-  // Map order status to progress index (0 to 6)
+  // Map order status to progress index (0 to 6 for standard, 0 to 4 for counter-pay)
   const getStatusIndex = (st: OrderStatus): number => {
+    if (isPayFirst) {
+      switch (st) {
+        case 'pending':
+          return 0;
+        case 'accepted':
+        case 'sent_to_kitchen':
+        case 'accepted_by_kitchen':
+        case 'waiter_accepted':
+          return 1;
+        case 'preparing':
+          return 2;
+        case 'ready':
+          return 3;
+        case 'served':
+        case 'completed':
+          return 4;
+        default:
+          return 0;
+      }
+    }
+
     switch (st) {
       case 'pending':
         return 0;
@@ -75,12 +106,13 @@ export function OrderProgressStepper({
     }
   };
 
+  const activeSteps = isPayFirst ? counterSteps : standardSteps;
   const currentIndex = getStatusIndex(status);
 
   return (
     <div className="w-full py-2 space-y-3">
-      {/* Waiter assignment status pill (if assigned) */}
-      {assignedWaiterName && (
+      {/* Waiter assignment status pill (if standard waiter flow) */}
+      {!isPayFirst && assignedWaiterName && (
         <div className="flex items-center justify-between text-xs px-3 py-1.5 bg-light-surface-container-low border border-light-outline-variant/60 rounded-xl text-light-on-surface-variant">
           <span className="flex items-center gap-1.5">
             <UserCheck className="w-3.5 h-3.5 text-light-primary" />
@@ -93,12 +125,14 @@ export function OrderProgressStepper({
         </div>
       )}
 
-      {/* 7-Step Grid Stepper matching mockup */}
+      {/* Grid Stepper */}
       <div
         aria-label="Order progress"
-        className="grid grid-cols-4 sm:grid-cols-7 gap-2 sm:gap-3 pt-1"
+        className={`grid gap-2 sm:gap-3 pt-1 ${
+          isPayFirst ? 'grid-cols-5' : 'grid-cols-4 sm:grid-cols-7'
+        }`}
       >
-        {steps.map((step, idx) => {
+        {activeSteps.map((step, idx) => {
           const Icon = step.icon;
           const isCompleted = idx < currentIndex;
           const isCurrent = idx === currentIndex;
