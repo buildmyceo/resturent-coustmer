@@ -317,7 +317,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             </span>
           </div>
           <p className="font-body text-xs sm:text-sm text-light-on-surface-variant">
-            Review your selected dishes before sending them to the kitchen for Table {tableNumberDisplay}.
+            Review your selected dishes before confirming your order for Table {tableNumberDisplay}.
           </p>
         </div>
 
@@ -699,7 +699,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                   ? 'Restaurant Closed'
                   : isOrderBlockedByGeofence
                   ? 'Outside Ordering Area'
-                  : `Send to Kitchen • ${formatCurrency(cartTotals.totalAmount, currency)}`}
+                  : `Confirm Order • ${formatCurrency(cartTotals.totalAmount, currency)}`}
               </span>
             </button>
 
