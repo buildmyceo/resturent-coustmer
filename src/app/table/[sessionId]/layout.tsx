@@ -5,6 +5,7 @@ import { CustomerHeader } from '@/components/layout/CustomerHeader';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { CallWaiterFab } from '@/components/layout/CallWaiterFab';
 import { DishModal } from '@/components/menu/DishModal';
+import { CustomerWaitingPage } from '@/components/CustomerWaitingPage';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession } from '@/lib/guest-session';
 import { Clock, QrCode } from 'lucide-react';
@@ -145,6 +146,16 @@ export default function TableSessionLayout({ children, params }: TableLayoutProp
           </Button>
         </div>
       </div>
+    );
+  }
+
+  // If restaurant operational credits are exhausted or restaurant suspended, show company waiting page
+  if (restaurant?.status === 'suspended' || (restaurant as any)?.isCreditsPaused) {
+    return (
+      <CustomerWaitingPage
+        restaurantName={restaurant?.name}
+        tableNumber={table?.number || (session as any)?.tableNumber}
+      />
     );
   }
 

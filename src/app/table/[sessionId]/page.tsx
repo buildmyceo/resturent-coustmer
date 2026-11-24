@@ -280,7 +280,12 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
   // If restaurant operational credits are exhausted, show company waiting page
   if (restaurant?.status === 'suspended' || (restaurant as any)?.isCreditsPaused) {
-    return <CustomerWaitingPage restaurantName={restaurant?.name} />;
+    return (
+      <CustomerWaitingPage
+        restaurantName={restaurant?.name}
+        tableNumber={table?.number}
+      />
+    );
   }
 
   const restaurantName = restaurant?.name || 'Barista';

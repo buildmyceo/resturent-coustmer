@@ -136,7 +136,12 @@ export default function CustomerPortalLandingPage() {
   }, [restaurant?.geofence?.enabled, isInsideGeofence, userCoords, isWithinGeofence]);
 
   if (restaurant?.status === 'suspended' || restaurant?.isCreditsPaused) {
-    return <CustomerWaitingPage restaurantName={restaurant?.name} />;
+    return (
+      <CustomerWaitingPage
+        restaurantName={restaurant?.name}
+        tableNumber={activeSession?.tableNumber}
+      />
+    );
   }
 
   return (
