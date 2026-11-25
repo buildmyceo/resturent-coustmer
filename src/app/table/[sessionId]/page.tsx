@@ -73,6 +73,32 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
   const [vegOnly, setVegOnly] = useState(false);
   const [fastOnly, setFastOnly] = useState(false);
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
+  const categoryBtnRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const [categoryPill, setCategoryPill] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  useEffect(() => {
+    const updatePill = () => {
+      const btn = categoryBtnRefs.current[activeCategoryId];
+      if (btn) {
+        setCategoryPill({
+          left: btn.offsetLeft,
+          width: btn.offsetWidth,
+          ready: true,
+        });
+      }
+    };
+    updatePill();
+    const btn = categoryBtnRefs.current[activeCategoryId];
+    if (btn) {
+      btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+    window.addEventListener('resize', updatePill);
+    return () => window.removeEventListener('resize', updatePill);
+  }, [activeCategoryId, categories, isLoading]);
 
   // Check if previous table orders are fully settled and no active session
   const isSessionSettled = useMemo(() => {
@@ -548,31 +574,49 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
             </div>
           </div>
 
-          {/* Horizontal Category Tabs Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
-            <button
-              onClick={() => setActiveCategoryId('all')}
-              className={`category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeCategoryId === 'all'
-                  ? 'bg-light-primary text-light-on-primary shadow-xs'
-                  : 'bg-light-surface-container-lowest border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
-              }`}
-            >
-              <span>All Items</span>
-            </button>
-            {categories.map((cat) => (
+          {/* Horizontal Category Tabs Strip with Sliding Pill */}
+          <div className="overflow-x-auto no-scrollbar py-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
+            <div className="relative inline-flex items-center gap-2">
+              {categoryPill.ready && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-0 bottom-0 left-0 rounded-full bg-light-primary shadow-xs transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                  style={{
+                    width: `${categoryPill.width}px`,
+                    transform: `translateX(${categoryPill.left}px)`,
+                  }}
+                />
+              )}
               <button
-                key={cat.id}
-                onClick={() => setActiveCategoryId(cat.id)}
-                className={`category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                  activeCategoryId === cat.id
-                    ? 'bg-light-primary text-light-on-primary shadow-xs'
-                    : 'bg-light-surface-container-lowest border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
+                ref={(el) => {
+                  categoryBtnRefs.current['all'] = el;
+                }}
+                onClick={() => setActiveCategoryId('all')}
+                className={`relative z-10 category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-colors duration-200 cursor-pointer ${
+                  activeCategoryId === 'all'
+                    ? 'text-light-on-primary'
+                    : 'bg-light-surface-container-lowest/80 border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
                 }`}
               >
-                <span>{cat.name.replace(/^[\p{Emoji}\u200d\uFE0F\s]+/u, '').trim() || cat.name}</span>
+                <span>All Items</span>
               </button>
-            ))}
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  ref={(el) => {
+                    categoryBtnRefs.current[cat.id] = el;
+                  }}
+                  onClick={() => setActiveCategoryId(cat.id)}
+                  className={`relative z-10 category-pill shrink-0 inline-flex items-center px-4 py-2 rounded-full font-label text-xs sm:text-sm font-semibold transition-colors duration-200 cursor-pointer ${
+                    activeCategoryId === cat.id
+                      ? 'text-light-on-primary'
+                      : 'bg-light-surface-container-lowest/80 border border-light-outline-variant/80 text-light-on-surface hover:bg-light-surface-container'
+                  }`}
+                >
+                  <span>{cat.name.replace(/^[\p{Emoji}\u200d\uFE0F\s]+/u, '').trim() || cat.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
