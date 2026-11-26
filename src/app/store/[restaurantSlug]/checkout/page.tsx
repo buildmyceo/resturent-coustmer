@@ -279,6 +279,27 @@ export default function DeliveryCheckoutPage() {
     );
   }
 
+  if (cart.length === 0) {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-4 shadow-xs">
+          <Truck className="w-10 h-10 text-slate-300 mx-auto" />
+          <h1 className="text-xl font-bold text-slate-900">Your Cart is Empty</h1>
+          <p className="text-sm text-slate-500">
+            Add some dishes from the menu before proceeding to checkout.
+          </p>
+          <Link
+            href={`/store/${restaurantSlug}`}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Browse Menu
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">

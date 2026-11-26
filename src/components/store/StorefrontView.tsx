@@ -314,7 +314,7 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
       )}
 
       {/* 2. Sticky Search & Quick Dietary Filters */}
-      <div className="sticky top-[64px] z-30 bg-light-surface/95 backdrop-blur-md border-b border-light-outline-variant/40 py-2.5 px-4 sm:px-6 shadow-2xs">
+      <div className="sticky top-0 z-30 bg-light-surface/95 backdrop-blur-md border-b border-light-outline-variant/40 py-2.5 px-4 sm:px-6 shadow-2xs">
         <div className="max-w-[1200px] mx-auto flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -484,33 +484,33 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
         )}
       </main>
 
-      {/* Floating Delivery Checkout Bar */}
-      {deliveryCfg?.enabled && cartTotals.itemCount > 0 && (
-        <div className="fixed bottom-4 inset-x-4 z-40 max-w-2xl mx-auto">
-          <div className="bg-light-primary text-light-on-primary rounded-2xl px-5 py-3.5 shadow-xl flex items-center justify-between gap-4">
+      {/* Floating Cart Pill above Bottom Nav */}
+      {cartTotals.itemCount > 0 && (
+        <div className="fixed bottom-20 inset-x-4 z-40 max-w-md mx-auto">
+          <button
+            type="button"
+            onClick={() => router.push(`/store/${restaurantSlug}/checkout`)}
+            className="w-full bg-light-primary text-light-on-primary rounded-full px-4 py-3 shadow-xl flex items-center justify-between gap-4 hover:opacity-95 transition-opacity cursor-pointer"
+          >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-                <ShoppingBag className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs opacity-85">
-                  {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'} in delivery cart
+              <span className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-sm font-bold">
+                {cartTotals.itemCount}
+              </span>
+              <div className="text-left leading-tight">
+                <p className="text-[11px] opacity-85">
+                  {cartTotals.itemCount} {cartTotals.itemCount === 1 ? 'item' : 'items'}
                 </p>
-                <p className="text-base font-bold">
+                <p className="text-sm font-bold">
                   {formatCurrency(cartTotals.subtotal, currency)}
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push(`/store/${restaurantSlug}/checkout`)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-light-primary text-sm font-bold hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <span>Delivery Checkout</span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold pr-1">
+              <span>View Cart</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+            </span>
+          </button>
         </div>
       )}
       <StorefrontBottomNav restaurantSlug={restaurantSlug} />
