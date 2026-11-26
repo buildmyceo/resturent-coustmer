@@ -85,15 +85,19 @@ export default function DeliveryCheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurantId: restaurant.id,
-          deliveryLat: latNum,
-          deliveryLng: lngNum,
-          subtotal,
+          customerLat: latNum,
+          customerLng: lngNum,
+          discountedSubtotal: subtotal,
         }),
       });
       const json = await res.json();
       setZoneResult(json);
-      if (!json.eligible) {
-        setError(json.reason || 'Your location is outside the delivery zone.');
+      if (!res.ok || !json.success) {
+        setError(json.error || 'Could not verify delivery zone.');
+      } else if (!json.isWithinZone) {
+        setError(
+          `Your location is ${json.distanceKm} km away, outside the ${json.maxRadiusKm} km delivery zone.`
+        );
       }
     } catch (err: any) {
       setError(err?.message || 'Delivery zone check failed.');
@@ -126,8 +130,8 @@ export default function DeliveryCheckoutPage() {
     );
   };
 
-  const deliveryFee = zoneResult?.eligible
-    ? Number(zoneResult.deliveryFee || 0)
+  const deliveryFee = zoneResult?.isWithinZone
+    ? Number(zoneResult.appliedDeliveryFee ?? zoneResult.deliveryFee ?? 0)
     : deliveryCfg?.freeAbove != null && subtotal >= Number(deliveryCfg.freeAbove)
     ? 0
     : Number(deliveryCfg?.charge || 0);
@@ -422,7 +426,7 @@ export default function DeliveryCheckoutPage() {
                 </button>
               )}
 
-              {zoneResult?.eligible && (
+              {zoneResult?.isWithinZone && (
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>
@@ -521,7 +525,7 @@ export default function DeliveryCheckoutPage() {
 
             <button
               type="submit"
-              disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.eligible)}
+              disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.isWithinZone)}
               className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {submitting ? (

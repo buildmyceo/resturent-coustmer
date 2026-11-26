@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     const { data: settingsData } = await supabase
       .from('restaurant_settings')
       .select(
-        'opening_hours, timezone, currency, tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer, pay_first_enabled, geofence_enabled, geofence_lat, geofence_lng, geofence_radius_m, delivery_enabled, delivery_radius_km, delivery_charge, delivery_free_above, delivery_min_order, razorpay_settlement_mode, razorpay_linked_account_id, platform_fee_percent'
+        'opening_hours, timezone, currency, tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer, pay_first_enabled, geofence_enabled, geofence_radius_meters, delivery_enabled, delivery_radius_km, delivery_fee, free_delivery_min_order, delivery_min_order_amount, razorpay_settlement_mode, razorpay_linked_account_id, platform_fee_percent'
       )
       .eq('restaurant_id', restaurantId)
       .maybeSingle();
@@ -291,9 +291,9 @@ export async function POST(request: Request) {
         : null;
 
     if (orderType === 'dine_in') {
-      const gfLat = settingsData?.geofence_lat ?? restData.latitude;
-      const gfLng = settingsData?.geofence_lng ?? restData.longitude;
-      const gfRadius = Number(settingsData?.geofence_radius_m ?? 200);
+      const gfLat = restData.latitude;
+      const gfLng = restData.longitude;
+      const gfRadius = Number(settingsData?.geofence_radius_meters ?? 200);
       const gfEnabled = settingsData?.geofence_enabled === true;
 
       if (gfEnabled && typeof gfLat === 'number' && typeof gfLng === 'number') {
@@ -345,8 +345,8 @@ export async function POST(request: Request) {
         );
       }
 
-      const restLat = restData.latitude ?? settingsData.geofence_lat;
-      const restLng = restData.longitude ?? settingsData.geofence_lng;
+      const restLat = restData.latitude;
+      const restLng = restData.longitude;
       if (typeof restLat !== 'number' || typeof restLng !== 'number') {
         return NextResponse.json(
           { success: false, error: 'Restaurant delivery location is not configured yet.' },
@@ -521,7 +521,7 @@ export async function POST(request: Request) {
     // 5c. Delivery Minimum Order & Delivery Charge Calculation
     let deliveryFee = 0;
     if (orderType === 'delivery') {
-      const minOrder = Number(settingsData?.delivery_min_order ?? 0);
+      const minOrder = Number(settingsData?.delivery_min_order_amount ?? 0);
       if (minOrder > 0 && discountedSubtotal < minOrder) {
         return NextResponse.json(
           {
@@ -533,10 +533,11 @@ export async function POST(request: Request) {
       }
 
       const freeAbove =
-        settingsData?.delivery_free_above !== null && settingsData?.delivery_free_above !== undefined
-          ? Number(settingsData.delivery_free_above)
+        settingsData?.free_delivery_min_order !== null &&
+        settingsData?.free_delivery_min_order !== undefined
+          ? Number(settingsData.free_delivery_min_order)
           : null;
-      const baseCharge = Number(settingsData?.delivery_charge ?? 0);
+      const baseCharge = Number(settingsData?.delivery_fee ?? 0);
       deliveryFee = freeAbove !== null && discountedSubtotal >= freeAbove ? 0 : baseCharge;
     }
 
