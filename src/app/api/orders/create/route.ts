@@ -656,15 +656,14 @@ export async function POST(request: Request) {
       customer_note: noteWithCoupon,
       payment_status: 'pending',
       payment_gateway: paymentMethod === 'razorpay' ? 'razorpay' : null,
-      assigned_waiter_id: assignedWaiterId,
-      assigned_at: assignedWaiterId ? new Date().toISOString() : null,
-      assignment_method:
-        paymentMethod === 'razorpay'
-          ? 'razorpay'
-          : isPayFirst
-          ? 'counter_pay'
-          : 'equal_distribution',
-      assignment_status: assignmentStatus,
+      ...(assignedWaiterId
+        ? {
+            assigned_waiter_id: assignedWaiterId,
+            assigned_at: new Date().toISOString(),
+            assignment_method: 'equal_distribution',
+            assignment_status: assignmentStatus,
+          }
+        : {}),
       customer_name: customerName ? String(customerName).trim().slice(0, 120) : participantName || null,
       customer_phone: normalizedPhone,
       customer_email: normalizedEmail,
@@ -686,14 +685,32 @@ export async function POST(request: Request) {
         : {}),
     };
 
-    const { data: createdOrder, error: orderErr } = await supabase
-      .from('orders')
-      .insert(orderPayload)
-      .select('id, order_number, status, total_amount, created_at, assigned_waiter_id')
-      .single();
+    let createdOrder: any = null;
+    let lastInsertErr: any = null;
+    const insertPayload: Record<string, any> = { ...orderPayload };
 
-    if (orderErr || !createdOrder) {
-      throw new Error(orderErr?.message || 'Failed to insert order into database');
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const { data: attemptData, error: attemptErr } = await supabase
+        .from('orders')
+        .insert(insertPayload)
+        .select('id, order_number, status, total_amount, created_at')
+        .single();
+
+      if (!attemptErr && attemptData) {
+        createdOrder = attemptData;
+        break;
+      }
+      lastInsertErr = attemptErr;
+      const missingColMatch = attemptErr?.message?.match(/Could not find the '([^']+)' column/);
+      if (missingColMatch && missingColMatch[1] && missingColMatch[1] in insertPayload) {
+        delete insertPayload[missingColMatch[1]];
+        continue;
+      }
+      break;
+    }
+
+    if (!createdOrder) {
+      throw new Error(lastInsertErr?.message || 'Failed to insert order into database');
     }
 
     // 8. Insert Order Items
