@@ -3,11 +3,39 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Clock, Loader2, Package, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, Flame, Loader2, Package, Truck, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/format';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
+
+function getDeliveryProgress(order: any) {
+  const status = String(order.status || 'pending').toLowerCase();
+  const dStatus = String(order.delivery_status || '').toLowerCase();
+
+  if (status === 'cancelled' || status === 'rejected') {
+    return { step: -1, label: 'Cancelled', badgeClass: 'bg-rose-100 text-rose-700' };
+  }
+  if (dStatus === 'delivered') {
+    return { step: 4, label: 'Delivered · Done', badgeClass: 'bg-emerald-100 text-emerald-800' };
+  }
+  if (
+    order.order_type === 'delivery' &&
+    (dStatus === 'out_for_delivery' || status === 'ready' || status === 'completed')
+  ) {
+    return { step: 3, label: 'Out for Delivery', badgeClass: 'bg-amber-100 text-amber-800' };
+  }
+  if (status === 'completed' || status === 'served') {
+    return { step: 4, label: 'Completed', badgeClass: 'bg-emerald-100 text-emerald-800' };
+  }
+  if (status === 'ready') {
+    return { step: 3, label: 'Food Ready', badgeClass: 'bg-emerald-100 text-emerald-800' };
+  }
+  if (status === 'preparing' || status === 'accepted') {
+    return { step: 2, label: 'Preparing Food', badgeClass: 'bg-blue-100 text-blue-800' };
+  }
+  return { step: 1, label: 'Order Confirmed', badgeClass: 'bg-slate-100 text-slate-800' };
+}
 
 export default function StorefrontOrdersPage() {
   const params = useParams<{ restaurantSlug: string }>();
@@ -19,8 +47,8 @@ export default function StorefrontOrdersPage() {
   const [user, setUser] = useState<any>(null);
   const [authOpen, setAuthOpen] = useState(false);
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const loadOrders = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data: authData } = await supabase.auth.getUser();
       setUser(authData?.user || null);
@@ -49,13 +77,22 @@ export default function StorefrontOrdersPage() {
         setOrders(json.orders || []);
       }
     } catch {}
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
     loadOrders();
+    const interval = setInterval(() => loadOrders(true), 6000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantSlug]);
+
+  const steps = [
+    { id: 1, title: 'Confirmed', icon: Clock },
+    { id: 2, title: 'Preparing', icon: Flame },
+    { id: 3, title: 'Out for Delivery', icon: Truck },
+    { id: 4, title: 'Delivered', icon: CheckCircle2 },
+  ];
 
   return (
     <main className="min-h-screen bg-light-surface pb-24">
@@ -108,34 +145,75 @@ export default function StorefrontOrdersPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-3">
-            {orders.map((o) => (
-              <Link
-                key={o.id}
-                href={`/store/${restaurantSlug}/orders/${o.id}`}
-                className="block bg-white border border-slate-200 rounded-2xl p-4 hover:border-light-primary transition-colors shadow-2xs"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-xs font-bold text-light-primary">
-                      #{o.order_number}
-                    </span>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {new Date(o.created_at).toLocaleString()} ·{' '}
-                      {o.order_type === 'delivery' ? 'Delivery' : 'Dine-In'}
-                    </p>
+          <div className="space-y-4">
+            {orders.map((o) => {
+              const progress = getDeliveryProgress(o);
+              return (
+                <Link
+                  key={o.id}
+                  href={`/store/${restaurantSlug}/orders/${o.id}`}
+                  className="block bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 hover:border-light-primary transition-colors shadow-2xs space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-xs font-bold text-light-primary">
+                        #{o.order_number}
+                      </span>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {new Date(o.created_at).toLocaleString()} ·{' '}
+                        {o.order_type === 'delivery' ? 'Delivery' : 'Dine-In'}
+                      </p>
+                      <p className="text-xs text-slate-700 mt-1">
+                        {(o.order_items || [])
+                          .map((i: any) => `${i.quantity}× ${i.dish_name}`)
+                          .join(', ')}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase ${progress.badgeClass}`}
+                      >
+                        {progress.label}
+                      </span>
+                      <p className="text-sm font-bold text-slate-900 mt-1.5">
+                        {formatCurrency(Number(o.total_amount || 0), 'INR')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase bg-slate-100 text-slate-800">
-                      {o.delivery_status || o.status}
-                    </span>
-                    <p className="text-sm font-bold text-slate-900 mt-1">
-                      {formatCurrency(Number(o.total_amount || 0), 'INR')}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+
+                  {/* Live 4-Step Progress Tracker */}
+                  {progress.step > 0 && (
+                    <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">
+                      {steps.map((s) => {
+                        const Icon = s.icon;
+                        const done = progress.step >= s.id;
+                        const active = progress.step === s.id;
+                        return (
+                          <div key={s.id} className="flex flex-col items-center text-center gap-1">
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center border text-xs ${
+                                done
+                                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                              } ${active ? 'ring-2 ring-emerald-200' : ''}`}
+                            >
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold leading-tight ${
+                                done ? 'text-slate-900' : 'text-slate-400'
+                              }`}
+                            >
+                              {s.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

@@ -137,7 +137,14 @@ export default function DeliveryOrderTrackerPage() {
             </div>
 
             <div className="px-3.5 py-1.5 rounded-full bg-slate-900 text-white text-xs font-semibold uppercase">
-              {order.deliveryStatus || order.status}
+              {order.deliveryStatus === 'delivered'
+                ? 'Delivered · Done'
+                : order.orderType === 'delivery' &&
+                  (order.deliveryStatus === 'out_for_delivery' ||
+                    order.status === 'ready' ||
+                    order.status === 'completed')
+                ? 'Out for Delivery'
+                : order.deliveryStatus || order.status}
             </div>
           </div>
 
