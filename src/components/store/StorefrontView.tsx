@@ -16,12 +16,16 @@ import {
   Star,
   Store,
   Truck,
+  User,
   UtensilsCrossed,
   X,
   Zap,
 } from 'lucide-react';
 import { useCustomer } from '@/context/CustomerContext';
 import { DishCard } from '@/components/menu/DishCard';
+import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
+import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
+import { createClient } from '@/lib/supabase/client';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
 import { formatCurrency } from '@/lib/format';
 import { Category, Dish } from '@/types';
@@ -57,6 +61,15 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
   const [vegOnly, setVegOnly] = useState(false);
   const [fastOnly, setFastOnly] = useState(false);
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setCurrentUser(data.user);
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -245,8 +258,20 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
               </p>
             </div>
 
-            {/* Book Table & Delivery Quick Actions */}
+            {/* Book Table, Delivery & Account Quick Actions */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-white/20 backdrop-blur-md text-white font-label text-xs font-semibold hover:bg-white/30 transition-colors cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>
+                  {currentUser
+                    ? currentUser.user_metadata?.full_name || currentUser.email
+                    : 'Sign In'}
+                </span>
+              </button>
               {bookingCfg?.enabled && (
                 <Link
                   href={`/store/${restaurantSlug}/book`}
@@ -488,6 +513,12 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
           </div>
         </div>
       )}
+      <StorefrontBottomNav restaurantSlug={restaurantSlug} />
+      <CustomerAuthModal
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onSuccess={(u) => setCurrentUser(u)}
+      />
     </div>
   );
 }
