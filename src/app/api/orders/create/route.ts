@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     const { data: settingsData } = await supabase
       .from('restaurant_settings')
       .select(
-        'opening_hours, timezone, currency, tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer, pay_first_enabled, geofence_enabled, geofence_radius_meters, delivery_enabled, delivery_radius_km, delivery_fee, free_delivery_min_order, delivery_min_order_amount, razorpay_settlement_mode, razorpay_linked_account_id, platform_fee_percent'
+        'opening_hours, timezone, currency, tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer, pay_first_enabled, geofence_enabled, geofence_radius_meters, delivery_enabled, delivery_radius_km, delivery_fee, free_delivery_min_order, delivery_min_order_amount, razorpay_settlement_mode, razorpay_linked_account_id, platform_commission_bps'
       )
       .eq('restaurant_id', restaurantId)
       .maybeSingle();
@@ -721,7 +721,7 @@ export async function POST(request: Request) {
         amountPaise,
         settlementMode: settingsData?.razorpay_settlement_mode,
         linkedAccountId: settingsData?.razorpay_linked_account_id,
-        commissionBps: Math.round(Number(settingsData?.platform_fee_percent ?? 0) * 100),
+        commissionBps: Number(settingsData?.platform_commission_bps ?? 0),
         restaurantId,
         entityId: createdOrder.id,
       });
