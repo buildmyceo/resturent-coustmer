@@ -56,9 +56,10 @@ export async function proxy(request: NextRequest) {
       const rows = await rpcRes.json();
       const match = Array.isArray(rows) ? rows[0] : rows;
 
-      if (match?.restaurant_id && match?.slug) {
+      const restaurantId = match?.restaurant_id || match?.id;
+      if (restaurantId && match?.slug) {
         const requestHeaders = new Headers(request.headers);
-        requestHeaders.set('x-tenant-restaurant-id', String(match.restaurant_id));
+        requestHeaders.set('x-tenant-restaurant-id', String(restaurantId));
         requestHeaders.set('x-tenant-restaurant-slug', String(match.slug));
         requestHeaders.set('x-tenant-custom-domain', hostname);
 
