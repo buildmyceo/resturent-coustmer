@@ -43,9 +43,19 @@ export function CustomerAuthModal({ isOpen, onClose, onSuccess }: CustomerAuthMo
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-      window.location.pathname
-    )}`;
+    const currentOrigin = window.location.origin;
+    const isLocalOrVercel =
+      currentOrigin.includes('localhost') ||
+      currentOrigin.includes('127.0.0.1') ||
+      currentOrigin.endsWith('.vercel.app');
+
+    const authRelayOrigin =
+      process.env.NEXT_PUBLIC_PLATFORM_AUTH_ORIGIN || 'https://resturent-coustmer.vercel.app';
+
+    const redirectTo = isLocalOrVercel
+      ? `${currentOrigin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`
+      : `${authRelayOrigin}/auth/callback?returnTo=${encodeURIComponent(window.location.href)}`;
+
     const { error: oauthErr } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
