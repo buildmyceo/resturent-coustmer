@@ -49,13 +49,18 @@ export function CustomerAuthModal({ isOpen, onClose, onSuccess }: CustomerAuthMo
       currentOrigin.includes('127.0.0.1') ||
       currentOrigin.endsWith('.vercel.app');
 
-    const authRelayOrigin =
-      process.env.NEXT_PUBLIC_PLATFORM_AUTH_ORIGIN || 'https://resturent-coustmer.vercel.app';
+    if (!isLocalOrVercel) {
+      const authRelayOrigin =
+        process.env.NEXT_PUBLIC_PLATFORM_AUTH_ORIGIN || 'https://resturent-coustmer.vercel.app';
+      window.location.href = `${authRelayOrigin}/api/auth/google-start?returnTo=${encodeURIComponent(
+        window.location.href
+      )}`;
+      return;
+    }
 
-    const redirectTo = isLocalOrVercel
-      ? `${currentOrigin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`
-      : `${authRelayOrigin}/auth/callback?returnTo=${encodeURIComponent(window.location.href)}`;
-
+    const redirectTo = `${currentOrigin}/auth/callback?next=${encodeURIComponent(
+      window.location.pathname
+    )}`;
     const { error: oauthErr } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
