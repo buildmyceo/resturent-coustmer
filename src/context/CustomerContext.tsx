@@ -152,6 +152,13 @@ export function CustomerProvider({
       return;
     }
 
+    // Dine-in 200m geofence applies ONLY to /table/[sessionId] QR ordering, never to delivery/booking storefronts
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/table/')) {
+      setIsInsideGeofence(true);
+      setLocationStatus('disabled');
+      return;
+    }
+
     const geo = restaurant?.settings?.geofence;
     const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
     const isEnforced = Boolean(geo && (geo.enabled !== false || hasCoordinates));
@@ -252,7 +259,14 @@ export function CustomerProvider({
       customerAudio.playTap();
 
       // Enforce Restaurant Location Geofence
-      const geo = restaurant?.settings?.geofence;
+      // Dine-in 200m geofence applies ONLY to /table/[sessionId] QR ordering, never to delivery/booking storefronts
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/table/')) {
+      setIsInsideGeofence(true);
+      setLocationStatus('disabled');
+      return;
+    }
+
+    const geo = restaurant?.settings?.geofence;
       const hasCoordinates = typeof geo?.latitude === 'number' && typeof geo?.longitude === 'number';
       const isGeofenceConfigured = Boolean(geo && (geo.enabled !== false || hasCoordinates));
 
