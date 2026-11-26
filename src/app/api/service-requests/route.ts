@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
-// In-memory cooldown store to prevent repeated accidental submissions
 const cooldownStore = new Map<string, number>();
 
 export async function POST(request: Request) {
@@ -16,7 +15,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Rate-limiting check: 20-second cooldown per table per request type
     const cooldownKey = `${tableId}_${requestType}`;
     const lastRequestTime = cooldownStore.get(cooldownKey);
     const now = Date.now();
@@ -32,11 +30,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminClient();
     let requestId = `req_${Date.now()}`;
     let insertedSuccessfully = false;
 
-    // 1. Try real service_requests table
     try {
       const { data, error } = await supabase
         .from('service_requests')
@@ -56,56 +53,45 @@ export async function POST(request: Request) {
         requestId = data.id;
         insertedSuccessfully = true;
       }
-    } catch {
-      // Continue to fallback
-    }
-
-    // 2. Resilient fallback: store call in orders table if service_requests table is missing
-    if (!insertedSuccessfully) {
-      try {
-        const orderCallNum = `CALL-${Math.floor(1000 + Math.random() * 9000)}`;
-        const notePayload = `CALL_WAITER: ${requestType} | ${notes || 'Customer requested assistance at table'}`;
-
-        const { data: ordData, error: ordErr } = await supabase
-          .from('orders')
-          .insert({
-            restaurant_id: restaurantId,
-            table_id: tableId,
-            order_number: orderCallNum,
-            order_source: 'Customer',
-            subtotal: 0,
-            tax_amount: 0,
-            service_fee: 0,
-            total_amount: 0,
-            status: 'pending',
-            customer_note: notePayload,
-            payment_status: 'pending',
-          })
-          .select('id')
-          .maybeSingle();
-
-        if (!ordErr && ordData) {
-          requestId = ordData.id;
-        }
-      } catch (fallbackErr) {
-        console.warn('Fallback call waiter store error:', fallbackErr);
-      }
-    }
-
-    // 3. Fetch table number/name for immediate rich waiter notification
-    let tableNumber = '';
-    try {
-      const { data: tbl } = await supabase
-        .from('restaurant_tables')
-        .select('table_number, table_name')
-        .eq('id', tableId)
-        .maybeSingle();
-      if (tbl) {
-        tableNumber = tbl.table_number || tbl.table_name || '';
-      }
     } catch {}
 
-    // 4. Send real-time broadcast alert to all connected portals (Staff, Admin)
+    if (!insertedSuccessfully) {
+      const orderCallNum = `CALL-${Math.floor(1000 + Math.random() * 9000)}`;
+      const notePayload = `CALL_WAITER: ${requestType} | ${notes || 'Customer requested assistance at table'}`;
+
+      const { data: ordData } = await supabase
+        .from('orders')
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          order_number: orderCallNum,
+          order_source: 'Customer',
+          subtotal: 0,
+          tax_amount: 0,
+          service_fee: 0,
+          total_amount: 0,
+          status: 'pending',
+          customer_note: notePayload,
+          payment_status: 'pending',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (ordData) {
+        requestId = ordData.id;
+      }
+    }
+
+    let tableNumber = '';
+    const { data: tbl } = await supabase
+      .from('restaurant_tables')
+      .select('table_number, table_name')
+      .eq('id', tableId)
+      .maybeSingle();
+    if (tbl) {
+      tableNumber = tbl.table_number || tbl.table_name || '';
+    }
+
     try {
       const rtChannel = supabase.channel(`restaurant:${restaurantId}`, {
         config: { broadcast: { self: true } },
@@ -114,7 +100,7 @@ export async function POST(request: Request) {
         rtChannel.subscribe((status) => {
           if (status === 'SUBSCRIBED') resolve();
         });
-        setTimeout(resolve, 300); // 300ms max wait
+        setTimeout(resolve, 300);
       });
 
       const eventPayload = {
@@ -128,25 +114,15 @@ export async function POST(request: Request) {
         status: 'pending',
         created_at: new Date().toISOString(),
       };
-      await rtChannel.send({
-        type: 'broadcast',
-        event: 'SERVICE_REQUEST',
-        payload: eventPayload,
-      });
-      await rtChannel.send({
-        type: 'broadcast',
-        event: 'call_waiter',
-        payload: eventPayload,
-      });
-      // Allow brief moment for broadcast delivery before closing
+      await rtChannel.send({ type: 'broadcast', event: 'SERVICE_REQUEST', payload: eventPayload });
+      await rtChannel.send({ type: 'broadcast', event: 'call_waiter', payload: eventPayload });
       setTimeout(() => {
-        try { supabase.removeChannel(rtChannel); } catch {}
+        try {
+          supabase.removeChannel(rtChannel);
+        } catch {}
       }, 1000);
-    } catch (broadcastErr) {
-      // Non-blocking broadcast
-    }
+    } catch {}
 
-    // Record cooldown timestamp
     cooldownStore.set(cooldownKey, now);
 
     return NextResponse.json({

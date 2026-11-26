@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { useCustomer } from '@/context/CustomerContext';
 import { getGuestSession, clearGuestSession } from '@/lib/guest-session';
 import { formatCurrency, formatDateTime } from '@/lib/format';
+import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import {
   QrCode,
   Banknote,
@@ -239,6 +240,129 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
 
     clearSessionState();
     clearGuestSession();
+  };
+
+  // Submit Razorpay payment for session bill
+  const handleRazorpayBillPay = async () => {
+    if (!validateContacts()) {
+      showToast('Required Fields Missing', 'Please enter your compulsory Email and Phone number.', 'error');
+      const el = document.getElementById('contact-form-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    const stored = getGuestSession();
+    const activeTableId = table?.id || stored?.tableId;
+    const activeRestId = restaurant?.id || stored?.restaurantId;
+
+    try {
+      const intentRes = await fetch('/api/payment/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purpose: 'session_bill',
+          sessionId,
+          tableId: activeTableId,
+          restaurantId: activeRestId,
+          paymentMethod: 'razorpay',
+        }),
+      });
+      const intentData = await intentRes.json();
+      if (!intentRes.ok || !intentData.success || !intentData.razorpay) {
+        setErrorMessage(intentData?.error || 'Could not initiate Razorpay checkout.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const loaded = await loadRazorpayCheckoutScript();
+      if (!loaded || !(window as any).Razorpay) {
+        setErrorMessage('Unable to load Razorpay payment gateway.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const rzp = new (window as any).Razorpay({
+        key: intentData.razorpay.keyId,
+        amount: intentData.razorpay.amountPaise,
+        currency: intentData.razorpay.currency || 'INR',
+        name: restaurant?.name || 'Restaurant',
+        description: `Table ${table?.number || ''} Bill Settlement`,
+        order_id: intentData.razorpay.orderId,
+        prefill: {
+          name: customerName.trim() || 'Guest',
+          email: customerEmail.trim(),
+          contact: customerPhone.trim(),
+        },
+        handler: async (rzpRes: any) => {
+          try {
+            const verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                purpose: 'session_bill',
+                restaurantId: activeRestId,
+                sessionId,
+                razorpay_order_id: rzpRes.razorpay_order_id,
+                razorpay_payment_id: rzpRes.razorpay_payment_id,
+                razorpay_signature: rzpRes.razorpay_signature,
+                customerDetails: {
+                  name: customerName.trim() || undefined,
+                  email: customerEmail.trim(),
+                  phone: customerPhone.trim(),
+                },
+              }),
+            });
+            const verifyJson = await verifyRes.json();
+            if (!verifyRes.ok || !verifyJson.success) {
+              setErrorMessage(verifyJson.error || 'Payment verification failed.');
+            } else {
+              await handleSettlementConfirmed();
+            }
+          } catch (vErr: any) {
+            setErrorMessage(vErr?.message || 'Payment verification failed.');
+          } finally {
+            setIsProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setIsProcessing(false),
+        },
+      });
+      rzp.open();
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Razorpay payment failed.');
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSettleZeroBill = async () => {
+    setIsProcessing(true);
+    setErrorMessage(null);
+    const stored = getGuestSession();
+    try {
+      const res = await fetch('/api/bill/settle-zero', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          restaurantId: restaurant?.id || stored?.restaurantId,
+          guestToken: stored?.guestToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setErrorMessage(json.error || 'Could not settle bill.');
+      } else {
+        await handleSettlementConfirmed();
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Settlement failed.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Submit UPI payment details & transition to awaiting cashier/waiter approval
@@ -658,6 +782,31 @@ export default function CheckoutPaymentPage({ params }: PaymentPageProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 2b. Instant Razorpay Online Payment / Zero-Balance Settle */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+        {outstandingBalance <= 0 && (billDetails?.bookingFeeCredit || 0) > 0 ? (
+          <Button
+            type="button"
+            onClick={handleSettleZeroBill}
+            disabled={isProcessing}
+            className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm"
+          >
+            {isProcessing ? 'Settling...' : 'Settle Bill (Covered by Table Booking Credit)'}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={handleRazorpayBillPay}
+            disabled={isProcessing || outstandingBalance <= 0}
+            className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm"
+          >
+            {isProcessing
+              ? 'Opening Razorpay...'
+              : `Pay ${formatCurrency(outstandingBalance, currency)} Online with Razorpay`}
+          </Button>
+        )}
       </div>
 
       {/* 3. Direct UPI Payment: Google Pay, PhonePe, QR */}

@@ -1,11 +1,9 @@
-import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { refundRazorpayPayment } from '@/lib/razorpay';
 
 const APPROVED_STATUSES = [
   'accepted',
-  'confirmed',
-  'waiter_accepted',
-  'sent_to_kitchen',
   'accepted_by_kitchen',
   'preparing',
   'ready',
@@ -13,157 +11,112 @@ const APPROVED_STATUSES = [
   'completed',
 ];
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { orderId, reason, isAdmin } = body;
+    const body = await req.json();
+    const { orderId, guestToken, reason } = body;
 
     if (!orderId) {
-      return NextResponse.json(
-        { success: false, error: 'Order ID is required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Missing orderId' }, { status: 400 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const token = guestToken || req.cookies.get('zovo_guest_token')?.value;
+    if (!token) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: guest token required' }, { status: 401 });
+    }
 
-    // 1. Fetch the order
-    const { data: order, error: fetchError } = await supabase
+    const admin = createAdminClient();
+    const { data: order } = await admin
       .from('orders')
-      .select('id, order_number, status, restaurant_id, table_id, table_session_id')
+      .select('id, restaurant_id, table_session_id, status, payment_status, razorpay_payment_id, total_amount, guest_token')
       .eq('id', orderId)
       .maybeSingle();
 
-    if (fetchError || !order) {
-      return NextResponse.json(
-        { success: false, error: fetchError?.message || 'Order not found.' },
-        { status: 404 }
-      );
+    if (!order) {
+      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    // 2. Validate current state
-    if (order.status === 'cancelled') {
-      return NextResponse.json(
-        { success: false, error: 'This order is already cancelled.' },
-        { status: 400 }
-      );
+    let authorized = order.guest_token === token;
+    if (!authorized && order.table_session_id) {
+      const { data: part } = await admin
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', order.table_session_id)
+        .eq('guest_token', token)
+        .maybeSingle();
+      authorized = Boolean(part);
     }
 
-    if (order.status === 'completed' || order.status === 'served') {
-      return NextResponse.json(
-        { success: false, error: 'Cannot cancel an order that has already been delivered or completed.' },
-        { status: 400 }
-      );
+    if (!authorized) {
+      return NextResponse.json({ success: false, error: 'Forbidden: you do not own this order' }, { status: 403 });
     }
 
-    // 3. User Rule Enforcement: Once approved, ONLY Admin/Cashier can cancel
-    const isApproved = APPROVED_STATUSES.includes(String(order.status).toLowerCase());
-
-    if (isApproved && !isAdmin) {
+    if (APPROVED_STATUSES.includes(order.status)) {
       return NextResponse.json(
-        {
-          success: false,
-          isApproved: true,
-          error:
-            'This order has already been approved and sent to the kitchen. Once approved, the order can only be cancelled by the Cashier or Admin.',
-        },
+        { success: false, error: 'Order has already been accepted by the restaurant and cannot be cancelled.' },
         { status: 403 }
       );
     }
 
-    // 4. Update the order to cancelled
-    const cancellationReason =
-      reason?.trim() ||
-      (isAdmin
-        ? 'Cancelled by Cashier / Admin'
-        : 'Cancelled by customer before cashier approval');
+    let nextPaymentStatus = order.payment_status;
 
-    const { error: updateError } = await supabase
+    if (order.payment_status === 'paid' && order.razorpay_payment_id) {
+      const { data: settings } = await admin
+        .from('restaurant_settings')
+        .select('razorpay_settlement_mode')
+        .eq('restaurant_id', order.restaurant_id)
+        .maybeSingle();
+
+      const refundRes = await refundRazorpayPayment({
+        paymentId: order.razorpay_payment_id,
+        reason: reason || 'Customer cancelled before preparation',
+        reverseAll: settings?.razorpay_settlement_mode === 'platform_route',
+      });
+
+      await admin
+        .from('payments')
+        .update({
+          status: 'refunded',
+          refund_id: refundRes.id,
+          refunded_amount: order.total_amount,
+        })
+        .eq('gateway_payment_id', order.razorpay_payment_id);
+
+      nextPaymentStatus = 'refunded';
+    }
+
+    const nowIso = new Date().toISOString();
+    await admin
       .from('orders')
       .update({
         status: 'cancelled',
-        rejection_reason: cancellationReason,
-        updated_at: new Date().toISOString(),
+        payment_status: nextPaymentStatus,
+        updated_at: nowIso,
       })
       .eq('id', orderId);
 
-    if (updateError) {
-      return NextResponse.json(
-        { success: false, error: updateError.message },
-        { status: 500 }
-      );
-    }
+    await admin
+      .from('order_items')
+      .update({ status: 'cancelled' })
+      .eq('order_id', orderId);
 
-    // 5. Update items to cancelled as well
     try {
-      await supabase
-        .from('order_items')
-        .update({ status: 'cancelled' })
-        .eq('order_id', orderId);
-    } catch {
-      // Non-blocking item status update
-    }
-
-    // 6. Clean up any state marker rows
-    try {
-      const shortId = String(orderId).replace(/-/g, '').slice(0, 8);
-      await supabase
-        .from('orders')
-        .delete()
-        .or(`customer_note.like.ORDER_STATUS:${orderId}:%,order_number.like.ORD_STATE-${shortId}%`);
-    } catch {
-      // Non-blocking cleanup
-    }
-
-    // 7. Realtime broadcast to restaurant channel so Staff, Kitchen, and Admin update instantly
-    if (order.restaurant_id) {
-      try {
-        const rtChannel = supabase.channel(`restaurant:${order.restaurant_id}`, {
-          config: { broadcast: { self: true } },
-        });
-        rtChannel.subscribe(async (subStatus) => {
-          if (subStatus === 'SUBSCRIBED') {
-            const payload = {
-              id: order.id,
-              order_number: order.order_number,
-              restaurant_id: order.restaurant_id,
-              table_id: order.table_id,
-              table_session_id: order.table_session_id,
-              status: 'cancelled',
-              rejection_reason: cancellationReason,
-              updated_at: new Date().toISOString(),
-            };
-
-            await rtChannel.send({
-              type: 'broadcast',
-              event: 'ORDER_UPDATED',
-              payload,
-            });
-            await rtChannel.send({
-              type: 'broadcast',
-              event: 'order_status_updated',
-              payload,
-            });
-
-            setTimeout(() => {
-              supabase.removeChannel(rtChannel);
-            }, 1500);
-          }
-        });
-      } catch {
-        // Non-blocking broadcast
-      }
-    }
+      const ch = admin.channel(`restaurant:${order.restaurant_id}`);
+      await ch.subscribe();
+      await ch.send({
+        type: 'broadcast',
+        event: 'ORDER_UPDATED',
+        payload: { id: orderId, status: 'cancelled', payment_status: nextPaymentStatus },
+      });
+      admin.removeChannel(ch);
+    } catch {}
 
     return NextResponse.json({
       success: true,
-      message: `Order #${order.order_number} has been cancelled successfully.`,
       status: 'cancelled',
+      paymentStatus: nextPaymentStatus,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: err?.message || 'Internal server error while cancelling order.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err?.message || 'Cancel failed' }, { status: 500 });
   }
 }

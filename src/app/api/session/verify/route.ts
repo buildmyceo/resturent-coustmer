@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
   try {
@@ -13,79 +13,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminClient();
 
-    let session: any = null;
-    try {
-      const { data } = await supabase
-        .from('table_sessions')
-        .select('*, restaurant_tables(*), restaurants(*)')
-        .eq('id', sessionId)
-        .maybeSingle();
-      if (data) session = data;
-    } catch {
-      // Fallback
-    }
+    const { data: session, error: sessErr } = await supabase
+      .from('table_sessions')
+      .select('*, restaurant_tables(*), restaurants(*)')
+      .eq('id', sessionId)
+      .maybeSingle();
 
-    if (!session) {
-      // Find the active restaurant in Supabase rather than a hardcoded dummy
-      const { restaurantId: reqRestId, restaurantSlug: reqSlug } = body;
-      let realRest: any = null;
-
-      if (reqRestId && !reqRestId.startsWith('11111111')) {
-        const { data: r } = await supabase.from('restaurants').select('*').eq('id', reqRestId).maybeSingle();
-        if (r) realRest = r;
-      }
-      if (!realRest && reqSlug) {
-        const { data: rList } = await supabase.from('restaurants').select('*').or(`slug.ilike.${reqSlug},name.ilike.${reqSlug},slug.ilike.%${reqSlug}%,name.ilike.%${reqSlug}%`).limit(1);
-        if (rList && rList.length > 0) realRest = rList[0];
-      }
-      if (!realRest) {
-        const { data: defaultRests } = await supabase.from('restaurants').select('*').eq('id', 'a9feec11-8dee-4202-be6e-a097e45266e6').maybeSingle();
-        if (defaultRests) realRest = defaultRests;
-      }
-
-      // Find table for this restaurant
-      let realTable: any = null;
-      if (realRest) {
-        const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', realRest.id).order('table_number', { ascending: true }).limit(1);
-        if (tList && tList.length > 0) realTable = tList[0];
-      }
-
-      const restId = realRest?.id || 'a9feec11-8dee-4202-be6e-a097e45266e6';
-      const restName = realRest?.name || 'bikaner';
-      const restSlug = realRest?.slug || 'bikaner-w7bt';
-      const tableId = realTable?.id || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
-      const tableNumber = realTable?.table_number || 'T-01';
-      const tableName = realTable?.table_name || 'Table 1';
-
-      return NextResponse.json({
-        success: true,
-        isExpired: false,
-        session: {
-          id: sessionId,
-          restaurantId: restId,
-          restaurantName: restName,
-          restaurantSlug: restSlug,
-          tableId: tableId,
-          tableNumber: tableNumber,
-          tableName: tableName,
-          status: 'occupied',
-          guestCount: 1,
-          subtotal: 0,
-          taxAmount: 0,
-          serviceFee: 0,
-          totalAmount: 0,
-          totalPaid: 0,
-          initialClaimExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          isClaimPermanent: false,
+    if (sessErr || !session) {
+      return NextResponse.json(
+        {
+          success: false,
+          isDeactivated: true,
+          error: 'Table session not found. Please scan the table QR code again.',
         },
-        participant: {
-          id: `part_${Date.now()}`,
-          name: 'Guest',
-          isHost: true,
-        },
-      });
+        { status: 404 }
+      );
     }
 
     if (session.status === 'completed' || session.status === 'cancelled') {
@@ -94,33 +38,28 @@ export async function POST(request: Request) {
         isClosed: true,
         isDeactivated: true,
         sessionStatus: session.status,
-        error: session.status === 'cancelled'
-          ? 'This table session has been deactivated. Please scan the table QR code to start.'
-          : 'This dining session has ended. Please scan a new QR code.',
+        error:
+          session.status === 'cancelled'
+            ? 'This table session has been deactivated. Please scan the table QR code to start.'
+            : 'This dining session has ended. Please scan a new QR code.',
       });
     }
 
     let isExpired = false;
-
-    // Check if session has placed any orders
     let hasSubmittedOrders = session.is_claim_permanent === true;
     if (!hasSubmittedOrders) {
-      try {
-        const { data: ord } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('table_session_id', sessionId)
-          .neq('status', 'cancelled')
-          .limit(1);
-        if (ord && ord.length > 0) {
-          hasSubmittedOrders = true;
-        }
-      } catch {
-        // Non-blocking
+      const { data: ord } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('table_session_id', sessionId)
+        .neq('status', 'cancelled')
+        .neq('status', 'pending_payment')
+        .limit(1);
+      if (ord && ord.length > 0) {
+        hasSubmittedOrders = true;
       }
     }
 
-    // 1-hour expiration applies ONLY before first order is submitted
     if (!hasSubmittedOrders) {
       const expiresAt = session.initial_claim_expires_at
         ? new Date(session.initial_claim_expires_at).getTime()
@@ -128,7 +67,6 @@ export async function POST(request: Request) {
 
       if (Date.now() > expiresAt) {
         isExpired = true;
-        // Release table
         await supabase
           .from('table_sessions')
           .update({ status: 'cancelled', updated_at: new Date().toISOString() })
@@ -138,39 +76,34 @@ export async function POST(request: Request) {
           success: false,
           isExpired: true,
           isDeactivated: true,
-          error: 'Your temporary table session was deactivated after 1 hour without placing an order. Please scan the QR code again.',
+          error:
+            'Your temporary table session was deactivated after 1 hour without placing an order. Please scan the QR code again.',
         });
       }
-    } else {
-      isExpired = false; // Never expire active dining sessions
     }
 
     let participant: any = null;
     if (guestToken) {
-      try {
-        const { data: partData } = await supabase
-          .from('session_participants')
-          .select('*')
-          .eq('session_id', sessionId)
-          .eq('guest_token', guestToken)
-          .maybeSingle();
+      const { data: partData } = await supabase
+        .from('session_participants')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('guest_token', guestToken)
+        .maybeSingle();
 
-        if (partData) {
-          participant = partData;
-        }
-      } catch {
-        // Non-blocking
+      if (partData) {
+        participant = partData;
       }
     }
 
     return NextResponse.json({
       success: true,
-      isExpired: false,
+      isExpired,
       session: {
         id: session.id,
         restaurantId: session.restaurant_id,
-        restaurantName: session.restaurants?.name || 'Ceova Restaurant',
-        restaurantSlug: session.restaurants?.slug || 'ceova-restaurant',
+        restaurantName: session.restaurants?.name || 'Restaurant',
+        restaurantSlug: session.restaurants?.slug || '',
         tableId: session.table_id,
         tableNumber: session.restaurant_tables?.table_number || '01',
         tableName: session.restaurant_tables?.table_name || 'Dining Table',
@@ -182,6 +115,8 @@ export async function POST(request: Request) {
         serviceFee: Number(session.service_fee || 0),
         totalAmount: Number(session.total_amount || 0),
         totalPaid: Number(session.total_paid || 0),
+        bookingFeeCredit: Number(session.booking_fee_credit || 0),
+        bookingId: session.booking_id || null,
         initialClaimExpiresAt: session.initial_claim_expires_at,
         isClaimPermanent: hasSubmittedOrders,
       },

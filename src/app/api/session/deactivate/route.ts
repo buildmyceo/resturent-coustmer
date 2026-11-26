@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/client';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * POST /api/session/deactivate
- * Deactivates a temporary customer table session if no orders have been submitted within 1 hour.
- * Cancels table_sessions row and releases the table for new diners.
- */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { sessionId, reason } = body;
+    const { sessionId, reason, guestToken } = body;
+    const cookieToken = req.cookies.get('zovo_guest_token')?.value;
+    const token = guestToken || cookieToken;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -20,17 +17,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = createAdminClient();
+
+    // Verify caller holds a valid guestToken for this session if participants exist
+    if (token) {
+      const { data: part } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('guest_token', token)
+        .maybeSingle();
+
+      if (!part) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized session deactivation request.' },
+          { status: 403 }
+        );
+      }
+    }
 
     // 1. Check if session has any confirmed / active orders
     const { data: orders, error: ordErr } = await supabase
       .from('orders')
       .select('id, status')
       .eq('table_session_id', sessionId)
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled')
+      .neq('status', 'pending_payment');
 
     if (!ordErr && orders && orders.length > 0) {
-      // Customer has active orders! Do not cancel dining session.
       return NextResponse.json({
         success: false,
         deactivated: false,
@@ -48,7 +62,10 @@ export async function POST(req: NextRequest) {
       .eq('id', sessionId);
 
     if (updateErr) {
-      console.warn('Failed to update table_session status in Supabase:', updateErr);
+      return NextResponse.json(
+        { success: false, error: updateErr.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

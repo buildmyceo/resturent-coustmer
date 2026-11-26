@@ -8,6 +8,8 @@ import { useCustomer } from '@/context/CustomerContext';
 import { formatCurrency } from '@/lib/format';
 import { OrderConfirmModal } from '@/components/cart/OrderConfirmModal';
 import { customerAudio } from '@/lib/audio';
+import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
+import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import confetti from 'canvas-confetti';
 import { Dish } from '@/types';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
@@ -66,6 +68,9 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCustomerNote, setOrderCustomerNote] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [paymentChoice, setPaymentChoice] = useState<'default' | 'razorpay'>('default');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [fallbackDishes, setFallbackDishes] = useState<Dish[]>([]);
@@ -191,6 +196,18 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       return;
     }
 
+    if (!isValidPhone(customerPhone)) {
+      showToast('Phone Required', 'Please enter a valid 10-15 digit phone number before placing your order.', 'error');
+      setIsConfirmModalOpen(false);
+      return;
+    }
+
+    if (!isValidEmail(customerEmail)) {
+      showToast('Email Required', 'Please enter a valid email address before placing your order.', 'error');
+      setIsConfirmModalOpen(false);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const idempotencyKey = `ord_idemp_${sessionId}_${Date.now()}_${Math.random()
@@ -207,6 +224,11 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           tableSessionId: sessionId,
           participantId: participant?.id,
           participantName: participant?.name || 'Guest',
+          orderType: 'dine_in',
+          paymentMethod: paymentChoice === 'razorpay' ? 'razorpay' : undefined,
+          customerName: participant?.name || 'Guest',
+          customerPhone: customerPhone.trim(),
+          customerEmail: customerEmail.trim(),
           items: cart.map((item) => ({
             dishId: item.dishId,
             dishName: item.dishName,
@@ -231,6 +253,63 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         return;
       }
 
+      if (data.razorpay) {
+        const loaded = await loadRazorpayCheckoutScript();
+        if (!loaded || !(window as any).Razorpay) {
+          showToast('Payment Error', 'Could not load Razorpay checkout.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        const rzp = new (window as any).Razorpay({
+          key: data.razorpay.keyId,
+          amount: data.razorpay.amountPaise,
+          currency: data.razorpay.currency || 'INR',
+          name: restaurant.name,
+          description: `Order ${data.orderNumber}`,
+          order_id: data.razorpay.orderId,
+          prefill: {
+            name: participant?.name || 'Guest',
+            email: customerEmail.trim(),
+            contact: customerPhone.trim(),
+          },
+          handler: async (rzpRes: any) => {
+            try {
+              const vRes = await fetch('/api/payment/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  purpose: 'order',
+                  restaurantId: restaurant.id,
+                  orderId: data.orderId,
+                  razorpay_order_id: rzpRes.razorpay_order_id,
+                  razorpay_payment_id: rzpRes.razorpay_payment_id,
+                  razorpay_signature: rzpRes.razorpay_signature,
+                }),
+              });
+              const vJson = await vRes.json();
+              if (!vRes.ok || !vJson.success) {
+                showToast('Verification Failed', vJson.error || 'Payment verification failed.', 'error');
+                setIsSubmitting(false);
+                return;
+              }
+              customerAudio.playOrderPlaced();
+              clearCart();
+              await refreshOrders();
+              setIsSubmitting(false);
+              setIsConfirmModalOpen(false);
+              router.push(`/table/${sessionId}/orders`);
+            } catch {
+              setIsSubmitting(false);
+            }
+          },
+          modal: {
+            ondismiss: () => setIsSubmitting(false),
+          },
+        });
+        rzp.open();
+        return;
+      }
+
       // Order Success!
       customerAudio.playOrderPlaced();
 
@@ -245,7 +324,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       }
 
       // Instant client broadcast to staff and kitchen portals via active websocket
-      if (broadcastOrderCreated && restaurant?.id && table?.id) {
+      if (broadcastOrderCreated && restaurant?.id && table?.id && data.status !== 'pending_payment') {
         broadcastOrderCreated({
           id: data.orderId,
           order_number: data.orderNumber,
@@ -695,11 +774,70 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             </div>
           )}
 
+          {/* Mandatory Customer Contact (R3) */}
+          <div className="p-3.5 bg-light-surface-container-low border border-light-outline-variant/60 rounded-xl space-y-2.5">
+            <p className="text-xs font-bold text-light-on-surface">
+              Contact Details (Required before ordering)
+            </p>
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="Phone number * (e.g. +91 9876543210)"
+              className="w-full px-3 py-2 text-xs bg-white border border-light-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-light-primary/20"
+              required
+            />
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="Email address * (for order & receipt)"
+              className="w-full px-3 py-2 text-xs bg-white border border-light-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-light-primary/20"
+              required
+            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPaymentChoice('default')}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  paymentChoice === 'default'
+                    ? 'bg-light-primary text-white border-light-primary'
+                    : 'bg-white text-light-on-surface border-light-outline-variant'
+                }`}
+              >
+                {(restaurant?.settings?.payFirstEnabled || (restaurant as any)?.payFirstEnabled)
+                  ? 'Pay at Counter'
+                  : 'Pay After Meal'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentChoice('razorpay')}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  paymentChoice === 'razorpay'
+                    ? 'bg-light-primary text-white border-light-primary'
+                    : 'bg-white text-light-on-surface border-light-outline-variant'
+                }`}
+              >
+                Pay Now (Razorpay)
+              </button>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2 pt-1">
             <button
               id="place-order-btn"
               type="button"
-              onClick={() => setIsConfirmModalOpen(true)}
+              onClick={() => {
+                if (!isValidPhone(customerPhone)) {
+                  showToast('Phone Required', 'Please enter a valid 10-15 digit phone number.', 'error');
+                  return;
+                }
+                if (!isValidEmail(customerEmail)) {
+                  showToast('Email Required', 'Please enter a valid email address.', 'error');
+                  return;
+                }
+                setIsConfirmModalOpen(true);
+              }}
               disabled={isOrderBlockedByGeofence || !isShopOpen || isSubmitting}
               className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container active:scale-[0.99] px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md shadow-light-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >

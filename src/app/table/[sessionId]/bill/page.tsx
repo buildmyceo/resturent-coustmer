@@ -270,6 +270,15 @@ export default function SharedTableBillPage({ params }: BillPageProps) {
               </dd>
             </div>
 
+            {bill.bookingFeeCredit > 0 && (
+              <div className="flex items-center justify-between text-veg font-medium">
+                <dt className="font-body">Table Booking Fee Credit</dt>
+                <dd className="font-body tabular-nums">
+                  -{formatCurrency(bill.bookingFeeCredit, currency)}
+                </dd>
+              </div>
+            )}
+
             {bill.totalPaid > 0 && (
               <div className="flex items-center justify-between text-veg font-medium">
                 <dt className="font-body">Payments Received</dt>

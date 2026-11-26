@@ -22,9 +22,26 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug') || searchParams.get('restaurantSlug');
-    const id = searchParams.get('id') || searchParams.get('restaurantId');
+    let id = searchParams.get('id') || searchParams.get('restaurantId') || request.headers.get('x-tenant-restaurant-id');
 
-    const supabase = await createServerSupabaseClient();
+    const admin = getAdminClient();
+    const supabase = admin || (await createServerSupabaseClient());
+
+    if (!id && !slug) {
+      const rawHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+      const cleanHost = rawHost.split(':')[0].toLowerCase().trim();
+      if (cleanHost && cleanHost !== 'localhost') {
+        const { data: resolved } = await supabase.rpc('resolve_restaurant_by_host', { p_host: cleanHost });
+        const row = Array.isArray(resolved) ? resolved[0] : resolved;
+        if (row?.id) {
+          id = row.id;
+        }
+      }
+    }
+
+    if (!id && !slug) {
+      return NextResponse.json({ success: false, tenantResolved: false, restaurant: null }, { status: 404 });
+    }
 
     // 1. Fetch restaurant
     let query = supabase.from('restaurants').select('*, restaurant_settings(*)');
@@ -32,53 +49,13 @@ export async function GET(request: Request) {
       query = query.eq('id', id);
     } else if (slug) {
       query = query.eq('slug', slug);
-    } else {
-      query = query.eq('status', 'active').limit(1);
     }
 
     const { data: restaurants, error: rErr } = await query;
     const r = restaurants && restaurants.length > 0 ? restaurants[0] : null;
 
     if (rErr || !r) {
-      const fallbackId = 'a9feec11-8dee-4202-be6e-a097e45266e6';
-      const cached = restaurantOverrides.get(fallbackId);
-      return NextResponse.json({
-        success: true,
-        restaurant: cached || {
-          id: fallbackId,
-          name: 'Bikaner Sweets & Restaurant',
-          slug: 'bikaner-w7bt',
-          description: 'Authentic Sweets, Street Food & Fine Dining',
-          restaurantType: 'Restaurant',
-          logoUrl: '',
-          coverImageUrl: '',
-          phone: '+91 9229950815',
-          helpline: '+91 9229950815',
-          email: 'harshit10205@gmail.com',
-          website: 'https://bikaner.zovo.com',
-          address: 'Saguna More',
-          city: 'Patna',
-          state: 'Bihar',
-          country: 'India',
-          currency: 'INR',
-          timezone: 'Asia/Kolkata',
-          status: 'active',
-          socialLinks: {
-            instagram: 'https://instagram.com/bikanersweets',
-            facebook: 'https://facebook.com/bikanersweets',
-            twitter: '',
-            whatsapp: '+919229950815',
-            youtube: '',
-          },
-          geofence: {
-            enabled: true,
-            latitude: 25.618193,
-            longitude: 85.039305,
-            radiusMeters: 500,
-            address: 'Saguna More, Patna',
-          },
-        },
-      });
+      return NextResponse.json({ success: false, tenantResolved: false, restaurant: null }, { status: 404 });
     }
 
     const settingsObj = Array.isArray(r.restaurant_settings)
@@ -187,16 +164,13 @@ export async function GET(request: Request) {
     // Merge with any runtime overrides
     const cached = restaurantOverrides.get(r.id);
 
-    // Check credit balance: if credits <= 0, pause restaurant customer service
+    // Check ordering enabled via boolean-only RPC
     let isCreditsPaused = false;
     try {
-      const { data: creditRow } = await supabase
-        .from('credit_balances')
-        .select('balance')
-        .eq('restaurant_id', r.id)
-        .maybeSingle();
-
-      if (creditRow && Number(creditRow.balance) <= 0) {
+      const { data: orderingEnabled } = await supabase.rpc('is_restaurant_ordering_enabled', {
+        p_restaurant_id: r.id,
+      });
+      if (orderingEnabled === false) {
         isCreditsPaused = true;
       }
     } catch {
@@ -223,6 +197,28 @@ export async function GET(request: Request) {
       timezone: r.timezone || 'Asia/Kolkata',
       status: isCreditsPaused ? 'suspended' : r.status,
       isCreditsPaused,
+      latitude: r.latitude ?? null,
+      longitude: r.longitude ?? null,
+      primaryCustomDomain: r.primary_custom_domain || null,
+      booking: {
+        enabled: Boolean(settingsObj?.booking_enabled),
+        feeAmount: Number(settingsObj?.booking_fee_amount ?? 0),
+        creditToBill: settingsObj?.booking_fee_credit_to_bill ?? true,
+        slotDurationMins: Number(settingsObj?.booking_slot_duration_mins ?? 90),
+        allowTableSelection: settingsObj?.booking_allow_table_selection ?? true,
+      },
+      delivery: {
+        enabled: Boolean(settingsObj?.delivery_enabled),
+        radiusKm: Number(settingsObj?.delivery_radius_km ?? 5),
+        fee: Number(settingsObj?.delivery_fee ?? 0),
+        freeMinOrder:
+          settingsObj?.free_delivery_min_order !== null && settingsObj?.free_delivery_min_order !== undefined
+            ? Number(settingsObj.free_delivery_min_order)
+            : null,
+        minOrderAmount: Number(settingsObj?.delivery_min_order_amount ?? 0),
+        estimatedMins: Number(settingsObj?.delivery_estimated_mins ?? 35),
+      },
+      razorpayEnabled: settingsObj?.razorpay_enabled ?? true,
       socialLinks: cached?.socialLinks || socialLinks,
       geofence: cached?.geofence || geofence,
       landingPage: cached?.landingPage || landingPage,

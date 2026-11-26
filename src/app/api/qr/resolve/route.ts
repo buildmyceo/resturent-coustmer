@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyTableSignatureSync } from '@/lib/qr/signature';
 
 export async function POST(request: Request) {
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Direct URL spoofing prevention: If direct dummy token is passed or table does not match cryptographic signature
     if (trimmedToken.startsWith('direct_')) {
       return NextResponse.json(
         {
@@ -41,7 +40,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse slug or table from token string if encoded (e.g. zv_barista-pum1_tt01_1693d7f6)
     if (!slug && trimmedToken.startsWith('zv_')) {
       const parts = trimmedToken.split('_');
       if (parts.length >= 3) {
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminClient();
 
     // 1. Try atomic database RPC first if token is present
     if (trimmedToken) {
@@ -78,48 +76,42 @@ export async function POST(request: Request) {
           });
         }
       } catch {
-        // Fall through to query
+        // Fall through
       }
 
       // 2. Query table_qr_codes table directly
-      try {
-        const { data: qrRecord } = await supabase
-          .from('table_qr_codes')
-          .select('*, restaurant_tables(*), restaurants(*)')
-          .eq('public_identifier', trimmedToken)
-          .maybeSingle();
+      const { data: qrRecord } = await supabase
+        .from('table_qr_codes')
+        .select('*, restaurant_tables(*), restaurants(*)')
+        .eq('public_identifier', trimmedToken)
+        .maybeSingle();
 
-        if (qrRecord && qrRecord.restaurant_tables && qrRecord.restaurants) {
-          const t = qrRecord.restaurant_tables;
-          const r = qrRecord.restaurants;
-          return NextResponse.json({
-            success: true,
-            table: {
-              tableId: t.id,
-              tableNumber: t.table_number,
-              tableName: t.table_name || `Table ${t.table_number}`,
-              seatingCapacity: t.seating_capacity || 4,
-              restaurantId: r.id,
-              restaurantName: r.name,
-              restaurantSlug: r.slug,
-              restaurantStatus: r.status || 'active',
-              activeSessionId: null,
-              sessionStatus: null,
-            },
-          });
-        }
-      } catch {
-        // Fall through
+      if (qrRecord && qrRecord.restaurant_tables && qrRecord.restaurants) {
+        const t = qrRecord.restaurant_tables;
+        const r = qrRecord.restaurants;
+        return NextResponse.json({
+          success: true,
+          table: {
+            tableId: t.id,
+            tableNumber: t.table_number,
+            tableName: t.table_name || `Table ${t.table_number}`,
+            seatingCapacity: t.seating_capacity || 4,
+            restaurantId: r.id,
+            restaurantName: r.name,
+            restaurantSlug: r.slug,
+            restaurantStatus: r.status || 'active',
+            activeSessionId: null,
+            sessionStatus: null,
+          },
+        });
       }
     }
 
     // 3. Cryptographic Table Security Verification
-    // A user can NOT change the URL table number unless their uniqueCode matches the cryptographic signature
     if (tblNum && slug) {
       const cleanTableNum = tblNum.toLowerCase().replace(/^table\s*/i, '').trim();
       const isSignatureValid = verifyTableSignatureSync(slug, cleanTableNum, trimmedToken);
 
-      // If user provided a token that fails cryptographic validation for this table, reject immediately!
       if (!isSignatureValid) {
         return NextResponse.json(
           {
@@ -140,144 +132,130 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Resilient Direct Lookup for validated table and restaurant
-    let matchedRest: any = null;
-
-    if (slug) {
-      const { data: restList } = await supabase
-        .from('restaurants')
-        .select('*')
-        .or(`slug.ilike.${slug},name.ilike.${slug},slug.ilike.%${slug}%,name.ilike.%${slug}%`)
-        .limit(1);
-
-      if (restList && restList.length > 0) {
-        matchedRest = restList[0];
-      }
-    }
+    // 4. Strict Restaurant Lookup by slug
+    const { data: matchedRest } = await supabase
+      .from('restaurants')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
 
     if (!matchedRest) {
-      const { data: defaultRests } = await supabase
-        .from('restaurants')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (defaultRests && defaultRests.length > 0) {
-        matchedRest = defaultRests[0];
-      }
+      return NextResponse.json(
+        { success: false, error: 'Restaurant could not be found.' },
+        { status: 404 }
+      );
     }
 
-    if (matchedRest) {
-      let matchedTable: any = null;
-      const cleanDigits = tblNum.replace(/\D/g, '');
+    const cleanDigits = tblNum.replace(/\D/g, '');
+    const filterClauses = [
+      `table_number.ilike.${tblNum}`,
+      `table_number.ilike.T-${tblNum}`,
+      `table_number.ilike.Table ${tblNum}`,
+    ];
+    if (cleanDigits) {
+      filterClauses.push(`table_number.ilike.T-0${cleanDigits}`);
+      filterClauses.push(`table_number.ilike.T-${cleanDigits}`);
+      filterClauses.push(`table_number.ilike.%${cleanDigits}%`);
+    }
 
-      if (tblNum) {
-        const tableQuery = supabase
-          .from('restaurant_tables')
-          .select('*')
-          .eq('restaurant_id', matchedRest.id);
+    const { data: tables } = await supabase
+      .from('restaurant_tables')
+      .select('*')
+      .eq('restaurant_id', matchedRest.id)
+      .or(filterClauses.join(','))
+      .limit(1);
 
-        const filterClauses = [
-          `table_number.ilike.${tblNum}`,
-          `table_number.ilike.T-${tblNum}`,
-          `table_number.ilike.Table ${tblNum}`,
-        ];
-        if (cleanDigits) {
-          filterClauses.push(`table_number.ilike.T-0${cleanDigits}`);
-          filterClauses.push(`table_number.ilike.T-${cleanDigits}`);
-          filterClauses.push(`table_number.ilike.%${cleanDigits}%`);
-        }
+    const matchedTable = tables?.[0];
+    if (!matchedTable) {
+      return NextResponse.json(
+        { success: false, error: 'Table could not be found.' },
+        { status: 404 }
+      );
+    }
 
-        const { data: tables } = await tableQuery.or(filterClauses.join(',')).limit(1);
-        if (tables && tables.length > 0) {
-          matchedTable = tables[0];
-        }
-      }
+    let activeSessionId: string | null = null;
+    let sessionStatus: string | null = null;
+    const { data: activeSession } = await supabase
+      .from('table_sessions')
+      .select('id, status')
+      .eq('table_id', matchedTable.id)
+      .in('status', ['occupied', 'payment_pending'])
+      .maybeSingle();
 
-      // Check for active dining session
-      let activeSessionId: string | null = null;
-      let sessionStatus: string | null = null;
+    if (activeSession) {
+      activeSessionId = activeSession.id;
+      sessionStatus = activeSession.status;
+    }
 
-      if (matchedTable) {
-        try {
-          const { data: activeSession } = await supabase
-            .from('table_sessions')
-            .select('id, status')
-            .eq('table_id', matchedTable.id)
-            .in('status', ['occupied', 'payment_pending'])
-            .maybeSingle();
+    // Fetch geofence configuration from restaurant_settings columns first, fallback to receipt_footer
+    let geofence: {
+      enabled: boolean;
+      latitude: number | null;
+      longitude: number | null;
+      radiusMeters: number;
+      address: string;
+    } = {
+      enabled: false,
+      latitude: matchedRest.latitude ?? null,
+      longitude: matchedRest.longitude ?? null,
+      radiusMeters: 200,
+      address: matchedRest.address || '',
+    };
 
-          if (activeSession) {
-            activeSessionId = activeSession.id;
-            sessionStatus = activeSession.status;
-          }
-        } catch {}
-      }
+    const { data: sData } = await supabase
+      .from('restaurant_settings')
+      .select('geofence_enabled, geofence_lat, geofence_lng, geofence_radius_m, receipt_footer')
+      .eq('restaurant_id', matchedRest.id)
+      .maybeSingle();
 
-      const finalTableNumber = matchedTable?.table_number || tblNum;
-      const finalTableName = matchedTable?.table_name || `Table ${finalTableNumber}`;
-      const finalTableId = matchedTable?.id || `tbl-${matchedRest.id}-${finalTableNumber}`;
-
-      // Fetch geofence configuration from restaurant_settings
-      let geofence = {
-        enabled: true,
-        latitude: 25.618193,
-        longitude: 85.039305,
-        radiusMeters: 50,
-        address: matchedRest.address || 'sagunamore, patna',
-      };
-      try {
-        const { data: sData } = await supabase
-          .from('restaurant_settings')
-          .select('receipt_footer')
-          .eq('restaurant_id', matchedRest.id)
-          .maybeSingle();
-
-        if (sData?.receipt_footer) {
-          const match = sData.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
-          if (match && match[1]) {
+    if (sData) {
+      if (typeof sData.geofence_lat === 'number' && typeof sData.geofence_lng === 'number') {
+        geofence = {
+          enabled: sData.geofence_enabled === true,
+          latitude: sData.geofence_lat,
+          longitude: sData.geofence_lng,
+          radiusMeters: Number(sData.geofence_radius_m ?? 200),
+          address: matchedRest.address || '',
+        };
+      } else if (sData.receipt_footer) {
+        const match = sData.receipt_footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
+        if (match && match[1]) {
+          try {
             const parsed = JSON.parse(match[1]);
-            geofence = {
-              ...geofence,
-              ...parsed,
-              enabled:
-                typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number'
-                  ? true
-                  : parsed.enabled !== false,
-              latitude: parsed.latitude || 25.618193,
-              longitude: parsed.longitude || 85.039305,
-              radiusMeters: Math.min(200, Math.max(10, parsed.radiusMeters || 50)),
-            };
-          }
+            if (typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+              geofence = {
+                enabled: parsed.enabled !== false,
+                latitude: parsed.latitude,
+                longitude: parsed.longitude,
+                radiusMeters: Math.min(200, Math.max(10, Number(parsed.radiusMeters || 50))),
+                address: parsed.address || matchedRest.address || '',
+              };
+            }
+          } catch {}
         }
-      } catch {}
-
-      return NextResponse.json({
-        success: true,
-        table: {
-          tableId: finalTableId,
-          tableNumber: finalTableNumber,
-          tableName: finalTableName,
-          seatingCapacity: matchedTable?.seating_capacity || 4,
-          restaurantId: matchedRest.id,
-          restaurantName: matchedRest.name,
-          restaurantSlug: matchedRest.slug || slug,
-          restaurantStatus: matchedRest.status || 'active',
-          logoUrl: matchedRest.logo_url || null,
-          coverImageUrl: matchedRest.cover_image_url || null,
-          description: matchedRest.description || '',
-          currency: matchedRest.currency || 'INR',
-          activeSessionId,
-          sessionStatus,
-          geofence,
-        },
-      });
+      }
     }
 
-    return NextResponse.json(
-      { success: false, error: 'Restaurant or table could not be found.' },
-      { status: 404 }
-    );
+    return NextResponse.json({
+      success: true,
+      table: {
+        tableId: matchedTable.id,
+        tableNumber: matchedTable.table_number,
+        tableName: matchedTable.table_name || `Table ${matchedTable.table_number}`,
+        seatingCapacity: matchedTable.seating_capacity || 4,
+        restaurantId: matchedRest.id,
+        restaurantName: matchedRest.name,
+        restaurantSlug: matchedRest.slug || slug,
+        restaurantStatus: matchedRest.status || 'active',
+        logoUrl: matchedRest.logo_url || null,
+        coverImageUrl: matchedRest.cover_image_url || null,
+        description: matchedRest.description || '',
+        currency: matchedRest.currency || 'INR',
+        activeSessionId,
+        sessionStatus,
+        geofence,
+      },
+    });
   } catch (err: any) {
     console.error('API /api/qr/resolve error:', err);
     return NextResponse.json(

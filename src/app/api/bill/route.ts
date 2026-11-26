@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
   try {
@@ -8,56 +8,95 @@ export async function GET(request: Request) {
     let tableId = searchParams.get('tableId');
     let restaurantId = searchParams.get('restaurantId');
 
-    const supabase = await createServerSupabaseClient();
+    if (!sessionId && !tableId) {
+      return NextResponse.json(
+        { success: false, error: 'sessionId or tableId is required.' },
+        { status: 400 }
+      );
+    }
 
-    // 1. Resolve restaurant and table
-    let realRest: any = null;
-    let realTable: any = null;
+    const supabase = createAdminClient();
 
-    if (restaurantId && !restaurantId.startsWith('11111111')) {
-      const { data: r } = await supabase.from('restaurants').select('*').eq('id', restaurantId).maybeSingle();
+    let sessionRecord: any = null;
+    if (sessionId && !sessionId.startsWith('sess_')) {
+      const { data: s } = await supabase
+        .from('table_sessions')
+        .select('*, restaurants(*), restaurant_tables(*)')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (s) {
+        sessionRecord = s;
+        restaurantId = restaurantId || s.restaurant_id;
+        tableId = tableId || s.table_id;
+      }
+    }
+
+    let realRest: any = sessionRecord?.restaurants || null;
+    let realTable: any = sessionRecord?.restaurant_tables || null;
+
+    if (!realRest && restaurantId) {
+      const { data: r } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('id', restaurantId)
+        .maybeSingle();
       if (r) realRest = r;
     }
-    if (!realRest) {
-      const { data: defaultRests } = await supabase.from('restaurants').select('*').eq('id', 'a9feec11-8dee-4202-be6e-a097e45266e6').maybeSingle();
-      if (defaultRests) realRest = defaultRests;
+
+    if (!realTable && tableId) {
+      const { data: t } = await supabase
+        .from('restaurant_tables')
+        .select('*')
+        .eq('id', tableId)
+        .maybeSingle();
+      if (t) {
+        realTable = t;
+        if (!realRest && t.restaurant_id) {
+          const { data: r } = await supabase
+            .from('restaurants')
+            .select('*')
+            .eq('id', t.restaurant_id)
+            .maybeSingle();
+          if (r) realRest = r;
+        }
+      }
     }
 
-    const resolvedRestId = realRest?.id || 'a9feec11-8dee-4202-be6e-a097e45266e6';
-    const resolvedRestName = realRest?.name || 'bikaner';
-    const resolvedCurrency = realRest?.currency || 'INR';
-
-    if (tableId && !tableId.startsWith('44444444')) {
-      const { data: t } = await supabase.from('restaurant_tables').select('*').eq('id', tableId).maybeSingle();
-      if (t) realTable = t;
-    }
-    if (!realTable && realRest) {
-      const { data: tList } = await supabase.from('restaurant_tables').select('*').eq('restaurant_id', realRest.id).order('table_number', { ascending: true }).limit(1);
-      if (tList && tList.length > 0) realTable = tList[0];
+    if (!realRest || !realTable) {
+      return NextResponse.json(
+        { success: false, error: 'Session, table, or restaurant not found.' },
+        { status: 404 }
+      );
     }
 
-    const resolvedTableId = realTable?.id || '24f7b562-0d70-4f5e-bde4-9bd01639dbb6';
-    const resolvedTableNumber = realTable?.table_number || 'T-01';
-    const resolvedTableName = realTable?.table_name || 'Table 1';
+    const resolvedRestId = realRest.id;
+    const resolvedRestName = realRest.name;
+    const resolvedCurrency = realRest.currency || 'INR';
+    const resolvedTableId = realTable.id;
+    const resolvedTableNumber = realTable.table_number;
+    const resolvedTableName = realTable.table_name || `Table ${resolvedTableNumber}`;
 
-    // 2. Fetch all orders strictly for this table (excluding cancelled)
     let rawOrders: any[] = [];
-    try {
-      const { data, error } = await supabase
+    if (sessionRecord) {
+      const { data } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('table_session_id', sessionRecord.id)
+        .neq('status', 'cancelled')
+        .neq('status', 'pending_payment')
+        .order('created_at', { ascending: true });
+      if (data) rawOrders = data;
+    } else {
+      const { data } = await supabase
         .from('orders')
         .select('*, order_items(*)')
         .eq('table_id', resolvedTableId)
         .neq('status', 'cancelled')
+        .neq('status', 'pending_payment')
         .order('created_at', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        rawOrders = data;
-      }
-    } catch {
-      // Fallback
+      if (data) rawOrders = data;
     }
 
-    // Extract any ORDER_STATUS:* notes to overlay on real orders
     const stateMap = new Map<string, string>();
     const statusRank: Record<string, number> = {
       pending: 0,
@@ -81,11 +120,9 @@ export async function GET(request: Request) {
           const ordId = parts[1];
           const st = parts[2];
           const currentBest = stateMap.get(ordId);
-          const currentRank = currentBest ? (statusRank[currentBest] ?? 0) : -1;
+          const currentRank = currentBest ? statusRank[currentBest] ?? 0 : -1;
           const newRank = statusRank[st] ?? 0;
-          if (newRank >= currentRank) {
-            stateMap.set(ordId, st);
-          }
+          if (newRank >= currentRank) stateMap.set(ordId, st);
         }
       }
     });
@@ -95,32 +132,15 @@ export async function GET(request: Request) {
       if (base === 'completed' || base === 'cancelled') return base;
       const overlay = stateMap.get(ordId);
       if (!overlay) return base;
-      const baseRank = statusRank[base] ?? 0;
-      const overlayRank = statusRank[overlay] ?? 0;
-      return overlayRank > baseRank ? overlay : base;
+      return (statusRank[overlay] ?? 0) > (statusRank[base] ?? 0) ? overlay : base;
     };
-
-    // Parse session timestamp if available
-    let sessionStartTime: number | null = null;
-    if (sessionId) {
-      const match = sessionId.match(/^sess_(\d+)/);
-      if (match) {
-        const parsed = parseInt(match[1], 10);
-        if (!isNaN(parsed) && parsed > 1700000000000) {
-          sessionStartTime = parsed;
-        }
-      }
-    }
 
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    // 3. Filter to ONLY authentic food orders placed during this dining session / today
     const sessionFoodOrders = rawOrders.filter((order: any) => {
       const orderNum = order.order_number || '';
       const note = order.customer_note || '';
-
-      // Strictly exclude service requests, status markers, test rows, and empty tickets
       if (
         orderNum.startsWith('CALL-') ||
         orderNum.startsWith('SR_STATE-') ||
@@ -137,35 +157,13 @@ export async function GET(request: Request) {
         return false;
       }
 
-      const orderCreatedTime = new Date(order.created_at).getTime();
-
-      // Explicit session tag match
+      if (sessionRecord && order.table_session_id === sessionRecord.id) return true;
       if (sessionId && (note.includes(`[SESS:${sessionId}]`) || note.includes(`SESSION:${sessionId}`))) {
         return true;
       }
-
-      // If session start time is known, exclude orders placed before this session started
-      if (sessionStartTime) {
-        if (orderCreatedTime < sessionStartTime - 2 * 60 * 1000) {
-          return false;
-        }
-      }
-
-      // Exclude orders from previous calendar days (e.g. Nov 15, Nov 19)
-      if (orderCreatedTime < todayMidnight) {
-        return false;
-      }
-
-      // Exclude old completed & paid orders from previous meals
-      const effStatus = getEffectiveStatus(order.status, order.id);
-      if (effStatus === 'completed' && order.payment_status === 'paid' && sessionStartTime && orderCreatedTime < sessionStartTime) {
-        return false;
-      }
-
-      return true;
+      return new Date(order.created_at).getTime() >= todayMidnight;
     });
 
-    // 4. Aggregate item breakdown & totals from authentic dish items
     const allItems: any[] = [];
     let itemsSubtotal = 0;
     let ordersSubtotal = 0;
@@ -179,13 +177,11 @@ export async function GET(request: Request) {
       ordersTax += Number(order.tax_amount || 0);
       ordersServiceFee += Number(order.service_fee || 0);
       ordersTotal += Number(order.total_amount || 0);
-
       if (order.payment_status === 'paid') {
         totalPaid += Number(order.total_amount || 0);
       }
 
-      const orderItems = order.order_items || [];
-      for (const item of orderItems) {
+      for (const item of order.order_items || []) {
         const itemTotal = Number(item.unit_price) * (item.quantity || 1);
         itemsSubtotal += itemTotal;
         allItems.push({
@@ -204,79 +200,46 @@ export async function GET(request: Request) {
       }
     }
 
-    // Tax & Service rates from restaurant settings
-    let defaultTaxRate = 0.05;
-    let defaultServiceFeeRate = 0;
-    try {
-      const { data: settingsData } = await supabase
-        .from('restaurant_settings')
-        .select('tax_percentage, service_charge_percentage, tax_enabled, service_charge_enabled, receipt_footer')
-        .eq('restaurant_id', resolvedRestId)
-        .maybeSingle();
-
-      if (settingsData) {
-        let taxEnabled = settingsData.tax_enabled !== false;
-        let taxPercent = Number(settingsData.tax_percentage ?? 5.0);
-        let serviceFeeEnabled = settingsData.service_charge_enabled === true;
-        let serviceFeePercent = Number(settingsData.service_charge_percentage ?? 0);
-
-        if (settingsData.receipt_footer) {
-          const paymentMatch = settingsData.receipt_footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
-          if (paymentMatch && paymentMatch[1]) {
-            try {
-              const pConfig = JSON.parse(paymentMatch[1]);
-              const hasGst = Boolean(pConfig.gstNumber && pConfig.gstNumber.trim().length > 0);
-              const isTaxOn = pConfig.taxEnabled !== false && hasGst;
-              if (pConfig.taxRate !== undefined && isTaxOn) {
-                taxPercent = Number(pConfig.taxRate);
-              } else if (!isTaxOn) {
-                taxEnabled = false;
-                taxPercent = 0;
-              }
-              if (pConfig.taxIncluded) taxEnabled = false;
-              if (pConfig.serviceChargeRate !== undefined) serviceFeePercent = Number(pConfig.serviceChargeRate);
-              if (pConfig.serviceChargeEnabled !== undefined) serviceFeeEnabled = Boolean(pConfig.serviceChargeEnabled);
-            } catch {}
-          }
-        }
-
-        defaultTaxRate = taxEnabled ? taxPercent / 100 : 0;
-        defaultServiceFeeRate = serviceFeeEnabled ? serviceFeePercent / 100 : 0;
-      }
-    } catch {}
+    // If session itself has additional recorded payments (session_bill)
+    const sessionTotalPaid = Number(sessionRecord?.total_paid || 0);
+    if (sessionTotalPaid > totalPaid) {
+      totalPaid = sessionTotalPaid;
+    }
 
     const effectiveSubtotal = ordersSubtotal > 0 ? ordersSubtotal : itemsSubtotal;
-    const effectiveTax = ordersTax > 0 ? ordersTax : Number((effectiveSubtotal * defaultTaxRate).toFixed(2));
-    const effectiveServiceFee = ordersServiceFee > 0 ? ordersServiceFee : Number((effectiveSubtotal * defaultServiceFeeRate).toFixed(2));
+    const effectiveTax = ordersTax;
+    const effectiveServiceFee = ordersServiceFee;
     const effectiveTotal = ordersTotal > 0 ? ordersTotal : Number((effectiveSubtotal + effectiveTax + effectiveServiceFee).toFixed(2));
-
-    const outstandingBalance = Math.max(0, Number((effectiveTotal - totalPaid).toFixed(2)));
-    const isFullyPaid = outstandingBalance <= 0;
+    const bookingFeeCredit = Number(sessionRecord?.booking_fee_credit || 0);
+    const payableAmount = Math.max(0, Number((effectiveTotal - bookingFeeCredit - totalPaid).toFixed(2)));
+    const isFullyPaid = payableAmount <= 0;
 
     return NextResponse.json({
       success: true,
       bill: {
-        sessionId: sessionId || `sess_${resolvedTableId}`,
-        sessionStatus: isFullyPaid ? 'completed' : 'occupied',
+        sessionId: sessionRecord?.id || sessionId,
+        sessionStatus: sessionRecord?.status || (isFullyPaid ? 'completed' : 'occupied'),
         restaurantId: resolvedRestId,
         restaurantName: resolvedRestName,
         restaurantCurrency: resolvedCurrency,
         tableId: resolvedTableId,
         tableNumber: resolvedTableNumber,
         tableName: resolvedTableName,
-        guestCount: 1,
-        openedAt: sessionFoodOrders[0]?.created_at || (sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString()),
+        guestCount: sessionRecord?.guest_count || 1,
+        openedAt: sessionRecord?.opened_at || sessionFoodOrders[0]?.created_at || new Date().toISOString(),
         items: allItems,
         subtotal: effectiveSubtotal,
         taxAmount: effectiveTax,
         serviceFee: effectiveServiceFee,
         discountAmount: 0,
+        bookingFeeCredit,
         totalAmount: effectiveTotal,
         totalPaid,
-        outstandingBalance,
+        payableAmount,
+        outstandingBalance: payableAmount,
         isFullyPaid: isFullyPaid && allItems.length > 0,
         ordersCount: sessionFoodOrders.length,
-        hasPendingPayment: outstandingBalance > 0 && allItems.length > 0,
+        hasPendingPayment: payableAmount > 0 && allItems.length > 0,
       },
     });
   } catch (err: any) {

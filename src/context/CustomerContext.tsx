@@ -714,13 +714,6 @@ export function CustomerProvider({
       }
     );
 
-    // 3. Fallback: Listen for postgres changes if enabled in DB
-    channel.on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'orders' },
-      () => debouncedRefresh()
-    );
-
     channel.subscribe();
 
     return () => {
