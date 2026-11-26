@@ -73,8 +73,30 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
 
   useEffect(() => {
     let active = true;
+    const cacheKey = `ceova_storefront_cache_${restaurantSlug}`;
+
+    // Instant render from sessionStorage cache while refreshing in background
+    let hasCached = false;
+    try {
+      const cachedRaw = sessionStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached?.restaurant?.id) {
+          hasCached = true;
+          setRestaurant(cached.restaurant);
+          setGlobalRestaurant(cached.restaurant);
+          setBookingCfg(cached.booking || {});
+          setDeliveryCfg(cached.delivery || {});
+          setCategories(cached.categories || []);
+          setDishes(cached.dishes || []);
+          setMenuDishes(cached.dishes || []);
+          setLoading(false);
+        }
+      }
+    } catch {}
+
     async function load() {
-      setLoading(true);
+      if (!hasCached) setLoading(true);
       setError(null);
       try {
         const res = await fetch(
@@ -85,24 +107,41 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
         if (!active) return;
 
         if (!res.ok || !json.success || !json.restaurant) {
-          setError(json.error || 'Restaurant not found.');
+          if (!hasCached) setError(json.error || 'Restaurant not found.');
           setLoading(false);
           return;
         }
 
         const rest = json.restaurant;
+        const bCfg = rest.booking || json.booking || {};
+        const dCfg = rest.delivery || json.delivery || {};
         setRestaurant(rest);
         setGlobalRestaurant(rest);
-        setBookingCfg(rest.booking || json.booking || {});
-        setDeliveryCfg(rest.delivery || json.delivery || {});
+        setBookingCfg(bCfg);
+        setDeliveryCfg(dCfg);
 
         const menu = await fetchRestaurantAndMenuDB(rest.id);
         if (!active) return;
-        setCategories(menu.categories || []);
-        setDishes(menu.dishes || []);
-        setMenuDishes(menu.dishes || []);
+        const cats = menu.categories || [];
+        const dsh = menu.dishes || [];
+        setCategories(cats);
+        setDishes(dsh);
+        setMenuDishes(dsh);
+
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              restaurant: rest,
+              booking: bCfg,
+              delivery: dCfg,
+              categories: cats,
+              dishes: dsh,
+            })
+          );
+        } catch {}
       } catch (err: any) {
-        if (active) setError(err?.message || 'Failed to load restaurant menu.');
+        if (active && !hasCached) setError(err?.message || 'Failed to load restaurant menu.');
       } finally {
         if (active) setLoading(false);
       }

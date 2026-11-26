@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @theme {
   --color-brand-black: #1A110B;
   --color-primary: #3D1C0B;

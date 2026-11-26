@@ -57,7 +57,8 @@ export function StorefrontBottomNav({ restaurantSlug }: StorefrontBottomNavProps
             <Link
               key={item.label}
               href={item.href}
-              className={`relative flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-colors ${
+              prefetch={true}
+              className={`relative flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-all active:scale-95 ${
                 item.isActive
                   ? 'text-light-primary bg-light-secondary-container/60'
                   : 'text-slate-500 hover:text-slate-800'
