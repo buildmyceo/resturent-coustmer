@@ -93,8 +93,8 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
         const rest = json.restaurant;
         setRestaurant(rest);
         setGlobalRestaurant(rest);
-        setBookingCfg(json.booking || {});
-        setDeliveryCfg(json.delivery || {});
+        setBookingCfg(rest.booking || json.booking || {});
+        setDeliveryCfg(rest.delivery || json.delivery || {});
 
         const menu = await fetchRestaurantAndMenuDB(rest.id);
         if (!active) return;

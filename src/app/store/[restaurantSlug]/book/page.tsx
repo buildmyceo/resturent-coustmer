@@ -65,7 +65,7 @@ export default function BookTablePage() {
   }, [restaurantSlug]);
 
   const restaurant = info?.restaurant;
-  const bookingCfg = info?.booking || {};
+  const bookingCfg = info?.restaurant?.booking || info?.booking || {};
   const currency = restaurant?.currency || 'INR';
 
   const checkAvailability = async () => {

@@ -19,6 +19,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
+import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 
 interface CartItem {
   dishId: string;
@@ -67,7 +68,7 @@ export default function DeliveryCheckoutPage() {
   }, [restaurantSlug]);
 
   const restaurant = info?.restaurant;
-  const deliveryCfg = info?.delivery || {};
+  const deliveryCfg = info?.restaurant?.delivery || info?.delivery || {};
   const currency = restaurant?.currency || 'INR';
 
   const subtotal = useMemo(
@@ -130,11 +131,20 @@ export default function DeliveryCheckoutPage() {
     );
   };
 
+  const freeThreshold =
+    deliveryCfg?.freeMinOrder !== null && deliveryCfg?.freeMinOrder !== undefined
+      ? Number(deliveryCfg.freeMinOrder)
+      : deliveryCfg?.freeAbove != null
+      ? Number(deliveryCfg.freeAbove)
+      : null;
+
+  const baseFee = Number(deliveryCfg?.fee ?? deliveryCfg?.charge ?? 0);
+
   const deliveryFee = zoneResult?.isWithinZone
     ? Number(zoneResult.appliedDeliveryFee ?? zoneResult.deliveryFee ?? 0)
-    : deliveryCfg?.freeAbove != null && subtotal >= Number(deliveryCfg.freeAbove)
+    : freeThreshold !== null && subtotal >= freeThreshold
     ? 0
-    : Number(deliveryCfg?.charge || 0);
+    : baseFee;
 
   const estimatedTotal = Number((subtotal + deliveryFee).toFixed(2));
 
@@ -300,12 +310,13 @@ export default function DeliveryCheckoutPage() {
             Browse Menu
           </Link>
         </div>
+        <StorefrontBottomNav restaurantSlug={restaurantSlug} />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
+    <main className="min-h-screen bg-slate-50 py-8 pb-28 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">
         <Link
           href={`/store/${restaurantSlug}`}
@@ -511,10 +522,9 @@ export default function DeliveryCheckoutPage() {
                   )}
                 </span>
               </div>
-              {deliveryCfg?.freeAbove != null && subtotal < Number(deliveryCfg.freeAbove) && (
+              {freeThreshold !== null && subtotal < freeThreshold && (
                 <p className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg">
-                  Add {formatCurrency(Number(deliveryCfg.freeAbove) - subtotal, currency)} more for
-                  free delivery!
+                  Add {formatCurrency(freeThreshold - subtotal, currency)} more for free delivery!
                 </p>
               )}
               <div className="flex justify-between font-bold text-base text-slate-900 pt-2 border-t border-slate-100">
@@ -543,6 +553,7 @@ export default function DeliveryCheckoutPage() {
           </div>
         </form>
       </div>
+      <StorefrontBottomNav restaurantSlug={restaurantSlug} />
     </main>
   );
 }
