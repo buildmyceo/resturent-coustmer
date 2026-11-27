@@ -14,6 +14,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   Plus,
   Receipt,
@@ -59,6 +60,7 @@ export default function CustomerProfileSettingsPage() {
   const [savedAddresses, setSavedAddresses] = useState<SavedDeliveryAddress[]>([]);
 
   const [savingProfile, setSavingProfile] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [locatingProfile, setLocatingProfile] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -96,6 +98,9 @@ export default function CustomerProfileSettingsPage() {
       setDefaultAddress(merged.defaultAddress || '');
       setDefaultPincode(merged.defaultPincode || '');
       setSavedAddresses(merged.savedAddresses);
+      if (!merged.name && !merged.phone) {
+        setEditingProfile(true);
+      }
 
       try {
         const infoRes = await fetch(
@@ -222,6 +227,7 @@ export default function CustomerProfileSettingsPage() {
         savedAddresses
       );
       setStatusMsg('Profile settings saved!');
+      setEditingProfile(false);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to save profile.');
     } finally {
@@ -400,130 +406,199 @@ export default function CustomerProfileSettingsPage() {
           </div>
         )}
 
-        {/* Personal Profile Form */}
-        <form
-          onSubmit={handleSaveProfile}
-          className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs"
-        >
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <User className="w-4 h-4 text-light-primary" />
-            My Profile &amp; Default Address
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your full name"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                <Phone className="w-3 h-3 inline mr-1" />
-                Phone Number *
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 9876543210"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-1">
-              <label className="block text-xs font-medium text-slate-700 mb-1">Age</label>
-              <input
-                type="number"
-                min={1}
-                max={120}
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                placeholder="25"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">Gender</label>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-              >
-                <option value="">Prefer not to say</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              <Mail className="w-3 h-3 inline mr-1" />
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-            />
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-700">Default Address</label>
+        {/* Personal Profile Card (View Mode by default, Edit Mode on click) */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <User className="w-4 h-4 text-light-primary" />
+              My Profile &amp; Default Address
+            </h2>
+            {!editingProfile && (
               <button
                 type="button"
-                onClick={handleUseProfileGps}
-                disabled={locatingProfile}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[11px] font-semibold hover:bg-orange-100"
+                onClick={() => {
+                  setStatusMsg(null);
+                  setErrorMsg(null);
+                  setEditingProfile(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
               >
-                {locatingProfile ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <LocateFixed className="w-3 h-3" />
-                )}
-                Auto-fill from GPS
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
               </button>
-            </div>
-            <textarea
-              rows={2}
-              value={defaultAddress}
-              onChange={(e) => setDefaultAddress(e.target.value)}
-              placeholder="House/Flat no, Street, Area, City"
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-            />
-            <div className="max-w-[180px]">
-              <label className="block text-xs font-medium text-slate-700 mb-1">Pincode</label>
-              <input
-                type="text"
-                value={defaultPincode}
-                onChange={(e) => setDefaultPincode(e.target.value)}
-                placeholder="e.g. 248007"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-              />
-            </div>
+            )}
           </div>
 
-          <button
-            type="submit"
-            disabled={savingProfile}
-            className="px-5 py-2.5 rounded-xl bg-light-primary text-white text-xs font-semibold hover:opacity-95 disabled:opacity-50"
-          >
-            {savingProfile ? 'Saving...' : 'Save Profile'}
-          </button>
-        </form>
+          {!editingProfile ? (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-500">Full Name</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">{name || '—'}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-500">Phone Number</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">{phone || '—'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-500">Age</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">{age || '—'}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-500">Gender</p>
+                  <p className="font-semibold text-slate-900 mt-0.5 capitalize">
+                    {gender || 'Prefer not to say'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-500">Email</p>
+                  <p className="font-semibold text-slate-900 mt-0.5 truncate">{email || '—'}</p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[11px] font-medium text-slate-500">Default Delivery Address</p>
+                <p className="font-medium text-slate-900 mt-0.5">
+                  {defaultAddress || 'No default address saved yet.'}
+                  {defaultPincode ? ` - ${defaultPincode}` : ''}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your full name"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    <Phone className="w-3 h-3 inline mr-1" />
+                    Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 9876543210"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Age</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="25"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Gender</label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+                  >
+                    <option value="">Prefer not to say</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <Mail className="w-3 h-3 inline mr-1" />
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-700">Default Address</label>
+                  <button
+                    type="button"
+                    onClick={handleUseProfileGps}
+                    disabled={locatingProfile}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[11px] font-semibold hover:bg-orange-100"
+                  >
+                    {locatingProfile ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <LocateFixed className="w-3 h-3" />
+                    )}
+                    Auto-fill from GPS
+                  </button>
+                </div>
+                <textarea
+                  rows={2}
+                  value={defaultAddress}
+                  onChange={(e) => setDefaultAddress(e.target.value)}
+                  placeholder="House/Flat no, Street, Area, City"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+                <div className="max-w-[180px]">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Pincode</label>
+                  <input
+                    type="text"
+                    value={defaultPincode}
+                    onChange={(e) => setDefaultPincode(e.target.value)}
+                    placeholder="e.g. 248007"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-5 py-2.5 rounded-xl bg-light-primary text-white text-xs font-semibold hover:opacity-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {savingProfile ? 'Saving...' : 'Save Profile'}
+                </button>
+                {(name || phone) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProfile(false);
+                      loadData();
+                    }}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* Saved Addresses & Friends */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
