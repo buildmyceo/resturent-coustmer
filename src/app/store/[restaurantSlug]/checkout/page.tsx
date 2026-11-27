@@ -75,6 +75,7 @@ export default function DeliveryCheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [instantSavedMsg, setInstantSavedMsg] = useState<string | null>(null);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -700,15 +701,25 @@ export default function DeliveryCheckoutPage() {
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-900">Delivery Location &amp; Address</h2>
-                <button
-                  type="button"
-                  onClick={handleUseCurrentLocation}
-                  disabled={locating}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
-                >
-                  {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-                  Use My GPS Location
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMapModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                    Set Address Using Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
+                  >
+                    {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
+                    Use My GPS Location
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -736,26 +747,6 @@ export default function DeliveryCheckoutPage() {
                   <option value="new">+ Add New Address (Enter / GPS)</option>
                 </select>
               </div>
-
-              <DeliveryMapPicker
-                lat={
-                  deliveryLat && !Number.isNaN(parseFloat(deliveryLat))
-                    ? parseFloat(deliveryLat)
-                    : null
-                }
-                lng={
-                  deliveryLng && !Number.isNaN(parseFloat(deliveryLng))
-                    ? parseFloat(deliveryLng)
-                    : null
-                }
-                fallbackLat={
-                  typeof restaurant?.latitude === 'number' ? restaurant.latitude : 25.618193
-                }
-                fallbackLng={
-                  typeof restaurant?.longitude === 'number' ? restaurant.longitude : 85.039305
-                }
-                onSelectLocation={handleMapSelect}
-              />
 
               {checkingZone ? (
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
@@ -1102,6 +1093,70 @@ export default function DeliveryCheckoutPage() {
         </form>
       </div>
       <StorefrontBottomNav restaurantSlug={restaurantSlug} />
+
+      {mapModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-orange-600" />
+                Set Address Using Map
+              </h3>
+              <button
+                type="button"
+                onClick={() => setMapModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close map"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <DeliveryMapPicker
+              lat={
+                deliveryLat && !Number.isNaN(parseFloat(deliveryLat))
+                  ? parseFloat(deliveryLat)
+                  : null
+              }
+              lng={
+                deliveryLng && !Number.isNaN(parseFloat(deliveryLng))
+                  ? parseFloat(deliveryLng)
+                  : null
+              }
+              fallbackLat={
+                typeof restaurant?.latitude === 'number' ? restaurant.latitude : 25.618193
+              }
+              fallbackLng={
+                typeof restaurant?.longitude === 'number' ? restaurant.longitude : 85.039305
+              }
+              onSelectLocation={(lat, lng) => {
+                setSelectedSavedId('new');
+                handleMapSelect(lat, lng);
+              }}
+            />
+
+            {deliveryAddress && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                <p className="font-semibold text-slate-900">Selected Location</p>
+                <p className="text-slate-700">
+                  {deliveryAddress}
+                  {deliveryPincode ? ` - ${deliveryPincode}` : ''}
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMapModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold cursor-pointer"
+              >
+                Confirm &amp; Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
