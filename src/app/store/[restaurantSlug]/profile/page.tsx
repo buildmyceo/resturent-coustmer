@@ -26,6 +26,7 @@ import { formatCurrency } from '@/lib/format';
 import { createClient } from '@/lib/supabase/client';
 import {
   AddressCategory,
+  clearLocalProfile,
   mergeWithSupabaseUser,
   SavedDeliveryAddress,
   writeLocalProfile,
@@ -343,7 +344,19 @@ export default function CustomerProfileSettingsPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    clearLocalProfile();
     setUser(null);
+    setName('');
+    setPhone('');
+    setEmail('');
+    setAge('');
+    setGender('');
+    setDefaultAddress('');
+    setDefaultPincode('');
+    setSavedAddresses([]);
+    setBills([]);
+    setEditingProfile(true);
+    setStatusMsg('Signed out successfully.');
   };
 
   if (loading) {

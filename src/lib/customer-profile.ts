@@ -90,6 +90,15 @@ export function writeLocalProfile(data: Partial<CustomerProfileData>) {
   } catch {}
 }
 
+export function clearLocalProfile() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(PROFILE_KEY);
+    localStorage.removeItem(ADDRESSES_KEY);
+    localStorage.removeItem('ceova_recent_order_ids');
+  } catch {}
+}
+
 export function mergeWithSupabaseUser(user: any): CustomerProfileData {
   const local = readLocalProfile();
   if (!user) return local;

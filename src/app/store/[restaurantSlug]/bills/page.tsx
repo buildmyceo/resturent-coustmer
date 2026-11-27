@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Loader2, LogOut, Receipt, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { clearLocalProfile } from '@/lib/customer-profile';
 import { formatCurrency } from '@/lib/format';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
@@ -53,6 +54,7 @@ export default function StorefrontBillsPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    clearLocalProfile();
     setUser(null);
     setBills([]);
   };
