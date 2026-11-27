@@ -72,6 +72,7 @@ export default function DeliveryCheckoutPage() {
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [instantSavedMsg, setInstantSavedMsg] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -260,6 +261,91 @@ export default function DeliveryCheckoutPage() {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponError(null);
+  };
+
+  const handleSelectAddressId = (id: string) => {
+    setInstantSavedMsg(null);
+    setSelectedSavedId(id);
+    if (id === 'myself') {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        const m = mergeWithSupabaseUser(data?.user || null);
+        if (m.name) setCustomerName(m.name);
+        if (m.phone) setCustomerPhone(m.phone);
+        if (m.email) setCustomerEmail(m.email);
+        setDeliveryAddress(m.defaultAddress || '');
+        setDeliveryPincode(m.defaultPincode || '');
+        setDeliveryLandmark('');
+      });
+      return;
+    }
+    if (id === 'new') {
+      setDeliveryAddress('');
+      setDeliveryPincode('');
+      setDeliveryLandmark('');
+      setDeliveryLat('');
+      setDeliveryLng('');
+      setZoneResult(null);
+      setSaveForNextTime(true);
+      return;
+    }
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    setCustomerName(addr.recipientName);
+    setCustomerPhone(addr.recipientPhone);
+    if (addr.recipientEmail) setCustomerEmail(addr.recipientEmail);
+    setDeliveryAddress(addr.address);
+    setDeliveryPincode(addr.pincode || '');
+    setDeliveryLandmark(addr.landmark || '');
+    if (addr.category) setSaveCategory(addr.category);
+    setSaveLabel(addr.label);
+    if (typeof addr.lat === 'number' && typeof addr.lng === 'number') {
+      setDeliveryLat(String(addr.lat));
+      setDeliveryLng(String(addr.lng));
+      checkZone(addr.lat, addr.lng);
+    }
+  };
+
+  const handleInstantSaveAddress = async () => {
+    setError(null);
+    setInstantSavedMsg(null);
+    if (deliveryAddress.trim().length < 5) {
+      setError('Please enter a street address before saving.');
+      return;
+    }
+    const latNum = parseFloat(deliveryLat);
+    const lngNum = parseFloat(deliveryLng);
+    const newAddr: SavedDeliveryAddress = {
+      id: `addr_${Date.now()}`,
+      label: saveLabel.trim() || saveCategory,
+      category: saveCategory,
+      recipientName: customerName.trim() || 'Customer',
+      recipientPhone: customerPhone.trim() || '',
+      recipientEmail: customerEmail.trim() || undefined,
+      address: deliveryAddress.trim(),
+      pincode: deliveryPincode.trim() || undefined,
+      landmark: deliveryLandmark.trim() || undefined,
+      lat: Number.isNaN(latNum) ? undefined : latNum,
+      lng: Number.isNaN(lngNum) ? undefined : lngNum,
+    };
+    const updatedList = [
+      newAddr,
+      ...savedAddresses.filter((a) => a.address !== newAddr.address),
+    ].slice(0, 10);
+
+    setSavedAddresses(updatedList);
+    setSelectedSavedId(newAddr.id);
+    writeLocalProfile({ savedAddresses: updatedList });
+    try {
+      const supabase = createClient();
+      const { data: uData } = await supabase.auth.getUser();
+      if (uData?.user) {
+        await supabase.auth.updateUser({
+          data: { saved_addresses: updatedList },
+        });
+      }
+    } catch {}
+    setInstantSavedMsg('Address saved to your list!');
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -640,17 +726,52 @@ export default function DeliveryCheckoutPage() {
             </div>
 
             <div className="space-y-3 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-900">Delivery Location &amp; Address</h2>
-                <button
-                  type="button"
-                  onClick={handleUseCurrentLocation}
-                  disabled={locating}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100"
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAddressId('new')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
+                  >
+                    + Add New
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
+                  >
+                    {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
+                    Use My GPS Location
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="saved-address-select"
+                  className="block text-xs font-medium text-slate-700 mb-1"
                 >
-                  {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-                  Use My GPS Location
-                </button>
+                  Choose Saved Address
+                </label>
+                <select
+                  id="saved-address-select"
+                  value={selectedSavedId}
+                  onChange={(e) => handleSelectAddressId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white"
+                >
+                  <option value="myself">My Default Profile Address</option>
+                  {savedAddresses.map((addr) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.category ? `${addr.category} · ` : ''}
+                      {addr.label}
+                      {addr.isFriend ? ' (Friend)' : ''} — {addr.address}
+                      {addr.pincode ? ` - ${addr.pincode}` : ''}
+                    </option>
+                  ))}
+                  <option value="new">+ Add New Address (Enter / GPS)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -763,7 +884,7 @@ export default function DeliveryCheckoutPage() {
                   />
                   Save this address &amp; contact for next time
                 </label>
-                {saveForNextTime && selectedSavedId === 'myself' && (
+                {(saveForNextTime && (selectedSavedId === 'myself' || selectedSavedId === 'new')) && (
                   <div className="flex flex-wrap items-center gap-2">
                     {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
                       <button
@@ -791,7 +912,17 @@ export default function DeliveryCheckoutPage() {
                       placeholder="Label (e.g. Home, Friend - Rahul)"
                       className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
                     />
+                    <button
+                      type="button"
+                      onClick={handleInstantSaveAddress}
+                      className="px-3 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer"
+                    >
+                      Save Address Now
+                    </button>
                   </div>
+                )}
+                {instantSavedMsg && (
+                  <p className="text-[11px] font-semibold text-emerald-700">{instantSavedMsg}</p>
                 )}
               </div>
             </div>
