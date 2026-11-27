@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
         lat
-      )}&lon=${encodeURIComponent(lng)}&addressdetails=1`,
+      )}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`,
       {
         headers: {
           'User-Agent': 'CeovaRestaurantMenu/1.0',
@@ -31,16 +31,42 @@ export async function GET(request: Request) {
 
     const data = await res.json();
     const addr = data?.address || {};
-    const parts = [
+    const rawParts = [
       addr.house_number,
-      addr.road || addr.pedestrian || addr.neighbourhood,
-      addr.suburb || addr.village || addr.town,
+      addr.amenity || addr.building || addr.shop || addr.office,
+      addr.road ||
+        addr.pedestrian ||
+        addr.residential ||
+        addr.neighbourhood ||
+        addr.quarter ||
+        addr.locality,
+      addr.suburb || addr.village || addr.town || addr.hamlet || addr.city_district,
       addr.city || addr.state_district || addr.county,
       addr.state,
-    ].filter(Boolean);
+    ]
+      .map((p) => (p ? String(p).trim() : ''))
+      .filter(Boolean);
 
-    const formattedAddress = parts.length > 0 ? parts.join(', ') : data?.display_name || '';
+    const dedupedParts: string[] = [];
+    for (const p of rawParts) {
+      if (!dedupedParts.some((existing) => existing.toLowerCase() === p.toLowerCase())) {
+        dedupedParts.push(p);
+      }
+    }
+
     const pincode = addr.postcode ? String(addr.postcode).trim() : '';
+    let formattedAddress =
+      dedupedParts.length >= 3
+        ? dedupedParts.join(', ')
+        : data?.display_name || dedupedParts.join(', ');
+
+    if (pincode && formattedAddress.includes(pincode)) {
+      formattedAddress = formattedAddress
+        .replace(new RegExp(`[,\\s]*${pincode}[,\\s]*`, 'g'), ', ')
+        .replace(/,\s*India$/i, '')
+        .replace(/,\s*$/, '')
+        .trim();
+    }
 
     return NextResponse.json({
       success: true,

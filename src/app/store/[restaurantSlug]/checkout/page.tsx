@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   CheckCircle2,
+  ExternalLink,
   Loader2,
   LocateFixed,
   Mail,
@@ -22,6 +23,7 @@ import { formatCurrency } from '@/lib/format';
 import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
+import { DeliveryMapPicker } from '@/components/store/DeliveryMapPicker';
 import { createClient } from '@/lib/supabase/client';
 import {
   AddressCategory,
@@ -261,6 +263,20 @@ export default function DeliveryCheckoutPage() {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponError(null);
+  };
+
+  const handleMapSelect = async (lat: number, lng: number) => {
+    setDeliveryLat(String(lat));
+    setDeliveryLng(String(lng));
+    checkZone(lat, lng);
+    try {
+      const geoRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+      const geoJson = await geoRes.json();
+      if (geoRes.ok && geoJson.success) {
+        if (geoJson.address) setDeliveryAddress(geoJson.address);
+        if (geoJson.pincode) setDeliveryPincode(geoJson.pincode);
+      }
+    } catch {}
   };
 
   const handleSelectAddressId = (id: string) => {
@@ -702,22 +718,67 @@ export default function DeliveryCheckoutPage() {
                 </select>
               </div>
 
+              <DeliveryMapPicker
+                lat={
+                  deliveryLat && !Number.isNaN(parseFloat(deliveryLat))
+                    ? parseFloat(deliveryLat)
+                    : null
+                }
+                lng={
+                  deliveryLng && !Number.isNaN(parseFloat(deliveryLng))
+                    ? parseFloat(deliveryLng)
+                    : null
+                }
+                fallbackLat={
+                  typeof restaurant?.latitude === 'number' ? restaurant.latitude : 25.618193
+                }
+                fallbackLng={
+                  typeof restaurant?.longitude === 'number' ? restaurant.longitude : 85.039305
+                }
+                onSelectLocation={handleMapSelect}
+              />
+
               {checkingZone ? (
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
                   <span>Checking delivery availability...</span>
                 </div>
               ) : zoneResult?.isWithinZone ? (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>
-                    Eligible for delivery ({zoneResult.distanceKm} km away · Max{' '}
-                    {zoneResult.maxRadiusKm} km).
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>
+                      Eligible for delivery ({zoneResult.distanceKm} km away · Max{' '}
+                      {zoneResult.maxRadiusKm} km).
+                    </span>
                   </span>
+                  {deliveryLat && deliveryLng && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${deliveryLat},${deliveryLng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-emerald-900 underline hover:text-emerald-700"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Direction Link
+                    </a>
+                  )}
                 </div>
-              ) : (!deliveryLat || !deliveryLng) && (
+              ) : deliveryLat && deliveryLng ? (
+                <div className="flex justify-end">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${deliveryLat},${deliveryLng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Open Direction Link in Maps
+                  </a>
+                </div>
+              ) : (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-                  Tap &ldquo;Use My GPS Location&rdquo; or choose a saved address to verify delivery.
+                  Tap on the map, click &ldquo;Use My GPS Location&rdquo;, or choose a saved address.
                 </p>
               )}
 
