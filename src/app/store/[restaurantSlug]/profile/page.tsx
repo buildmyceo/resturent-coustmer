@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
+  Building2,
   CheckCircle2,
+  Home,
+  Hotel,
   Loader2,
   LocateFixed,
   LogOut,
@@ -19,6 +22,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import {
+  AddressCategory,
   mergeWithSupabaseUser,
   SavedDeliveryAddress,
   writeLocalProfile,
@@ -26,6 +30,13 @@ import {
 import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
+
+const ADDRESS_CATEGORIES: { id: AddressCategory; label: string; icon: any }[] = [
+  { id: 'HOME', label: 'Home', icon: Home },
+  { id: 'WORK', label: 'Work', icon: Building2 },
+  { id: 'HOTEL', label: 'Hotel', icon: Hotel },
+  { id: 'OTHER', label: 'Other', icon: MapPin },
+];
 
 export default function CustomerProfileSettingsPage() {
   const params = useParams<{ restaurantSlug: string }>();
@@ -39,23 +50,30 @@ export default function CustomerProfileSettingsPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [defaultAddress, setDefaultAddress] = useState('');
+  const [defaultPincode, setDefaultPincode] = useState('');
   const [savedAddresses, setSavedAddresses] = useState<SavedDeliveryAddress[]>([]);
 
   const [savingProfile, setSavingProfile] = useState(false);
+  const [locatingProfile, setLocatingProfile] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // New friend / address form
   const [showAddForm, setShowAddForm] = useState(false);
-  const [label, setLabel] = useState('');
+  const [category, setCategory] = useState<AddressCategory>('HOME');
+  const [customLabel, setCustomLabel] = useState('');
   const [isFriend, setIsFriend] = useState(false);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [pincode, setPincode] = useState('');
   const [landmark, setLandmark] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
-  const [locating, setLocating] = useState(false);
+  const [locatingAddr, setLocatingAddr] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -67,6 +85,10 @@ export default function CustomerProfileSettingsPage() {
       setName(merged.name);
       setPhone(merged.phone);
       setEmail(merged.email);
+      setAge(merged.age || '');
+      setGender(merged.gender || '');
+      setDefaultAddress(merged.defaultAddress || '');
+      setDefaultPincode(merged.defaultPincode || '');
       setSavedAddresses(merged.savedAddresses);
     } catch {}
     setLoading(false);
@@ -81,12 +103,20 @@ export default function CustomerProfileSettingsPage() {
     nextName: string,
     nextPhone: string,
     nextEmail: string,
+    nextAge: string,
+    nextGender: string,
+    nextDefaultAddr: string,
+    nextDefaultPin: string,
     nextAddresses: SavedDeliveryAddress[]
   ) => {
     writeLocalProfile({
       name: nextName,
       phone: nextPhone,
       email: nextEmail,
+      age: nextAge,
+      gender: nextGender,
+      defaultAddress: nextDefaultAddr,
+      defaultPincode: nextDefaultPin,
       savedAddresses: nextAddresses,
     });
     if (user) {
@@ -94,10 +124,48 @@ export default function CustomerProfileSettingsPage() {
         data: {
           full_name: nextName,
           phone: nextPhone,
+          age: nextAge || undefined,
+          gender: nextGender || undefined,
+          default_address: nextDefaultAddr || undefined,
+          default_pincode: nextDefaultPin || undefined,
           saved_addresses: nextAddresses,
         },
       });
     }
+  };
+
+  const reverseGeocode = async (latNum: number, lngNum: number) => {
+    const res = await fetch(`/api/geocode/reverse?lat=${latNum}&lng=${lngNum}`);
+    const json = await res.json();
+    return json;
+  };
+
+  const handleUseProfileGps = () => {
+    if (!navigator.geolocation) {
+      setErrorMsg('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocatingProfile(true);
+    setErrorMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const latNum = Number(pos.coords.latitude.toFixed(6));
+        const lngNum = Number(pos.coords.longitude.toFixed(6));
+        try {
+          const geo = await reverseGeocode(latNum, lngNum);
+          if (geo.success) {
+            if (geo.address) setDefaultAddress(geo.address);
+            if (geo.pincode) setDefaultPincode(geo.pincode);
+          }
+        } catch {}
+        setLocatingProfile(false);
+      },
+      (err) => {
+        setLocatingProfile(false);
+        setErrorMsg(err.message || 'Could not detect GPS location.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -120,7 +188,16 @@ export default function CustomerProfileSettingsPage() {
 
     setSavingProfile(true);
     try {
-      await persistAll(name.trim(), phone.trim(), email.trim(), savedAddresses);
+      await persistAll(
+        name.trim(),
+        phone.trim(),
+        email.trim(),
+        age.trim(),
+        gender,
+        defaultAddress.trim(),
+        defaultPincode.trim(),
+        savedAddresses
+      );
       setStatusMsg('Profile settings saved!');
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to save profile.');
@@ -129,20 +206,30 @@ export default function CustomerProfileSettingsPage() {
     }
   };
 
-  const handleUseGps = () => {
+  const handleUseAddrGps = () => {
     if (!navigator.geolocation) {
       setErrorMsg('Geolocation is not supported by your browser.');
       return;
     }
-    setLocating(true);
+    setLocatingAddr(true);
+    setErrorMsg(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(String(Number(pos.coords.latitude.toFixed(6))));
-        setLng(String(Number(pos.coords.longitude.toFixed(6))));
-        setLocating(false);
+      async (pos) => {
+        const latNum = Number(pos.coords.latitude.toFixed(6));
+        const lngNum = Number(pos.coords.longitude.toFixed(6));
+        setLat(String(latNum));
+        setLng(String(lngNum));
+        try {
+          const geo = await reverseGeocode(latNum, lngNum);
+          if (geo.success) {
+            if (geo.address) setAddress(geo.address);
+            if (geo.pincode) setPincode(geo.pincode);
+          }
+        } catch {}
+        setLocatingAddr(false);
       },
       (err) => {
-        setLocating(false);
+        setLocatingAddr(false);
         setErrorMsg(err.message || 'Could not detect GPS location.');
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -154,8 +241,13 @@ export default function CustomerProfileSettingsPage() {
     setErrorMsg(null);
     setStatusMsg(null);
 
-    if (!label.trim() || !recipientName.trim() || !address.trim()) {
-      setErrorMsg('Label, recipient name, and street address are required.');
+    const finalLabel =
+      category === 'OTHER' || isFriend
+        ? customLabel.trim() || (isFriend ? 'Friend' : 'Other')
+        : category.charAt(0) + category.slice(1).toLowerCase();
+
+    if (!recipientName.trim() || !address.trim()) {
+      setErrorMsg('Recipient name and street address are required.');
       return;
     }
     if (!isValidPhone(recipientPhone)) {
@@ -165,10 +257,12 @@ export default function CustomerProfileSettingsPage() {
 
     const newItem: SavedDeliveryAddress = {
       id: `addr_${Date.now()}`,
-      label: label.trim(),
+      category,
+      label: finalLabel,
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       address: address.trim(),
+      pincode: pincode.trim() || undefined,
       landmark: landmark.trim() || undefined,
       lat: lat ? parseFloat(lat) : undefined,
       lng: lng ? parseFloat(lng) : undefined,
@@ -177,24 +271,44 @@ export default function CustomerProfileSettingsPage() {
 
     const updated = [...savedAddresses, newItem];
     setSavedAddresses(updated);
-    await persistAll(name, phone, email, updated);
+    await persistAll(
+      name,
+      phone,
+      email,
+      age,
+      gender,
+      defaultAddress,
+      defaultPincode,
+      updated
+    );
 
-    setLabel('');
+    setCategory('HOME');
+    setCustomLabel('');
     setRecipientName('');
     setRecipientPhone('');
     setAddress('');
+    setPincode('');
     setLandmark('');
     setLat('');
     setLng('');
     setIsFriend(false);
     setShowAddForm(false);
-    setStatusMsg('Saved delivery address / friend added!');
+    setStatusMsg('Saved delivery address added!');
   };
 
   const handleDeleteAddress = async (id: string) => {
     const updated = savedAddresses.filter((a) => a.id !== id);
     setSavedAddresses(updated);
-    await persistAll(name, phone, email, updated);
+    await persistAll(
+      name,
+      phone,
+      email,
+      age,
+      gender,
+      defaultAddress,
+      defaultPincode,
+      updated
+    );
     setStatusMsg('Saved address removed.');
   };
 
@@ -247,7 +361,7 @@ export default function CustomerProfileSettingsPage() {
         <div>
           <h1 className="font-headline text-2xl font-bold text-slate-900">Profile Settings</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Save your contact info and your friends&apos; delivery addresses for 1-tap checkout.
+            Save your contact info, age, gender, and Home / Work / Hotel / Friend locations.
           </p>
         </div>
 
@@ -270,7 +384,7 @@ export default function CustomerProfileSettingsPage() {
         >
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <User className="w-4 h-4 text-light-primary" />
-            My Contact Info
+            My Profile &amp; Default Address
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -301,6 +415,34 @@ export default function CustomerProfileSettingsPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">Age</label>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="25"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-700 mb-1">Gender</label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              >
+                <option value="">Prefer not to say</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               <Mail className="w-3 h-3 inline mr-1" />
@@ -313,6 +455,42 @@ export default function CustomerProfileSettingsPage() {
               placeholder="you@example.com"
               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
             />
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-700">Default Address</label>
+              <button
+                type="button"
+                onClick={handleUseProfileGps}
+                disabled={locatingProfile}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[11px] font-semibold hover:bg-orange-100"
+              >
+                {locatingProfile ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <LocateFixed className="w-3 h-3" />
+                )}
+                Auto-fill from GPS
+              </button>
+            </div>
+            <textarea
+              rows={2}
+              value={defaultAddress}
+              onChange={(e) => setDefaultAddress(e.target.value)}
+              placeholder="House/Flat no, Street, Area, City"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+            />
+            <div className="max-w-[180px]">
+              <label className="block text-xs font-medium text-slate-700 mb-1">Pincode</label>
+              <input
+                type="text"
+                value={defaultPincode}
+                onChange={(e) => setDefaultPincode(e.target.value)}
+                placeholder="e.g. 248007"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+              />
+            </div>
           </div>
 
           <button
@@ -330,10 +508,10 @@ export default function CustomerProfileSettingsPage() {
             <div>
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users className="w-4 h-4 text-light-primary" />
-                Saved Delivery Locations &amp; Friends
+                Saved Addresses (Home / Work / Hotel / Friends)
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Order food to your own address or directly to a friend&apos;s location.
+                Order food to your Home, Work, Hotel, or a friend&apos;s location.
               </p>
             </div>
             <button
@@ -351,8 +529,27 @@ export default function CustomerProfileSettingsPage() {
               onSubmit={handleAddAddress}
               className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">New Delivery Recipient</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {ADDRESS_CATEGORIES.map((cat) => {
+                    const Icon = cat.icon;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setCategory(cat.id)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          category === cat.id
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -360,19 +557,21 @@ export default function CustomerProfileSettingsPage() {
                     onChange={(e) => setIsFriend(e.target.checked)}
                     className="rounded"
                   />
-                  This is a friend&apos;s address
+                  Friend&apos;s address
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {(category === 'OTHER' || isFriend) && (
                 <input
                   type="text"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder="Label (e.g. Home, Rahul)"
-                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
-                  required
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  placeholder="Custom Label (e.g. Friend - Rahul, Room 302)"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
                 />
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <input
                   type="text"
                   value={recipientName}
@@ -391,6 +590,22 @@ export default function CustomerProfileSettingsPage() {
                 />
               </div>
 
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleUseAddrGps}
+                  disabled={locatingAddr}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-orange-600 text-xs font-semibold hover:bg-orange-50"
+                >
+                  {locatingAddr ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <LocateFixed className="w-3.5 h-3.5" />
+                  )}
+                  Detect GPS, Address &amp; Pincode
+                </button>
+              </div>
+
               <textarea
                 rows={2}
                 value={address}
@@ -403,6 +618,13 @@ export default function CustomerProfileSettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
                 <input
                   type="text"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  placeholder="Pincode"
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+                />
+                <input
+                  type="text"
                   value={landmark}
                   onChange={(e) => setLandmark(e.target.value)}
                   placeholder="Landmark (Optional)"
@@ -410,33 +632,11 @@ export default function CustomerProfileSettingsPage() {
                 />
                 <input
                   type="text"
-                  value={lat}
-                  onChange={(e) => setLat(e.target.value)}
-                  placeholder="Lat (optional)"
-                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-white"
+                  value={lat && lng ? `${lat}, ${lng}` : ''}
+                  readOnly
+                  placeholder="GPS coordinates"
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-slate-100 text-slate-600"
                 />
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                    placeholder="Lng (optional)"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleUseGps}
-                    disabled={locating}
-                    title="Use Current GPS"
-                    className="px-2.5 py-2 rounded-xl bg-white border border-slate-200 text-orange-600 hover:bg-orange-50"
-                  >
-                    {locating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <LocateFixed className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -459,7 +659,7 @@ export default function CustomerProfileSettingsPage() {
 
           {savedAddresses.length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No saved addresses yet. Add your home, work, or a friend&apos;s delivery location.
+              No saved addresses yet. Add your Home, Work, Hotel, or a friend&apos;s location.
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -471,6 +671,11 @@ export default function CustomerProfileSettingsPage() {
                   <div className="space-y-1 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{addr.label}</span>
+                      {addr.category && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700">
+                          {addr.category}
+                        </span>
+                      )}
                       {addr.isFriend && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                           Friend
@@ -484,6 +689,7 @@ export default function CustomerProfileSettingsPage() {
                       <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-600" />
                       <span>
                         {addr.address}
+                        {addr.pincode ? ` - ${addr.pincode}` : ''}
                         {addr.landmark ? ` (${addr.landmark})` : ''}
                       </span>
                     </p>

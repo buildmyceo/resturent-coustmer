@@ -1,10 +1,14 @@
+export type AddressCategory = 'HOME' | 'WORK' | 'HOTEL' | 'OTHER';
+
 export interface SavedDeliveryAddress {
   id: string;
-  label: string; // e.g., "Home", "Office", "Friend - Rahul"
+  category?: AddressCategory;
+  label: string; // e.g., "Home", "Work", "Hotel", "Friend - Rahul"
   recipientName: string;
   recipientPhone: string;
   recipientEmail?: string;
   address: string;
+  pincode?: string;
   landmark?: string;
   lat?: number;
   lng?: number;
@@ -15,6 +19,10 @@ export interface CustomerProfileData {
   name: string;
   phone: string;
   email: string;
+  age?: string;
+  gender?: string;
+  defaultAddress?: string;
+  defaultPincode?: string;
   savedAddresses: SavedDeliveryAddress[];
 }
 
@@ -25,10 +33,14 @@ export function readLocalProfile(): CustomerProfileData {
   let name = '';
   let phone = '';
   let email = '';
+  let age = '';
+  let gender = '';
+  let defaultAddress = '';
+  let defaultPincode = '';
   let savedAddresses: SavedDeliveryAddress[] = [];
 
   if (typeof window === 'undefined') {
-    return { name, phone, email, savedAddresses };
+    return { name, phone, email, age, gender, defaultAddress, defaultPincode, savedAddresses };
   }
 
   try {
@@ -38,6 +50,10 @@ export function readLocalProfile(): CustomerProfileData {
       name = parsed.name || '';
       phone = parsed.phone || '';
       email = parsed.email || '';
+      age = parsed.age || '';
+      gender = parsed.gender || '';
+      defaultAddress = parsed.defaultAddress || '';
+      defaultPincode = parsed.defaultPincode || '';
     }
   } catch {}
 
@@ -49,7 +65,7 @@ export function readLocalProfile(): CustomerProfileData {
     }
   } catch {}
 
-  return { name, phone, email, savedAddresses };
+  return { name, phone, email, age, gender, defaultAddress, defaultPincode, savedAddresses };
 }
 
 export function writeLocalProfile(data: Partial<CustomerProfileData>) {
@@ -59,6 +75,12 @@ export function writeLocalProfile(data: Partial<CustomerProfileData>) {
     name: data.name !== undefined ? data.name : current.name,
     phone: data.phone !== undefined ? data.phone : current.phone,
     email: data.email !== undefined ? data.email : current.email,
+    age: data.age !== undefined ? data.age : current.age,
+    gender: data.gender !== undefined ? data.gender : current.gender,
+    defaultAddress:
+      data.defaultAddress !== undefined ? data.defaultAddress : current.defaultAddress,
+    defaultPincode:
+      data.defaultPincode !== undefined ? data.defaultPincode : current.defaultPincode,
   };
   try {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
@@ -85,6 +107,10 @@ export function mergeWithSupabaseUser(user: any): CustomerProfileData {
     name: meta.full_name || meta.name || local.name || '',
     phone: meta.phone || local.phone || '',
     email: user.email || local.email || '',
+    age: meta.age ? String(meta.age) : local.age || '',
+    gender: meta.gender || local.gender || '',
+    defaultAddress: meta.default_address || local.defaultAddress || '',
+    defaultPincode: meta.default_pincode || local.defaultPincode || '',
     savedAddresses: Array.from(mergedMap.values()),
   };
 

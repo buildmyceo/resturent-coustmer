@@ -22,6 +22,7 @@ import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { createClient } from '@/lib/supabase/client';
 import {
+  AddressCategory,
   mergeWithSupabaseUser,
   SavedDeliveryAddress,
   writeLocalProfile,
@@ -47,6 +48,7 @@ export default function DeliveryCheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryLandmark, setDeliveryLandmark] = useState('');
   const [deliveryLat, setDeliveryLat] = useState<string>('');
   const [deliveryLng, setDeliveryLng] = useState<string>('');
@@ -61,6 +63,7 @@ export default function DeliveryCheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<SavedDeliveryAddress[]>([]);
   const [selectedSavedId, setSelectedSavedId] = useState<string>('myself');
   const [saveForNextTime, setSaveForNextTime] = useState(true);
+  const [saveCategory, setSaveCategory] = useState<AddressCategory>('HOME');
   const [saveLabel, setSaveLabel] = useState('Home');
 
   useEffect(() => {
@@ -75,6 +78,8 @@ export default function DeliveryCheckoutPage() {
       if (merged.name) setCustomerName(merged.name);
       if (merged.phone) setCustomerPhone(merged.phone);
       if (merged.email) setCustomerEmail(merged.email);
+      if (merged.defaultAddress) setDeliveryAddress(merged.defaultAddress);
+      if (merged.defaultPincode) setDeliveryPincode(merged.defaultPincode);
       if (merged.savedAddresses.length > 0) {
         setSavedAddresses(merged.savedAddresses);
       }
@@ -138,13 +143,24 @@ export default function DeliveryCheckoutPage() {
     setLocating(true);
     setError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(6));
         const lng = Number(pos.coords.longitude.toFixed(6));
         setDeliveryLat(String(lat));
         setDeliveryLng(String(lng));
-        setLocating(false);
         checkZone(lat, lng);
+        try {
+          const geoRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+          const geoJson = await geoRes.json();
+          if (geoRes.ok && geoJson.success) {
+            if (geoJson.address) setDeliveryAddress(geoJson.address);
+            if (geoJson.pincode) setDeliveryPincode(geoJson.pincode);
+          }
+        } catch {
+          // Reverse geocoding failure shouldn't block GPS coordinate usage
+        } finally {
+          setLocating(false);
+        }
       },
       (geoErr) => {
         setLocating(false);
@@ -212,11 +228,13 @@ export default function DeliveryCheckoutPage() {
         const { data: uData } = await supabase.auth.getUser();
         const newAddr: SavedDeliveryAddress = {
           id: selectedSavedId !== 'myself' ? selectedSavedId : `addr_${Date.now()}`,
-          label: saveLabel.trim() || 'Saved Location',
+          label: saveLabel.trim() || saveCategory,
+          category: saveCategory,
           recipientName: customerName.trim(),
           recipientPhone: customerPhone.trim(),
           recipientEmail: customerEmail.trim(),
           address: deliveryAddress.trim(),
+          pincode: deliveryPincode.trim() || undefined,
           landmark: deliveryLandmark.trim() || undefined,
           lat: latNum,
           lng: lngNum,
@@ -230,6 +248,9 @@ export default function DeliveryCheckoutPage() {
           name: selectedSavedId === 'myself' ? customerName.trim() : undefined,
           phone: selectedSavedId === 'myself' ? customerPhone.trim() : undefined,
           email: customerEmail.trim(),
+          defaultAddress: selectedSavedId === 'myself' ? deliveryAddress.trim() : undefined,
+          defaultPincode:
+            selectedSavedId === 'myself' ? deliveryPincode.trim() || undefined : undefined,
           savedAddresses: updatedList,
         });
         if (uData?.user) {
@@ -249,6 +270,13 @@ export default function DeliveryCheckoutPage() {
         .toString(36)
         .slice(2, 8)}`;
 
+      const cleanAddress = deliveryAddress.trim();
+      const cleanPincode = deliveryPincode.trim();
+      const fullDeliveryAddress =
+        cleanPincode && !cleanAddress.includes(cleanPincode)
+          ? `${cleanAddress} - ${cleanPincode}`
+          : cleanAddress;
+
       const res = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,7 +287,7 @@ export default function DeliveryCheckoutPage() {
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim(),
-          deliveryAddress: deliveryAddress.trim(),
+          deliveryAddress: fullDeliveryAddress,
           deliveryLandmark: deliveryLandmark.trim() || undefined,
           deliveryLat: latNum,
           deliveryLng: lngNum,
@@ -420,6 +448,8 @@ export default function DeliveryCheckoutPage() {
                         if (m.name) setCustomerName(m.name);
                         if (m.phone) setCustomerPhone(m.phone);
                         if (m.email) setCustomerEmail(m.email);
+                        if (m.defaultAddress) setDeliveryAddress(m.defaultAddress);
+                        if (m.defaultPincode) setDeliveryPincode(m.defaultPincode);
                       });
                     }}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
@@ -440,7 +470,10 @@ export default function DeliveryCheckoutPage() {
                         setCustomerPhone(addr.recipientPhone);
                         if (addr.recipientEmail) setCustomerEmail(addr.recipientEmail);
                         setDeliveryAddress(addr.address);
+                        setDeliveryPincode(addr.pincode || '');
                         setDeliveryLandmark(addr.landmark || '');
+                        if (addr.category) setSaveCategory(addr.category);
+                        setSaveLabel(addr.label);
                         if (typeof addr.lat === 'number' && typeof addr.lng === 'number') {
                           setDeliveryLat(String(addr.lat));
                           setDeliveryLng(String(addr.lng));
@@ -453,6 +486,7 @@ export default function DeliveryCheckoutPage() {
                           : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
                       }`}
                     >
+                      {addr.category ? `${addr.category} · ` : ''}
                       {addr.label}
                       {addr.isFriend ? ' (Friend)' : ''}
                     </button>
@@ -590,7 +624,19 @@ export default function DeliveryCheckoutPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Pincode / ZIP
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryPincode}
+                    onChange={(e) => setDeliveryPincode(e.target.value)}
+                    placeholder="e.g. 800001"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
                     Landmark (Optional)
@@ -617,7 +663,7 @@ export default function DeliveryCheckoutPage() {
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+              <div className="pt-2 space-y-2 text-xs">
                 <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -628,13 +674,34 @@ export default function DeliveryCheckoutPage() {
                   Save this address &amp; contact for next time
                 </label>
                 {saveForNextTime && selectedSavedId === 'myself' && (
-                  <input
-                    type="text"
-                    value={saveLabel}
-                    onChange={(e) => setSaveLabel(e.target.value)}
-                    placeholder="Label (e.g. Home, Friend - Rahul)"
-                    className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setSaveCategory(cat);
+                          if (['Home', 'Work', 'Hotel', 'Other', ''].includes(saveLabel)) {
+                            setSaveLabel(cat.charAt(0) + cat.slice(1).toLowerCase());
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                          saveCategory === cat
+                            ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                    <input
+                      type="text"
+                      value={saveLabel}
+                      onChange={(e) => setSaveLabel(e.target.value)}
+                      placeholder="Label (e.g. Home, Friend - Rahul)"
+                      className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
                 )}
               </div>
             </div>
