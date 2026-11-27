@@ -900,13 +900,6 @@ export default function DeliveryCheckoutPage() {
                           {cat}
                         </button>
                       ))}
-                      <input
-                        type="text"
-                        value={saveLabel}
-                        onChange={(e) => setSaveLabel(e.target.value)}
-                        placeholder="Label (e.g. Home, Friend - Rahul)"
-                        className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
-                      />
                       <button
                         type="button"
                         onClick={handleInstantSaveAddress}
