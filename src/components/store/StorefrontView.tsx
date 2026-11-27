@@ -273,6 +273,20 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#2D312E]/95 via-[#2D312E]/60 to-transparent" />
+          {/* Top-right Profile Button */}
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+            <Link
+              href={`/store/${restaurantSlug}/profile`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/25 text-white font-label text-xs font-semibold hover:bg-white/30 transition-colors shadow-xs"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>
+                {currentUser
+                  ? currentUser.user_metadata?.full_name || currentUser.email
+                  : 'Profile'}
+              </span>
+            </Link>
+          </div>
           <div className="relative z-10 text-white flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -297,20 +311,8 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
               </p>
             </div>
 
-            {/* Book Table, Delivery & Account Quick Actions */}
+            {/* Book Table & Delivery Quick Actions */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-white/20 backdrop-blur-md text-white font-label text-xs font-semibold hover:bg-white/30 transition-colors cursor-pointer"
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>
-                  {currentUser
-                    ? currentUser.user_metadata?.full_name || currentUser.email
-                    : 'Sign In'}
-                </span>
-              </button>
               {bookingCfg?.enabled && (
                 <Link
                   href={`/store/${restaurantSlug}/book`}

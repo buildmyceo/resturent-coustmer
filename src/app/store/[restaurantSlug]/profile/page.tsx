@@ -16,10 +16,12 @@ import {
   MapPin,
   Phone,
   Plus,
+  Receipt,
   Trash2,
   User,
   Users,
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import { createClient } from '@/lib/supabase/client';
 import {
   AddressCategory,
@@ -74,9 +76,12 @@ export default function CustomerProfileSettingsPage() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [locatingAddr, setLocatingAddr] = useState(false);
+  const [bills, setBills] = useState<any[]>([]);
+  const [loadingBills, setLoadingBills] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
+    setLoadingBills(true);
     try {
       const { data } = await supabase.auth.getUser();
       const u = data?.user || null;
@@ -90,7 +95,24 @@ export default function CustomerProfileSettingsPage() {
       setDefaultAddress(merged.defaultAddress || '');
       setDefaultPincode(merged.defaultPincode || '');
       setSavedAddresses(merged.savedAddresses);
+
+      try {
+        const infoRes = await fetch(
+          `/api/restaurant/info?slug=${encodeURIComponent(restaurantSlug)}`,
+          { cache: 'no-store' }
+        );
+        const infoJson = await infoRes.json();
+        const restaurantId = infoJson?.restaurant?.id || '';
+        const qs = new URLSearchParams();
+        if (restaurantId) qs.set('restaurantId', restaurantId);
+        const bRes = await fetch(`/api/customer/history?${qs.toString()}`, {
+          cache: 'no-store',
+        });
+        const bJson = await bRes.json();
+        if (bJson.success) setBills(bJson.bills || []);
+      } catch {}
     } catch {}
+    setLoadingBills(false);
     setLoading(false);
   };
 
@@ -702,6 +724,72 @@ export default function CustomerProfileSettingsPage() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bill History Section */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-orange-600" />
+                Bill History &amp; Receipts
+              </h2>
+              <p className="text-xs text-slate-500">
+                Your completed and paid bills for this restaurant.
+              </p>
+            </div>
+            <Link
+              href={`/store/${restaurantSlug}/bills`}
+              className="text-xs font-semibold text-orange-600 hover:underline"
+            >
+              View All
+            </Link>
+          </div>
+
+          {loadingBills ? (
+            <div className="py-6 text-center">
+              <Loader2 className="w-5 h-5 text-orange-600 animate-spin mx-auto" />
+            </div>
+          ) : bills.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              {user
+                ? 'No paid bills yet.'
+                : 'Sign in with Google or Email to view your bill history.'}
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {bills.slice(0, 5).map((b) => (
+                <div
+                  key={b.id}
+                  className="p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono font-bold text-slate-900">
+                        #{b.order_number}
+                      </span>
+                      <p className="text-slate-500">
+                        {new Date(b.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        PAID
+                      </span>
+                      <p className="text-sm font-bold text-slate-900 mt-1">
+                        {formatCurrency(Number(b.total_amount || 0), 'INR')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-slate-600 border-t border-slate-100 pt-1.5">
+                    {(b.order_items || [])
+                      .map((i: any) => `${i.quantity}× ${i.dish_name}`)
+                      .join(', ')}
+                  </div>
                 </div>
               ))}
             </div>

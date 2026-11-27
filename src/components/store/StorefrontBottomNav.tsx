@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UtensilsCrossed, ShoppingBag, Clock, Receipt, User } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, Clock } from 'lucide-react';
 import { useCustomer } from '@/context/CustomerContext';
 
 interface StorefrontBottomNavProps {
@@ -37,18 +37,6 @@ export function StorefrontBottomNav({ restaurantSlug }: StorefrontBottomNavProps
       isActive: pathname.includes('/orders'),
       icon: Clock,
     },
-    {
-      label: 'Bill History',
-      href: `/store/${restaurantSlug}/bills`,
-      isActive: pathname.endsWith('/bills'),
-      icon: Receipt,
-    },
-    {
-      label: 'Profile',
-      href: `/store/${restaurantSlug}/profile`,
-      isActive: pathname.endsWith('/profile'),
-      icon: User,
-    },
   ];
 
   return (
@@ -56,7 +44,7 @@ export function StorefrontBottomNav({ restaurantSlug }: StorefrontBottomNavProps
       aria-label="Storefront Navigation"
       className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1.5 shadow-lg"
     >
-      <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
+      <div className="max-w-lg mx-auto grid grid-cols-3 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
           return (
