@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   CheckCircle2,
-  ExternalLink,
   Loader2,
   LocateFixed,
   Mail,
@@ -753,21 +752,9 @@ export default function DeliveryCheckoutPage() {
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
                   <span>Checking delivery availability...</span>
                 </div>
-              ) : deliveryLat && deliveryLng ? (
-                <div className="flex justify-end">
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${deliveryLat},${deliveryLng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Open Direction Link in Maps
-                  </a>
-                </div>
-              ) : (
+              ) : (!deliveryLat || !deliveryLng) && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-                  Tap on the map, click &ldquo;Use My GPS Location&rdquo;, or choose a saved address.
+                  Tap &ldquo;Set Address Using Map&rdquo;, click &ldquo;Use My GPS Location&rdquo;, or choose a saved address.
                 </p>
               )}
 
