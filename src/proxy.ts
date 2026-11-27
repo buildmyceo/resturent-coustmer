@@ -74,6 +74,7 @@ export async function proxy(request: NextRequest) {
           pathname === '/checkout' ||
           pathname === '/orders' ||
           pathname === '/bills' ||
+          pathname === '/profile' ||
           pathname.startsWith('/orders/')
         ) {
           const url = request.nextUrl.clone();
