@@ -43,7 +43,10 @@ export async function GET(request: Request) {
     const orFilters: string[] = [];
     if (userEmail) orFilters.push(`customer_email.ilike.${userEmail}`);
     if (userPhone) orFilters.push(`customer_phone.eq.${userPhone}`);
-    if (localOrderIds.length > 0) orFilters.push(`id.in.(${localOrderIds.join(',')})`);
+    // Only allow localOrderIds fallback for unauthenticated guests, and strip PII below
+    if (!user && localOrderIds.length > 0) {
+      orFilters.push(`id.in.(${localOrderIds.join(',')})`);
+    }
 
     if (orFilters.length > 0) {
       query = query.or(orFilters.join(','));
@@ -54,13 +57,30 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    const cleanOrders = (orders || []).filter(
-      (o: any) =>
-        o.status !== 'pending_payment' &&
-        !String(o.order_number || '').startsWith('ORD_STATE-') &&
-        !String(o.order_number || '').startsWith('CALL-') &&
-        !String(o.order_number || '').startsWith('SR_STATE-')
-    );
+    const cleanOrders = (orders || [])
+      .filter(
+        (o: any) =>
+          o.status !== 'pending_payment' &&
+          !String(o.order_number || '').startsWith('ORD_STATE-') &&
+          !String(o.order_number || '').startsWith('CALL-') &&
+          !String(o.order_number || '').startsWith('SR_STATE-')
+      )
+      .map((o: any) => {
+        if (user) return o;
+        // Strip PII (phone, email, address, coordinates) for unauthenticated guest lookups
+        const {
+          customer_phone: _cp,
+          customer_email: _ce,
+          customer_name: _cn,
+          delivery_address: _da,
+          delivery_landmark: _dl,
+          delivery_lat: _dlat,
+          delivery_lng: _dlng,
+          guest_token: _gt,
+          ...safeOrder
+        } = o;
+        return safeOrder;
+      });
 
     const bills = cleanOrders.filter(
       (o: any) => o.payment_status === 'paid' || o.status === 'completed'

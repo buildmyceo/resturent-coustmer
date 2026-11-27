@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
   try {
@@ -27,11 +28,28 @@ export async function GET(request: Request) {
         .maybeSingle();
 
       if (data) {
-        if (data.order_type === 'delivery' && data.guest_token && guestToken && data.guest_token !== guestToken) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid guestToken for this order.' },
-            { status: 403 }
-          );
+        if (data.order_type === 'delivery') {
+          let authorized = Boolean(data.guest_token && guestToken && data.guest_token === guestToken);
+          if (!authorized) {
+            try {
+              const authClient = await createServerSupabaseClient();
+              const { data: authData } = await authClient.auth.getUser();
+              const uEmail = authData?.user?.email?.toLowerCase();
+              const uPhone = authData?.user?.user_metadata?.phone;
+              if (
+                (uEmail && data.customer_email?.toLowerCase() === uEmail) ||
+                (uPhone && data.customer_phone === uPhone)
+              ) {
+                authorized = true;
+              }
+            } catch {}
+          }
+          if (!authorized) {
+            return NextResponse.json(
+              { success: false, error: 'Unauthorized to view this delivery order.' },
+              { status: 403 }
+            );
+          }
         }
         ordersData = [data];
       }
