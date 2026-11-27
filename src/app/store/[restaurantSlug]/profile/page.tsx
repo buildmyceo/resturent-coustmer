@@ -77,6 +77,7 @@ export default function CustomerProfileSettingsPage() {
   const [lng, setLng] = useState('');
   const [locatingAddr, setLocatingAddr] = useState(false);
   const [bills, setBills] = useState<any[]>([]);
+  const [billFilter, setBillFilter] = useState<'all' | 'dine_in' | 'delivery'>('all');
   const [loadingBills, setLoadingBills] = useState(true);
 
   const loadData = async () => {
@@ -732,7 +733,7 @@ export default function CustomerProfileSettingsPage() {
 
         {/* Bill History Section */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-orange-600" />
@@ -742,37 +743,77 @@ export default function CustomerProfileSettingsPage() {
                 Your completed and paid bills for this restaurant.
               </p>
             </div>
-            <Link
-              href={`/store/${restaurantSlug}/bills`}
-              className="text-xs font-semibold text-orange-600 hover:underline"
-            >
-              View All
-            </Link>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 text-[11px] font-semibold">
+                {([
+                  { id: 'all', label: 'All' },
+                  { id: 'dine_in', label: 'Dine-In' },
+                  { id: 'delivery', label: 'Delivery' },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setBillFilter(tab.id)}
+                    className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                      billFilter === tab.id
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <Link
+                href={`/store/${restaurantSlug}/bills`}
+                className="text-xs font-semibold text-orange-600 hover:underline"
+              >
+                View All
+              </Link>
+            </div>
           </div>
 
           {loadingBills ? (
             <div className="py-6 text-center">
               <Loader2 className="w-5 h-5 text-orange-600 animate-spin mx-auto" />
             </div>
-          ) : bills.length === 0 ? (
+          ) : bills.filter((b) => billFilter === 'all' || (b.order_type || 'dine_in') === billFilter).length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">
               {user
-                ? 'No paid bills yet.'
+                ? billFilter === 'dine_in'
+                  ? 'No dine-in bills yet.'
+                  : billFilter === 'delivery'
+                  ? 'No delivery bills yet.'
+                  : 'No paid bills yet.'
                 : 'Sign in with Google or Email to view your bill history.'}
             </p>
           ) : (
             <div className="space-y-2.5">
-              {bills.slice(0, 5).map((b) => (
+              {bills
+                .filter((b) => billFilter === 'all' || (b.order_type || 'dine_in') === billFilter)
+                .slice(0, 5)
+                .map((b) => (
                 <div
                   key={b.id}
                   className="p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="font-mono font-bold text-slate-900">
-                        #{b.order_number}
-                      </span>
-                      <p className="text-slate-500">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-900">
+                          #{b.order_number}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            b.order_type === 'delivery'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}
+                        >
+                          {b.order_type === 'delivery' ? 'Delivery' : 'Dine-In'}
+                        </span>
+                      </div>
+                      <p className="text-slate-500 mt-0.5">
                         {new Date(b.created_at).toLocaleString()}
                       </p>
                     </div>
