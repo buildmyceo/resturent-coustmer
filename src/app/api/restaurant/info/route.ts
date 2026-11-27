@@ -114,8 +114,36 @@ export async function GET(request: Request) {
       footerText: '',
     };
 
+    let coupons: any[] = [];
+    let taxRate = settingsObj?.tax_enabled !== false ? Number(settingsObj?.tax_percentage ?? 8.5) : 0;
+    let taxEnabled = settingsObj?.tax_enabled !== false;
+
     if (settingsObj?.receipt_footer) {
       const footer = settingsObj.receipt_footer;
+      const paymentConfigMatch = footer.match(/<!--ZOVO_PAYMENT_CONFIG:([\s\S]*?)-->/);
+      if (paymentConfigMatch && paymentConfigMatch[1]) {
+        try {
+          const paymentConfig = JSON.parse(paymentConfigMatch[1]);
+          const hasGst = Boolean(paymentConfig.gstNumber && paymentConfig.gstNumber.trim().length > 0);
+          taxEnabled = paymentConfig.taxEnabled !== false && hasGst;
+          if (paymentConfig.taxRate !== undefined && taxEnabled) {
+            taxRate = Number(paymentConfig.taxRate);
+          } else if (!taxEnabled) {
+            taxRate = 0;
+          }
+        } catch {}
+      }
+
+      const couponMatch = footer.match(/<!--ZOVO_COUPONS_CONFIG:([\s\S]*?)-->/);
+      if (couponMatch && couponMatch[1]) {
+        try {
+          const parsedC = JSON.parse(couponMatch[1]);
+          if (Array.isArray(parsedC)) {
+            coupons = parsedC.filter((c: any) => c && c.isActive !== false);
+          }
+        } catch {}
+      }
+
       const geoMatch = footer.match(/<!--ZOVO_GEOFENCE_CONFIG:([\s\S]*?)-->/);
       if (geoMatch && geoMatch[1]) {
         try {
@@ -219,6 +247,9 @@ export async function GET(request: Request) {
         estimatedMins: Number(settingsObj?.delivery_estimated_mins ?? 35),
       },
       razorpayEnabled: settingsObj?.razorpay_enabled ?? true,
+      taxEnabled,
+      taxRate,
+      coupons,
       socialLinks: cached?.socialLinks || socialLinks,
       geofence: cached?.geofence || geofence,
       landingPage: cached?.landingPage || landingPage,

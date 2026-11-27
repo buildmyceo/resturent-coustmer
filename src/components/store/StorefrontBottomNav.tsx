@@ -32,7 +32,7 @@ export function StorefrontBottomNav({ restaurantSlug }: StorefrontBottomNavProps
       badge: cartTotals.itemCount > 0 ? cartTotals.itemCount : undefined,
     },
     {
-      label: 'Orders',
+      label: 'Order History',
       href: `/store/${restaurantSlug}/orders`,
       isActive: pathname.includes('/orders'),
       icon: Clock,

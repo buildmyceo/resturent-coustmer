@@ -547,9 +547,13 @@ export async function POST(request: Request) {
       (discountedSubtotal + calculatedTax + calculatedServiceFee + deliveryFee).toFixed(2)
     );
 
-    // Payment method: delivery defaults to razorpay; dine_in uses requested method or counter/pay_later
-    const paymentMethod: 'razorpay' | 'counter' | 'pay_later' =
-      rawPaymentMethod === 'razorpay' || orderType === 'delivery'
+    // Payment method: delivery supports razorpay (default) or cod; dine_in uses razorpay or counter/pay_later
+    const paymentMethod: 'razorpay' | 'cod' | 'counter' | 'pay_later' =
+      orderType === 'delivery'
+        ? rawPaymentMethod === 'cod'
+          ? 'cod'
+          : 'razorpay'
+        : rawPaymentMethod === 'razorpay'
         ? 'razorpay'
         : isPayFirst
         ? 'counter'
@@ -564,6 +568,8 @@ export async function POST(request: Request) {
     let assignmentStatus =
       paymentMethod === 'razorpay'
         ? 'razorpay_pending'
+        : paymentMethod === 'cod'
+        ? 'cod_pending'
         : isPayFirst
         ? 'counter_pending'
         : 'unassigned';
@@ -626,12 +632,19 @@ export async function POST(request: Request) {
     const initialStatus =
       paymentMethod === 'razorpay'
         ? 'pending_payment'
+        : paymentMethod === 'cod'
+        ? 'pending'
         : isPayFirst
         ? 'pending'
         : 'waiting_for_waiter';
 
     const sessionTag = tableSessionId ? `[SESS:${tableSessionId}]` : '';
-    const counterTag = paymentMethod === 'counter' ? '[PAY_FIRST:COUNTER]' : '';
+    const counterTag =
+      paymentMethod === 'counter'
+        ? '[PAY_FIRST:COUNTER]'
+        : paymentMethod === 'cod'
+        ? '[COD]'
+        : '';
     const noteParts = [
       counterTag,
       customerNote ? String(customerNote).slice(0, 450) : '',
@@ -655,7 +668,7 @@ export async function POST(request: Request) {
       status: initialStatus,
       customer_note: noteWithCoupon,
       payment_status: 'pending',
-      payment_gateway: paymentMethod === 'razorpay' ? 'razorpay' : null,
+      payment_gateway: paymentMethod === 'razorpay' ? 'razorpay' : paymentMethod === 'cod' ? 'cod' : null,
       ...(assignedWaiterId
         ? {
             assigned_waiter_id: assignedWaiterId,

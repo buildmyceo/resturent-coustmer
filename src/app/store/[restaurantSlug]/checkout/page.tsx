@@ -12,8 +12,10 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
+  Tag,
   Truck,
   User,
+  X,
   AlertCircle,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
@@ -66,6 +68,11 @@ export default function DeliveryCheckoutPage() {
   const [saveCategory, setSaveCategory] = useState<AddressCategory>('HOME');
   const [saveLabel, setSaveLabel] = useState('Home');
 
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(`ceova_delivery_cart_${restaurantSlug}`);
@@ -83,16 +90,37 @@ export default function DeliveryCheckoutPage() {
       if (merged.savedAddresses.length > 0) {
         setSavedAddresses(merged.savedAddresses);
       }
-    });
+    }).catch(() => {});
 
-    fetch(`/api/restaurant/info?slug=${encodeURIComponent(restaurantSlug)}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success) setInfo(json);
-        else setError(json.error || 'Restaurant not found.');
-      })
-      .catch((e) => setError(e?.message || 'Failed to load restaurant.'))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const loadRestaurant = async (attempt = 0) => {
+      try {
+        const res = await fetch(`/api/restaurant/info?slug=${encodeURIComponent(restaurantSlug)}`, {
+          cache: 'no-store',
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.success) {
+          setInfo(json);
+          setError(null);
+        } else {
+          setError(json.error || 'Restaurant not found.');
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        if (attempt === 0) {
+          setTimeout(() => loadRestaurant(1), 350);
+          return;
+        }
+        setError(e?.message || 'Failed to load restaurant.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadRestaurant();
+    return () => {
+      cancelled = true;
+    };
   }, [restaurantSlug]);
 
   const restaurant = info?.restaurant;
@@ -171,21 +199,68 @@ export default function DeliveryCheckoutPage() {
   };
 
   const freeThreshold =
-    deliveryCfg?.freeMinOrder !== null && deliveryCfg?.freeMinOrder !== undefined
+    zoneResult?.freeDeliveryMinOrder !== null && zoneResult?.freeDeliveryMinOrder !== undefined
+      ? Number(zoneResult.freeDeliveryMinOrder)
+      : deliveryCfg?.freeMinOrder !== null && deliveryCfg?.freeMinOrder !== undefined
       ? Number(deliveryCfg.freeMinOrder)
       : deliveryCfg?.freeAbove != null
       ? Number(deliveryCfg.freeAbove)
       : null;
 
-  const baseFee = Number(deliveryCfg?.fee ?? deliveryCfg?.charge ?? 0);
+  const baseFee = Number(zoneResult?.deliveryFee ?? deliveryCfg?.fee ?? deliveryCfg?.charge ?? 0);
 
-  const deliveryFee = zoneResult?.isWithinZone
-    ? Number(zoneResult.appliedDeliveryFee ?? zoneResult.deliveryFee ?? 0)
-    : freeThreshold !== null && subtotal >= freeThreshold
-    ? 0
-    : baseFee;
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.minOrderAmount && subtotal < Number(appliedCoupon.minOrderAmount)) return 0;
+    const raw =
+      appliedCoupon.discountType === 'percentage'
+        ? (subtotal * Number(appliedCoupon.discountValue || 0)) / 100
+        : Math.min(Number(appliedCoupon.discountValue || 0), subtotal);
+    const capped =
+      appliedCoupon.maxDiscountAmount && raw > Number(appliedCoupon.maxDiscountAmount)
+        ? Number(appliedCoupon.maxDiscountAmount)
+        : raw;
+    return Number(Math.max(0, capped).toFixed(2));
+  }, [appliedCoupon, subtotal]);
 
-  const estimatedTotal = Number((subtotal + deliveryFee).toFixed(2));
+  const discountedSubtotal = Math.max(0, Number((subtotal - couponDiscount).toFixed(2)));
+  const taxRate = restaurant?.taxEnabled ? Number(restaurant?.taxRate ?? 0) : 0;
+  const taxAmount = Number(((discountedSubtotal * taxRate) / 100).toFixed(2));
+
+  const deliveryFee =
+    freeThreshold !== null && discountedSubtotal >= freeThreshold ? 0 : baseFee;
+
+  const amountForFreeDelivery =
+    freeThreshold !== null ? Math.max(0, Number((freeThreshold - discountedSubtotal).toFixed(2))) : null;
+
+  const estimatedTotal = Number((discountedSubtotal + taxAmount + deliveryFee).toFixed(2));
+
+  const handleApplyCoupon = () => {
+    setCouponError(null);
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    const availableCoupons: any[] = Array.isArray(restaurant?.coupons) ? restaurant.coupons : [];
+    const matched = availableCoupons.find(
+      (c: any) => String(c.code || '').toUpperCase() === code && c.isActive !== false
+    );
+    if (!matched) {
+      setCouponError('Invalid or expired coupon code.');
+      return;
+    }
+    if (matched.minOrderAmount && subtotal < Number(matched.minOrderAmount)) {
+      setCouponError(
+        `Minimum order of ${formatCurrency(Number(matched.minOrderAmount), currency)} required.`
+      );
+      return;
+    }
+    setAppliedCoupon(matched);
+    setCouponInput('');
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,7 +358,8 @@ export default function DeliveryCheckoutPage() {
         body: JSON.stringify({
           restaurantId: restaurant.id,
           orderType: 'delivery',
-          paymentMethod: 'razorpay',
+          paymentMethod,
+          couponCode: appliedCoupon?.code || undefined,
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim(),
@@ -309,7 +385,16 @@ export default function DeliveryCheckoutPage() {
         return;
       }
 
-      if (!json.razorpay) {
+      const saveRecentOrder = (id: string) => {
+        try {
+          const existing = JSON.parse(localStorage.getItem('ceova_recent_order_ids') || '[]');
+          const next = [id, ...(Array.isArray(existing) ? existing.filter((x: string) => x !== id) : [])].slice(0, 20);
+          localStorage.setItem('ceova_recent_order_ids', JSON.stringify(next));
+        } catch {}
+      };
+
+      if (paymentMethod === 'cod' || !json.razorpay) {
+        saveRecentOrder(json.orderId);
         sessionStorage.removeItem(`ceova_delivery_cart_${restaurantSlug}`);
         router.push(`/store/${restaurantSlug}/orders/${json.orderId}?token=${encodeURIComponent(json.guestToken || '')}`);
         return;
@@ -353,6 +438,11 @@ export default function DeliveryCheckoutPage() {
               setError(verifyJson.error || 'Payment verification failed.');
               setSubmitting(false);
             } else {
+              try {
+                const existing = JSON.parse(localStorage.getItem('ceova_recent_order_ids') || '[]');
+                const next = [json.orderId, ...(Array.isArray(existing) ? existing.filter((x: string) => x !== json.orderId) : [])].slice(0, 20);
+                localStorage.setItem('ceova_recent_order_ids', JSON.stringify(next));
+              } catch {}
               sessionStorage.removeItem(`ceova_delivery_cart_${restaurantSlug}`);
               router.push(
                 `/store/${restaurantSlug}/orders/${json.orderId}?token=${encodeURIComponent(
@@ -708,8 +798,10 @@ export default function DeliveryCheckoutPage() {
           </div>
 
           {/* Summary Sidebar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 h-fit shadow-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 h-fit shadow-xs lg:sticky lg:top-6">
             <h2 className="text-base font-bold text-slate-900">Order Summary</h2>
+
+            {/* 1. Food List */}
             <div className="divide-y divide-slate-100 text-sm">
               {cart.map((item) => (
                 <div key={item.dishId} className="py-2 flex justify-between gap-2">
@@ -723,11 +815,77 @@ export default function DeliveryCheckoutPage() {
               ))}
             </div>
 
+            {/* Items Subtotal */}
+            <div className="pt-2 border-t border-slate-100 flex justify-between text-sm font-semibold text-slate-800">
+              <span>Items Total</span>
+              <span>{formatCurrency(subtotal, currency)}</span>
+            </div>
+
+            {/* 2. Coupon Code Area */}
+            <div className="pt-3 border-t border-slate-200 space-y-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-orange-600" />
+                Apply Coupon Code
+              </label>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+                  <div>
+                    <span className="font-bold text-emerald-800">{appliedCoupon.code}</span>
+                    <span className="text-emerald-700 ml-1.5">
+                      (-{formatCurrency(couponDiscount, currency)})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-emerald-700 hover:text-rose-600 p-0.5"
+                    aria-label="Remove coupon"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    placeholder="Enter coupon code"
+                    className="flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-xs uppercase tracking-wide"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={!couponInput.trim()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+              {couponError && (
+                <p className="text-[11px] font-medium text-rose-600">{couponError}</p>
+              )}
+            </div>
+
+            {/* 3. Bill & Delivery Breakdown */}
             <div className="pt-3 border-t border-slate-200 space-y-2 text-sm">
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal</span>
+                <span>Bill Subtotal</span>
                 <span>{formatCurrency(subtotal, currency)}</span>
               </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-emerald-700 font-medium">
+                  <span>Coupon Discount</span>
+                  <span>-{formatCurrency(couponDiscount, currency)}</span>
+                </div>
+              )}
+              {taxAmount > 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Taxes ({taxRate}%)</span>
+                  <span>{formatCurrency(taxAmount, currency)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-600">
                 <span>Delivery Charge</span>
                 <span>
@@ -738,31 +896,69 @@ export default function DeliveryCheckoutPage() {
                   )}
                 </span>
               </div>
-              {freeThreshold !== null && subtotal < freeThreshold && (
-                <p className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg">
-                  Add {formatCurrency(freeThreshold - subtotal, currency)} more for free delivery!
-                </p>
+              {freeThreshold !== null && amountForFreeDelivery !== null && (
+                amountForFreeDelivery > 0 ? (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5">
+                    <p className="text-[11px] font-medium text-amber-900">
+                      Add <span className="font-bold">{formatCurrency(amountForFreeDelivery, currency)}</span> more to get <span className="font-bold">FREE delivery</span>!
+                    </p>
+                    <div className="w-full h-1.5 bg-amber-200/70 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-600 rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(100, Math.round((discountedSubtotal / freeThreshold) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 p-2 rounded-xl">
+                    Free delivery unlocked!
+                  </p>
+                )
               )}
-              <div className="flex justify-between font-bold text-base text-slate-900 pt-2 border-t border-slate-100">
-                <span>Total</span>
+              <div className="flex justify-between font-bold text-base text-slate-900 pt-2 border-t border-slate-200">
+                <span>Total Bill</span>
                 <span>{formatCurrency(estimatedTotal, currency)}</span>
               </div>
             </div>
 
+            {/* 4. Payment Method Dropdown */}
+            <div className="pt-2 border-t border-slate-200 space-y-1.5">
+              <label
+                htmlFor="checkout-payment-method"
+                className="block text-xs font-bold text-slate-700"
+              >
+                Payment Option
+              </label>
+              <select
+                id="checkout-payment-method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as 'razorpay' | 'cod')}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              >
+                <option value="razorpay">Pay Online (Razorpay / UPI / Card)</option>
+                <option value="cod">Cash on Delivery (COD)</option>
+              </select>
+            </div>
+
+            {/* 5. Place Order Button */}
             <button
               type="submit"
               disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.isWithinZone)}
-              className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm cursor-pointer"
             >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
+                  {paymentMethod === 'cod' ? 'Placing Order...' : 'Opening Razorpay...'}
                 </>
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  Pay &amp; Place Delivery Order
+                  {paymentMethod === 'cod'
+                    ? `Place Order (COD) · ${formatCurrency(estimatedTotal, currency)}`
+                    : `Place Order & Pay · ${formatCurrency(estimatedTotal, currency)}`}
                 </>
               )}
             </button>

@@ -118,7 +118,7 @@ export default function StorefrontOrdersPage() {
 
         <h1 className="font-headline text-2xl font-bold text-slate-900 flex items-center gap-2">
           <Clock className="w-6 h-6 text-light-primary" />
-          Your Orders
+          Order History
         </h1>
 
         {loading ? (
