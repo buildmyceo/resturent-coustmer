@@ -135,17 +135,44 @@ function extractFromSVG(text: string): { primary: string; secondary: string } | 
   };
 }
 
+function isAllowedPublicHttpsUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    if (u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host === '::1' ||
+      host.startsWith('[') ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const logoUrl = searchParams.get('logoUrl');
 
-  if (!logoUrl) {
-    return NextResponse.json({ error: 'Missing logoUrl parameter' }, { status: 400 });
+  if (!logoUrl || !isAllowedPublicHttpsUrl(logoUrl)) {
+    return NextResponse.json({ error: 'Invalid or disallowed logoUrl parameter' }, { status: 400 });
   }
 
   try {
     const res = await fetch(logoUrl, {
       headers: { 'User-Agent': 'CeovaBrandThemeExtractor/1.0' },
+      signal: AbortSignal.timeout(5000),
       next: { revalidate: 86400 }, // Cache 24 hours
     });
 
