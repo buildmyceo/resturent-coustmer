@@ -153,6 +153,7 @@ export async function GET(request: Request) {
         restaurantName: o.restaurants?.name || null,
         restaurantSlug: o.restaurants?.slug || null,
         restaurantPhone: o.restaurants?.phone || null,
+        restaurantAddress: o.restaurants?.address || null,
         tableId: o.table_id,
         tableSessionId: o.table_session_id || sessionId || null,
         participantId: o.participant_id || 'guest',

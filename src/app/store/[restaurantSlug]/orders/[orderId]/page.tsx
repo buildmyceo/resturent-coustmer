@@ -7,13 +7,16 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  CreditCard,
+  HelpCircle,
   Loader2,
   MapPin,
   Package,
+  Phone,
   Truck,
-  XCircle,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import { createClient } from '@/lib/supabase/client';
 
 export default function DeliveryOrderTrackerPage() {
@@ -26,7 +29,8 @@ export default function DeliveryOrderTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   const fetchOrder = async () => {
     try {
@@ -66,26 +70,80 @@ export default function DeliveryOrderTrackerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.restaurantId]);
 
-  const handleCancelOrder = async () => {
-    if (!order?.id) return;
-    setCancelling(true);
+  const handlePayNow = async () => {
+    if (!order?.id || !order?.restaurantId) return;
+    setPaying(true);
     setError(null);
     try {
-      const res = await fetch('/api/orders/cancel', {
+      const res = await fetch('/api/payment/create-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, guestToken }),
+        body: JSON.stringify({
+          purpose: 'order',
+          restaurantId: order.restaurantId,
+          orderId: order.id,
+        }),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) {
-        setError(json.error || 'Cannot cancel order.');
-      } else {
-        fetchOrder();
+      if (!res.ok || !json.success || !json.razorpay) {
+        setError(json.error || 'Could not initiate payment.');
+        setPaying(false);
+        return;
       }
+
+      const loaded = await loadRazorpayCheckoutScript();
+      if (!loaded || !(window as any).Razorpay) {
+        setError('Unable to load Razorpay payment gateway.');
+        setPaying(false);
+        return;
+      }
+
+      const rzp = new (window as any).Razorpay({
+        key: json.razorpay.keyId,
+        amount: json.razorpay.amountPaise,
+        currency: json.razorpay.currency || 'INR',
+        name: order.restaurantName || 'Restaurant',
+        description: `Order #${order.orderNumber}`,
+        order_id: json.razorpay.orderId,
+        prefill: {
+          name: order.customerName || undefined,
+          email: order.customerEmail || undefined,
+          contact: order.customerPhone || undefined,
+        },
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                purpose: 'order',
+                restaurantId: order.restaurantId,
+                orderId: order.id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const verifyJson = await verifyRes.json();
+            if (!verifyRes.ok || !verifyJson.success) {
+              setError(verifyJson.error || 'Payment verification failed.');
+            } else {
+              await fetchOrder();
+            }
+          } catch (vErr: any) {
+            setError(vErr?.message || 'Payment verification failed.');
+          } finally {
+            setPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setPaying(false),
+        },
+      });
+      rzp.open();
     } catch (err: any) {
-      setError(err?.message || 'Cancellation failed.');
-    } finally {
-      setCancelling(false);
+      setError(err?.message || 'Payment failed.');
+      setPaying(false);
     }
   };
 
@@ -109,9 +167,9 @@ export default function DeliveryOrderTrackerPage() {
     );
   }
 
-  const canCancel = ['pending_payment', 'pending', 'waiting_for_waiter', 'accepted'].includes(
-    order.status
-  );
+  const isDelivered = order.deliveryStatus === 'delivered';
+  const isCancelled = ['cancelled', 'rejected'].includes(String(order.status || '').toLowerCase());
+  const canPayNow = !isDelivered && !isCancelled && order.paymentStatus !== 'paid';
 
   return (
     <main className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
@@ -197,17 +255,60 @@ export default function DeliveryOrderTrackerPage() {
             </div>
           </div>
 
-          {canCancel && (
-            <div className="pt-2 flex justify-end">
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setShowHelp((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+            >
+              <HelpCircle className="w-4 h-4 text-orange-600" />
+              Help
+            </button>
+
+            {canPayNow && (
               <button
                 type="button"
-                onClick={handleCancelOrder}
-                disabled={cancelling}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50"
+                onClick={handlePayNow}
+                disabled={paying}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
               >
-                <XCircle className="w-4 h-4" />
-                {cancelling ? 'Cancelling...' : 'Cancel Order & Refund'}
+                {paying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Opening Razorpay...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4" />
+                    Pay Now · {formatCurrency(order.totalAmount, 'INR')}
+                  </>
+                )}
               </button>
+            )}
+          </div>
+
+          {showHelp && (
+            <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs space-y-2">
+              <p className="font-bold text-slate-900">
+                Need help with your order? Contact {order.restaurantName || 'Restaurant'}
+              </p>
+              {order.restaurantPhone && (
+                <p className="text-slate-700 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                  <a
+                    href={`tel:${order.restaurantPhone}`}
+                    className="font-semibold text-orange-700 hover:underline"
+                  >
+                    {order.restaurantPhone}
+                  </a>
+                </p>
+              )}
+              {order.restaurantAddress && (
+                <p className="text-slate-700 flex items-start gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />
+                  <span>{order.restaurantAddress}</span>
+                </p>
+              )}
             </div>
           )}
         </div>
