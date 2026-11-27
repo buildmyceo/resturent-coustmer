@@ -619,7 +619,7 @@ export default function DeliveryCheckoutPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 py-8 pb-28 px-4 sm:px-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-5">
         <Link
           href={`/store/${restaurantSlug}`}
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -628,287 +628,12 @@ export default function DeliveryCheckoutPage() {
           Back to {restaurant?.name || 'Menu'}
         </Link>
 
-        <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 space-y-5 shadow-xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <Truck className="w-5 h-5 text-orange-600" />
-                <h1 className="text-xl font-bold text-slate-900">Delivery Checkout</h1>
-              </div>
-              <Link
-                href={`/store/${restaurantSlug}/profile`}
-                className="text-xs font-semibold text-orange-600 hover:underline"
-              >
-                Manage Saved / Friends
-              </Link>
-            </div>
-
-            {error && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-slate-900">Customer Contact (Required)</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    <User className="w-3.5 h-3.5 inline mr-1" />
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    <Phone className="w-3.5 h-3.5 inline mr-1" />
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="+91 9876543210"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  <Mail className="w-3.5 h-3.5 inline mr-1" />
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2 border-t border-slate-100">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-bold text-slate-900">Delivery Location &amp; Address</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMapModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                    Set Address Using Map
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    disabled={locating}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
-                  >
-                    {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-                    Use My GPS Location
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="saved-address-select"
-                  className="block text-xs font-medium text-slate-700 mb-1"
-                >
-                  Choose Saved Address
-                </label>
-                <select
-                  id="saved-address-select"
-                  value={selectedSavedId}
-                  onChange={(e) => handleSelectAddressId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white"
-                >
-                  <option value="myself">My Default Profile Address</option>
-                  {savedAddresses.map((addr) => (
-                    <option key={addr.id} value={addr.id}>
-                      {addr.category ? `${addr.category} · ` : ''}
-                      {addr.label}
-                      {addr.isFriend ? ' (Friend)' : ''} — {addr.address}
-                      {addr.pincode ? ` - ${addr.pincode}` : ''}
-                    </option>
-                  ))}
-                  <option value="new">+ Add New Address (Enter / GPS)</option>
-                </select>
-              </div>
-
-              {checkingZone ? (
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
-                  <span>Checking delivery availability...</span>
-                </div>
-              ) : (!deliveryLat || !deliveryLng) && (
-                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-                  Tap &ldquo;Set Address Using Map&rdquo;, click &ldquo;Use My GPS Location&rdquo;, or choose a saved address.
-                </p>
-              )}
-
-              {(selectedSavedId === 'new' || selectedSavedId === 'myself') && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      <MapPin className="w-3.5 h-3.5 inline mr-1" />
-                      Complete Street Address *
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      placeholder="House/Flat no, Building, Street, Area..."
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Pincode / ZIP
-                      </label>
-                      <input
-                        type="text"
-                        value={deliveryPincode}
-                        onChange={(e) => setDeliveryPincode(e.target.value)}
-                        placeholder="e.g. 800001"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Landmark (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={deliveryLandmark}
-                        onChange={(e) => setDeliveryLandmark(e.target.value)}
-                        placeholder="Near City Park..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-2">
-                <label className="block text-xs font-medium text-slate-700">
-                  Delivery Instructions (Optional)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    'Ring bell',
-                    'Call on arrival',
-                    'Leave at door',
-                    "Don't ring bell",
-                    'Drop with security',
-                  ].map((opt) => {
-                    const parts = customerNote
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean);
-                    const checked = parts.includes(opt);
-                    return (
-                      <label
-                        key={opt}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
-                          checked
-                            ? 'bg-orange-50 border-orange-300 text-orange-800'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            const next = checked
-                              ? parts.filter((p) => p !== opt)
-                              : [...parts, opt];
-                            setCustomerNote(next.join(', '));
-                          }}
-                          className="rounded accent-orange-600"
-                        />
-                        <span>{opt}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                <input
-                  type="text"
-                  value={customerNote}
-                  onChange={(e) => setCustomerNote(e.target.value)}
-                  placeholder="Or type custom delivery instructions..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                />
-              </div>
-
-              {(selectedSavedId === 'myself' || selectedSavedId === 'new') && (
-                <div className="pt-2 space-y-2 text-xs">
-                  <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={saveForNextTime}
-                      onChange={(e) => setSaveForNextTime(e.target.checked)}
-                      className="rounded"
-                    />
-                    Save this address for next time
-                  </label>
-                  {saveForNextTime && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setSaveCategory(cat);
-                            if (['Home', 'Work', 'Hotel', 'Other', ''].includes(saveLabel)) {
-                              setSaveLabel(cat.charAt(0) + cat.slice(1).toLowerCase());
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                            saveCategory === cat
-                              ? 'bg-orange-600 text-white border-orange-600'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={handleInstantSaveAddress}
-                        className="px-3 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer"
-                      >
-                        Save Address Now
-                      </button>
-                    </div>
-                  )}
-                  {instantSavedMsg && (
-                    <p className="text-[11px] font-semibold text-emerald-700">{instantSavedMsg}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Summary Sidebar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 h-fit shadow-xs lg:sticky lg:top-6">
+        <form onSubmit={handlePlaceOrder} className="space-y-5">
+          {/* 1. Order Summary (On Top) */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
             <h2 className="text-base font-bold text-slate-900">Order Summary</h2>
 
-            {/* 1. Food List */}
+            {/* Food List */}
             <div className="divide-y divide-slate-100 text-sm">
               {cart.map((item) => (
                 <div key={item.dishId} className="py-2 flex justify-between gap-2">
@@ -928,7 +653,7 @@ export default function DeliveryCheckoutPage() {
               <span>{formatCurrency(subtotal, currency)}</span>
             </div>
 
-            {/* 2. Coupon Code Area */}
+            {/* Coupon Code Area */}
             <div className="pt-3 border-t border-slate-200 space-y-2">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-orange-600" />
@@ -975,7 +700,7 @@ export default function DeliveryCheckoutPage() {
               )}
             </div>
 
-            {/* 3. Bill & Delivery Breakdown */}
+            {/* Bill & Delivery Breakdown */}
             <div className="pt-3 border-t border-slate-200 space-y-2 text-sm">
               <div className="flex justify-between text-slate-600">
                 <span>Bill Subtotal</span>
@@ -1030,7 +755,7 @@ export default function DeliveryCheckoutPage() {
               </div>
             </div>
 
-            {/* 4. Payment Method Dropdown */}
+            {/* Payment Method Dropdown */}
             <div className="pt-2 border-t border-slate-200 space-y-1.5">
               <label
                 htmlFor="checkout-payment-method"
@@ -1049,7 +774,7 @@ export default function DeliveryCheckoutPage() {
               </select>
             </div>
 
-            {/* 5. Place Order Button */}
+            {/* Place Order Button */}
             <button
               type="submit"
               disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.isWithinZone)}
@@ -1069,6 +794,297 @@ export default function DeliveryCheckoutPage() {
                 </>
               )}
             </button>
+          </div>
+
+          {/* 2. Compact Delivery Checkout (Below Order Summary) */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-orange-600" />
+                <h1 className="text-base font-bold text-slate-900">Delivery Checkout</h1>
+              </div>
+              <Link
+                href={`/store/${restaurantSlug}/profile`}
+                className="text-xs font-semibold text-orange-600 hover:underline"
+              >
+                Manage Saved
+              </Link>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label
+                  htmlFor="saved-address-select"
+                  className="text-xs font-bold text-slate-700"
+                >
+                  Delivery Address
+                </label>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMapModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-semibold hover:bg-slate-200 cursor-pointer"
+                  >
+                    <MapPin className="w-3 h-3 text-orange-600" />
+                    Set Address Using Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locating}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[11px] font-semibold hover:bg-orange-100 cursor-pointer"
+                  >
+                    {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
+                    Use My GPS Location
+                  </button>
+                </div>
+              </div>
+
+              <select
+                id="saved-address-select"
+                value={selectedSavedId}
+                onChange={(e) => handleSelectAddressId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white"
+              >
+                {savedAddresses.map((addr) => (
+                  <option key={addr.id} value={addr.id}>
+                    {addr.category ? `${addr.category} · ` : ''}
+                    {addr.label}
+                    {addr.isFriend ? ' (Friend)' : ''} — {addr.address}
+                    {addr.pincode ? ` - ${addr.pincode}` : ''}
+                  </option>
+                ))}
+                <option value="myself">My Default Profile Address</option>
+                <option value="new">+ Add New Address (Home / Work / Hotel / Other)</option>
+              </select>
+
+              {checkingZone && (
+                <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
+                  <span>Checking delivery availability...</span>
+                </div>
+              )}
+
+              {/* Compact Summary when a Saved Address (like HOME) is selected */}
+              {selectedSavedId !== 'new' && selectedSavedId !== 'myself' && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-orange-600" />
+                      {customerName || 'Customer'} · {customerPhone || 'No phone'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAddressId('new')}
+                      className="text-[11px] font-semibold text-orange-600 hover:underline cursor-pointer"
+                    >
+                      + Add New
+                    </button>
+                  </div>
+                  {customerEmail && (
+                    <p className="text-slate-600 flex items-center gap-1.5">
+                      <Mail className="w-3 h-3 text-slate-400" />
+                      {customerEmail}
+                    </p>
+                  )}
+                  <p className="text-slate-700 flex items-start gap-1.5 pt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />
+                    <span>
+                      {deliveryAddress || 'Address not set'}
+                      {deliveryPincode ? ` - ${deliveryPincode}` : ''}
+                      {deliveryLandmark ? ` (${deliveryLandmark})` : ''}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {/* Full Editable Fields only when adding/using New or Default address */}
+              {(selectedSavedId === 'new' || selectedSavedId === 'myself') && (
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        placeholder="+91 9876543210"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Complete Street Address *
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      placeholder="House/Flat no, Building, Street, Area..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Pincode / ZIP
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryPincode}
+                        onChange={(e) => setDeliveryPincode(e.target.value)}
+                        placeholder="e.g. 800001"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Landmark (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryLandmark}
+                        onChange={(e) => setDeliveryLandmark(e.target.value)}
+                        placeholder="Near City Park..."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-1 space-y-2 text-xs">
+                    <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveForNextTime}
+                        onChange={(e) => setSaveForNextTime(e.target.checked)}
+                        className="rounded"
+                      />
+                      Save this address as:
+                    </label>
+                    {saveForNextTime && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setSaveCategory(cat);
+                              setSaveLabel(cat.charAt(0) + cat.slice(1).toLowerCase());
+                            }}
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                              saveCategory === cat
+                                ? 'bg-orange-600 text-white border-orange-600'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={handleInstantSaveAddress}
+                          className="px-3 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer"
+                        >
+                          Save Address Now
+                        </button>
+                      </div>
+                    )}
+                    {instantSavedMsg && (
+                      <p className="text-[11px] font-semibold text-emerald-700">{instantSavedMsg}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Delivery Instructions Tick Options */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="block text-xs font-medium text-slate-700">
+                  Delivery Instructions (Optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'Ring bell',
+                    'Call on arrival',
+                    'Leave at door',
+                    "Don't ring bell",
+                    'Drop with security',
+                  ].map((opt) => {
+                    const parts = customerNote
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    const checked = parts.includes(opt);
+                    return (
+                      <label
+                        key={opt}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                          checked
+                            ? 'bg-orange-50 border-orange-300 text-orange-800'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked
+                              ? parts.filter((p) => p !== opt)
+                              : [...parts, opt];
+                            setCustomerNote(next.join(', '));
+                          }}
+                          className="rounded accent-orange-600"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  placeholder="Or type custom delivery instructions..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+            </div>
           </div>
         </form>
       </div>
