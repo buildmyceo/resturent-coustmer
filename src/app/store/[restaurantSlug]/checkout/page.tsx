@@ -608,69 +608,6 @@ export default function DeliveryCheckoutPage() {
               </Link>
             </div>
 
-            {savedAddresses.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-slate-600">
-                  Deliver To (Saved Locations &amp; Friends):
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSavedId('myself');
-                      const supabase = createClient();
-                      supabase.auth.getUser().then(({ data }) => {
-                        const m = mergeWithSupabaseUser(data?.user || null);
-                        if (m.name) setCustomerName(m.name);
-                        if (m.phone) setCustomerPhone(m.phone);
-                        if (m.email) setCustomerEmail(m.email);
-                        if (m.defaultAddress) setDeliveryAddress(m.defaultAddress);
-                        if (m.defaultPincode) setDeliveryPincode(m.defaultPincode);
-                      });
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                      selectedSavedId === 'myself'
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Myself
-                  </button>
-                  {savedAddresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSavedId(addr.id);
-                        setCustomerName(addr.recipientName);
-                        setCustomerPhone(addr.recipientPhone);
-                        if (addr.recipientEmail) setCustomerEmail(addr.recipientEmail);
-                        setDeliveryAddress(addr.address);
-                        setDeliveryPincode(addr.pincode || '');
-                        setDeliveryLandmark(addr.landmark || '');
-                        if (addr.category) setSaveCategory(addr.category);
-                        setSaveLabel(addr.label);
-                        if (typeof addr.lat === 'number' && typeof addr.lng === 'number') {
-                          setDeliveryLat(String(addr.lat));
-                          setDeliveryLng(String(addr.lng));
-                          checkZone(addr.lat, addr.lng);
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                        selectedSavedId === addr.id
-                          ? 'bg-orange-600 text-white border-orange-600'
-                          : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
-                      }`}
-                    >
-                      {addr.category ? `${addr.category} · ` : ''}
-                      {addr.label}
-                      {addr.isFriend ? ' (Friend)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {error && (
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -728,24 +665,15 @@ export default function DeliveryCheckoutPage() {
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-900">Delivery Location &amp; Address</h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAddressId('new')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
-                  >
-                    + Add New
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    disabled={locating}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
-                  >
-                    {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-                    Use My GPS Location
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
+                >
+                  {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
+                  Use My GPS Location
+                </button>
               </div>
 
               <div>
@@ -774,43 +702,12 @@ export default function DeliveryCheckoutPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
-                  <input
-                    type="text"
-                    value={deliveryLat}
-                    onChange={(e) => setDeliveryLat(e.target.value)}
-                    placeholder="25.618193"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono"
-                    required
-                  />
+              {checkingZone ? (
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
+                  <span>Checking delivery availability...</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
-                  <input
-                    type="text"
-                    value={deliveryLng}
-                    onChange={(e) => setDeliveryLng(e.target.value)}
-                    placeholder="85.039305"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono"
-                    required
-                  />
-                </div>
-              </div>
-
-              {deliveryLat && deliveryLng && (
-                <button
-                  type="button"
-                  onClick={() => checkZone(parseFloat(deliveryLat), parseFloat(deliveryLng))}
-                  disabled={checkingZone}
-                  className="text-xs font-semibold text-indigo-600 hover:underline"
-                >
-                  {checkingZone ? 'Checking delivery zone...' : 'Verify Delivery Zone'}
-                </button>
-              )}
-
-              {zoneResult?.isWithinZone && (
+              ) : zoneResult?.isWithinZone ? (
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>
@@ -818,6 +715,10 @@ export default function DeliveryCheckoutPage() {
                     {zoneResult.maxRadiusKm} km).
                   </span>
                 </div>
+              ) : (!deliveryLat || !deliveryLng) && (
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+                  Tap &ldquo;Use My GPS Location&rdquo; or choose a saved address to verify delivery.
+                </p>
               )}
 
               <div>
@@ -835,7 +736,7 @@ export default function DeliveryCheckoutPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
                     Pincode / ZIP
@@ -860,71 +761,74 @@ export default function DeliveryCheckoutPage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Delivery Instructions
-                  </label>
-                  <input
-                    type="text"
-                    value={customerNote}
-                    onChange={(e) => setCustomerNote(e.target.value)}
-                    placeholder="Ring bell / call on arrival"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                  />
-                </div>
               </div>
 
-              <div className="pt-2 space-y-2 text-xs">
-                <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={saveForNextTime}
-                    onChange={(e) => setSaveForNextTime(e.target.checked)}
-                    className="rounded"
-                  />
-                  Save this address &amp; contact for next time
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Delivery Instructions (Optional)
                 </label>
-                {(saveForNextTime && (selectedSavedId === 'myself' || selectedSavedId === 'new')) && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => {
-                          setSaveCategory(cat);
-                          if (['Home', 'Work', 'Hotel', 'Other', ''].includes(saveLabel)) {
-                            setSaveLabel(cat.charAt(0) + cat.slice(1).toLowerCase());
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                          saveCategory === cat
-                            ? 'bg-orange-600 text-white border-orange-600'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                    <input
-                      type="text"
-                      value={saveLabel}
-                      onChange={(e) => setSaveLabel(e.target.value)}
-                      placeholder="Label (e.g. Home, Friend - Rahul)"
-                      className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleInstantSaveAddress}
-                      className="px-3 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer"
-                    >
-                      Save Address Now
-                    </button>
-                  </div>
-                )}
-                {instantSavedMsg && (
-                  <p className="text-[11px] font-semibold text-emerald-700">{instantSavedMsg}</p>
-                )}
+                <input
+                  type="text"
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  placeholder="Ring bell / call on arrival"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
               </div>
+
+              {(selectedSavedId === 'myself' || selectedSavedId === 'new') && (
+                <div className="pt-2 space-y-2 text-xs">
+                  <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveForNextTime}
+                      onChange={(e) => setSaveForNextTime(e.target.checked)}
+                      className="rounded"
+                    />
+                    Save this address for next time
+                  </label>
+                  {saveForNextTime && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(['HOME', 'WORK', 'HOTEL', 'OTHER'] as AddressCategory[]).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setSaveCategory(cat);
+                            if (['Home', 'Work', 'Hotel', 'Other', ''].includes(saveLabel)) {
+                              setSaveLabel(cat.charAt(0) + cat.slice(1).toLowerCase());
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                            saveCategory === cat
+                              ? 'bg-orange-600 text-white border-orange-600'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                      <input
+                        type="text"
+                        value={saveLabel}
+                        onChange={(e) => setSaveLabel(e.target.value)}
+                        placeholder="Label (e.g. Home, Friend - Rahul)"
+                        className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleInstantSaveAddress}
+                        className="px-3 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800 cursor-pointer"
+                      >
+                        Save Address Now
+                      </button>
+                    </div>
+                  )}
+                  {instantSavedMsg && (
+                    <p className="text-[11px] font-semibold text-emerald-700">{instantSavedMsg}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
