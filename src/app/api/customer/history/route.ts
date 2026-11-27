@@ -56,6 +56,7 @@ export async function GET(request: Request) {
 
     const cleanOrders = (orders || []).filter(
       (o: any) =>
+        o.status !== 'pending_payment' &&
         !String(o.order_number || '').startsWith('ORD_STATE-') &&
         !String(o.order_number || '').startsWith('CALL-') &&
         !String(o.order_number || '').startsWith('SR_STATE-')

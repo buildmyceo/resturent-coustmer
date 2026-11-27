@@ -34,6 +34,9 @@ function getDeliveryProgress(order: any) {
   if (status === 'preparing' || status === 'accepted') {
     return { step: 2, label: 'Preparing Food', badgeClass: 'bg-blue-100 text-blue-800' };
   }
+  if (status === 'pending_payment') {
+    return { step: 0, label: 'Awaiting Payment', badgeClass: 'bg-amber-50 text-amber-700' };
+  }
   return { step: 1, label: 'Order Confirmed', badgeClass: 'bg-slate-100 text-slate-800' };
 }
 
