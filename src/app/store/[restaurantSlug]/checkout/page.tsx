@@ -92,6 +92,25 @@ export default function DeliveryCheckoutPage() {
       if (merged.defaultPincode) setDeliveryPincode(merged.defaultPincode);
       if (merged.savedAddresses.length > 0) {
         setSavedAddresses(merged.savedAddresses);
+        const homeAddr =
+          merged.savedAddresses.find(
+            (a) => a.category === 'HOME' || a.label.toLowerCase() === 'home'
+          ) || merged.savedAddresses[0];
+        if (homeAddr) {
+          setSelectedSavedId(homeAddr.id);
+          if (homeAddr.recipientName) setCustomerName(homeAddr.recipientName);
+          if (homeAddr.recipientPhone) setCustomerPhone(homeAddr.recipientPhone);
+          if (homeAddr.recipientEmail) setCustomerEmail(homeAddr.recipientEmail);
+          setDeliveryAddress(homeAddr.address);
+          setDeliveryPincode(homeAddr.pincode || '');
+          setDeliveryLandmark(homeAddr.landmark || '');
+          if (homeAddr.category) setSaveCategory(homeAddr.category);
+          setSaveLabel(homeAddr.label);
+          if (typeof homeAddr.lat === 'number' && typeof homeAddr.lng === 'number') {
+            setDeliveryLat(String(homeAddr.lat));
+            setDeliveryLng(String(homeAddr.lng));
+          }
+        }
       }
     }).catch(() => {});
 
@@ -743,27 +762,6 @@ export default function DeliveryCheckoutPage() {
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
                   <span>Checking delivery availability...</span>
                 </div>
-              ) : zoneResult?.isWithinZone ? (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>
-                      Eligible for delivery ({zoneResult.distanceKm} km away · Max{' '}
-                      {zoneResult.maxRadiusKm} km).
-                    </span>
-                  </span>
-                  {deliveryLat && deliveryLng && (
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${deliveryLat},${deliveryLng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 font-semibold text-emerald-900 underline hover:text-emerald-700"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Direction Link
-                    </a>
-                  )}
-                </div>
               ) : deliveryLat && deliveryLng ? (
                 <div className="flex justify-end">
                   <a
@@ -782,47 +780,51 @@ export default function DeliveryCheckoutPage() {
                 </p>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  <MapPin className="w-3.5 h-3.5 inline mr-1" />
-                  Complete Street Address *
-                </label>
-                <textarea
-                  rows={2}
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  placeholder="House/Flat no, Building, Street, Area..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                  required
-                />
-              </div>
+              {(selectedSavedId === 'new' || selectedSavedId === 'myself') && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      <MapPin className="w-3.5 h-3.5 inline mr-1" />
+                      Complete Street Address *
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      placeholder="House/Flat no, Building, Street, Area..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      required
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Pincode / ZIP
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryPincode}
-                    onChange={(e) => setDeliveryPincode(e.target.value)}
-                    placeholder="e.g. 800001"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Landmark (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryLandmark}
-                    onChange={(e) => setDeliveryLandmark(e.target.value)}
-                    placeholder="Near City Park..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Pincode / ZIP
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryPincode}
+                        onChange={(e) => setDeliveryPincode(e.target.value)}
+                        placeholder="e.g. 800001"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Landmark (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryLandmark}
+                        onChange={(e) => setDeliveryLandmark(e.target.value)}
+                        placeholder="Near City Park..."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <label className="block text-xs font-medium text-slate-700">
