@@ -77,7 +77,16 @@ export default function StorefrontOrdersPage() {
       });
       const json = await res.json();
       if (json.success) {
-        setOrders(json.orders || []);
+        const runningOrders = (json.orders || []).filter((o: any) => {
+          const st = String(o.status || '').toLowerCase();
+          const dSt = String(o.delivery_status || '').toLowerCase();
+          if (st === 'cancelled' || st === 'rejected' || dSt === 'delivered') return false;
+          if (o.order_type !== 'delivery' && (st === 'completed' || st === 'served')) {
+            return false;
+          }
+          return true;
+        });
+        setOrders(runningOrders);
       }
     } catch {}
     if (!silent) setLoading(false);
@@ -131,11 +140,11 @@ export default function StorefrontOrdersPage() {
         ) : orders.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center space-y-3">
             <Package className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-sm font-semibold text-slate-800">No orders found yet</p>
+            <p className="text-sm font-semibold text-slate-800">No running orders right now</p>
             <p className="text-xs text-slate-500">
               {user
-                ? 'Orders placed with your email or phone will appear here.'
-                : 'Sign in with Google or Email to see all your past and active orders.'}
+                ? 'Active orders will appear here. Completed orders are in Bill History inside your Profile.'
+                : 'Sign in with Google or Email to track your active orders.'}
             </p>
             {!user && (
               <button
