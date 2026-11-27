@@ -763,15 +763,53 @@ export default function DeliveryCheckoutPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-700">
                   Delivery Instructions (Optional)
                 </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'Ring bell',
+                    'Call on arrival',
+                    'Leave at door',
+                    "Don't ring bell",
+                    'Drop with security',
+                  ].map((opt) => {
+                    const parts = customerNote
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    const checked = parts.includes(opt);
+                    return (
+                      <label
+                        key={opt}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                          checked
+                            ? 'bg-orange-50 border-orange-300 text-orange-800'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked
+                              ? parts.filter((p) => p !== opt)
+                              : [...parts, opt];
+                            setCustomerNote(next.join(', '));
+                          }}
+                          className="rounded accent-orange-600"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
                 <input
                   type="text"
                   value={customerNote}
                   onChange={(e) => setCustomerNote(e.target.value)}
-                  placeholder="Ring bell / call on arrival"
+                  placeholder="Or type custom delivery instructions..."
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
                 />
               </div>
