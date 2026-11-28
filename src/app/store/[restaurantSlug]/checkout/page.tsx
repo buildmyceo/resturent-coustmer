@@ -23,6 +23,7 @@ import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
 import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { DeliveryMapPicker } from '@/components/store/DeliveryMapPicker';
+import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import { createClient } from '@/lib/supabase/client';
 import {
   AddressCategory,
@@ -75,6 +76,40 @@ export default function DeliveryCheckoutPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [instantSavedMsg, setInstantSavedMsg] = useState<string | null>(null);
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const syncUserProfile = (user: any) => {
+    setAuthUser(user);
+    const merged = mergeWithSupabaseUser(user);
+    if (merged.name) setCustomerName(merged.name);
+    if (merged.phone) setCustomerPhone(merged.phone);
+    if (merged.email) setCustomerEmail(merged.email);
+    if (merged.defaultAddress) setDeliveryAddress(merged.defaultAddress);
+    if (merged.defaultPincode) setDeliveryPincode(merged.defaultPincode);
+    if (merged.savedAddresses.length > 0) {
+      setSavedAddresses(merged.savedAddresses);
+      const homeAddr =
+        merged.savedAddresses.find(
+          (a) => a.category === 'HOME' || a.label.toLowerCase() === 'home'
+        ) || merged.savedAddresses[0];
+      if (homeAddr) {
+        setSelectedSavedId(homeAddr.id);
+        if (homeAddr.recipientName) setCustomerName(homeAddr.recipientName);
+        if (homeAddr.recipientPhone) setCustomerPhone(homeAddr.recipientPhone);
+        if (homeAddr.recipientEmail) setCustomerEmail(homeAddr.recipientEmail);
+        setDeliveryAddress(homeAddr.address);
+        setDeliveryPincode(homeAddr.pincode || '');
+        setDeliveryLandmark(homeAddr.landmark || '');
+        if (homeAddr.category) setSaveCategory(homeAddr.category);
+        setSaveLabel(homeAddr.label);
+        if (typeof homeAddr.lat === 'number' && typeof homeAddr.lng === 'number') {
+          setDeliveryLat(String(homeAddr.lat));
+          setDeliveryLng(String(homeAddr.lng));
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     try {
@@ -84,34 +119,7 @@ export default function DeliveryCheckoutPage() {
 
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
-      const merged = mergeWithSupabaseUser(data?.user || null);
-      if (merged.name) setCustomerName(merged.name);
-      if (merged.phone) setCustomerPhone(merged.phone);
-      if (merged.email) setCustomerEmail(merged.email);
-      if (merged.defaultAddress) setDeliveryAddress(merged.defaultAddress);
-      if (merged.defaultPincode) setDeliveryPincode(merged.defaultPincode);
-      if (merged.savedAddresses.length > 0) {
-        setSavedAddresses(merged.savedAddresses);
-        const homeAddr =
-          merged.savedAddresses.find(
-            (a) => a.category === 'HOME' || a.label.toLowerCase() === 'home'
-          ) || merged.savedAddresses[0];
-        if (homeAddr) {
-          setSelectedSavedId(homeAddr.id);
-          if (homeAddr.recipientName) setCustomerName(homeAddr.recipientName);
-          if (homeAddr.recipientPhone) setCustomerPhone(homeAddr.recipientPhone);
-          if (homeAddr.recipientEmail) setCustomerEmail(homeAddr.recipientEmail);
-          setDeliveryAddress(homeAddr.address);
-          setDeliveryPincode(homeAddr.pincode || '');
-          setDeliveryLandmark(homeAddr.landmark || '');
-          if (homeAddr.category) setSaveCategory(homeAddr.category);
-          setSaveLabel(homeAddr.label);
-          if (typeof homeAddr.lat === 'number' && typeof homeAddr.lng === 'number') {
-            setDeliveryLat(String(homeAddr.lat));
-            setDeliveryLng(String(homeAddr.lng));
-          }
-        }
-      }
+      syncUserProfile(data?.user || null);
     }).catch(() => {});
 
     let cancelled = false;
@@ -386,6 +394,12 @@ export default function DeliveryCheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!authUser) {
+      setAuthModalOpen(true);
+      setError('Please sign in with your Google account before placing an order.');
+      return;
+    }
 
     if (cart.length === 0) {
       setError('Your cart is empty.');
@@ -775,11 +789,21 @@ export default function DeliveryCheckoutPage() {
             </div>
 
             {/* Place Order Button */}
-            <button
-              type="submit"
-              disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.isWithinZone)}
-              className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm cursor-pointer"
-            >
+            {!authUser ? (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              >
+                <User className="w-4 h-4" />
+                Sign In with Google to Place Order
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting || cart.length === 0 || (zoneResult && !zoneResult.isWithinZone)}
+                className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm cursor-pointer"
+              >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -794,6 +818,7 @@ export default function DeliveryCheckoutPage() {
                 </>
               )}
             </button>
+            )}
           </div>
 
           {/* 2. Compact Delivery Checkout (Below Order Summary) */}
@@ -1089,6 +1114,16 @@ export default function DeliveryCheckoutPage() {
         </form>
       </div>
       <StorefrontBottomNav restaurantSlug={restaurantSlug} />
+
+      <CustomerAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={async () => {
+          const supabase = createClient();
+          const { data } = await supabase.auth.getUser();
+          syncUserProfile(data?.user || null);
+        }}
+      />
 
       {mapModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">

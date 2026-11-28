@@ -10,6 +10,8 @@ import { OrderConfirmModal } from '@/components/cart/OrderConfirmModal';
 import { customerAudio } from '@/lib/audio';
 import { isValidEmail, isValidPhone } from '@/lib/validation/customer';
 import { loadRazorpayCheckoutScript } from '@/lib/razorpay-client';
+import { createClient } from '@/lib/supabase/client';
+import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import confetti from 'canvas-confetti';
 import { Dish } from '@/types';
 import { fetchRestaurantAndMenuDB } from '@/lib/supabase/service';
@@ -30,6 +32,8 @@ import {
   Store,
   Loader2,
   CheckCircle2,
+  LocateFixed,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -68,12 +72,63 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCustomerNote, setOrderCustomerNote] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [detectedLocation, setDetectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
   const [paymentChoice, setPaymentChoice] = useState<'default' | 'razorpay'>('default');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [fallbackDishes, setFallbackDishes] = useState<Dish[]>([]);
+
+  const syncAuthUser = async () => {
+    try {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      const u = data?.user || null;
+      setAuthUser(u);
+      if (u) {
+        if (u.user_metadata?.full_name || u.user_metadata?.name) {
+          setCustomerName((prev) => prev || u.user_metadata.full_name || u.user_metadata.name);
+        }
+        if (u.user_metadata?.phone) {
+          setCustomerPhone((prev) => prev || u.user_metadata.phone);
+        }
+        if (u.email) {
+          setCustomerEmail((prev) => prev || u.email || '');
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    syncAuthUser();
+  }, []);
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('Location Error', 'Geolocation is not supported by your browser.', 'error');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDetectedLocation({
+          latitude: Number(pos.coords.latitude.toFixed(6)),
+          longitude: Number(pos.coords.longitude.toFixed(6)),
+        });
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        showToast('Location Required', err.message || 'Please allow location access to order.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // If menuDishes was not yet populated from context, fetch once
   useEffect(() => {
@@ -196,6 +251,19 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       return;
     }
 
+    if (!authUser) {
+      showToast('Login Required', 'Please sign in with Google before placing your order.', 'error');
+      setIsConfirmModalOpen(false);
+      setAuthModalOpen(true);
+      return;
+    }
+
+    if (customerName.trim().length < 2) {
+      showToast('Name Required', 'Please enter your full name before placing your order.', 'error');
+      setIsConfirmModalOpen(false);
+      return;
+    }
+
     if (!isValidPhone(customerPhone)) {
       showToast('Phone Required', 'Please enter a valid 10-15 digit phone number before placing your order.', 'error');
       setIsConfirmModalOpen(false);
@@ -204,6 +272,13 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
 
     if (!isValidEmail(customerEmail)) {
       showToast('Email Required', 'Please enter a valid email address before placing your order.', 'error');
+      setIsConfirmModalOpen(false);
+      return;
+    }
+
+    const activeCoords = detectedLocation || customerLocation;
+    if (!activeCoords || typeof activeCoords.latitude !== 'number' || typeof activeCoords.longitude !== 'number') {
+      showToast('Location Required', 'Please detect your location before placing your order.', 'error');
       setIsConfirmModalOpen(false);
       return;
     }
@@ -226,7 +301,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           participantName: participant?.name || 'Guest',
           orderType: 'dine_in',
           paymentMethod: paymentChoice === 'razorpay' ? 'razorpay' : undefined,
-          customerName: participant?.name || 'Guest',
+          customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim(),
           items: cart.map((item) => ({
@@ -239,7 +314,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           })),
           customerNote: orderCustomerNote.trim() || undefined,
           idempotencyKey,
-          customerCoordinates: customerLocation || undefined,
+          customerCoordinates: activeCoords,
           couponCode: appliedCoupon?.code,
         }),
       });
@@ -774,11 +849,31 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
             </div>
           )}
 
-          {/* Mandatory Customer Contact (R3) */}
+          {/* Mandatory Google Login + Name, Phone & Location (R3) */}
           <div className="p-3.5 bg-light-surface-container-low border border-light-outline-variant/60 rounded-xl space-y-2.5">
-            <p className="text-xs font-bold text-light-on-surface">
-              Contact Details (Required before ordering)
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-light-on-surface">
+                Customer Details (Required)
+              </p>
+              {!authUser && (
+                <button
+                  type="button"
+                  onClick={() => setAuthModalOpen(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold cursor-pointer"
+                >
+                  <User className="w-3 h-3" />
+                  Sign In with Google
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Full name *"
+              className="w-full px-3 py-2 text-xs bg-white border border-light-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-light-primary/20"
+              required
+            />
             <input
               type="tel"
               value={customerPhone}
@@ -795,6 +890,24 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
               className="w-full px-3 py-2 text-xs bg-white border border-light-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-light-primary/20"
               required
             />
+            <div className="flex items-center justify-between gap-2 pt-0.5">
+              {(detectedLocation || customerLocation) ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Location verified
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={locating}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-semibold cursor-pointer"
+                >
+                  {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
+                  Detect My Location *
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
@@ -824,23 +937,41 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           </div>
 
           <div className="flex flex-col gap-2 pt-1">
-            <button
-              id="place-order-btn"
-              type="button"
-              onClick={() => {
-                if (!isValidPhone(customerPhone)) {
-                  showToast('Phone Required', 'Please enter a valid 10-15 digit phone number.', 'error');
-                  return;
-                }
-                if (!isValidEmail(customerEmail)) {
-                  showToast('Email Required', 'Please enter a valid email address.', 'error');
-                  return;
-                }
-                setIsConfirmModalOpen(true);
-              }}
-              disabled={isOrderBlockedByGeofence || !isShopOpen || isSubmitting}
-              className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container active:scale-[0.99] px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md shadow-light-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            {!authUser ? (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-black px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md cursor-pointer"
+              >
+                <User className="w-4 h-4" />
+                <span>Sign In with Google to Order</span>
+              </button>
+            ) : (
+              <button
+                id="place-order-btn"
+                type="button"
+                onClick={() => {
+                  if (customerName.trim().length < 2) {
+                    showToast('Name Required', 'Please enter your full name.', 'error');
+                    return;
+                  }
+                  if (!isValidPhone(customerPhone)) {
+                    showToast('Phone Required', 'Please enter a valid 10-15 digit phone number.', 'error');
+                    return;
+                  }
+                  if (!isValidEmail(customerEmail)) {
+                    showToast('Email Required', 'Please enter a valid email address.', 'error');
+                    return;
+                  }
+                  if (!(detectedLocation || customerLocation)) {
+                    showToast('Location Required', 'Please detect your location before ordering.', 'error');
+                    return;
+                  }
+                  setIsConfirmModalOpen(true);
+                }}
+                disabled={isOrderBlockedByGeofence || !isShopOpen || isSubmitting}
+                className="w-full inline-flex items-center justify-center gap-2 bg-light-primary text-light-on-primary hover:bg-light-primary-container active:scale-[0.99] px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md shadow-light-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
               {isSubmitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
@@ -856,6 +987,7 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                   : `Confirm Order • ${formatCurrency(cartTotals.totalAmount, currency)}`}
               </span>
             </button>
+            )}
 
             <Link
               href={`/table/${sessionId}`}
@@ -874,6 +1006,12 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
         onClose={() => setIsConfirmModalOpen(false)}
         onConfirmOrder={handlePlaceOrder}
         isSubmitting={isSubmitting}
+      />
+
+      <CustomerAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => syncAuthUser()}
       />
     </main>
   );

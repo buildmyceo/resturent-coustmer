@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { calculateDistanceMeters } from '@/lib/geofence';
 import { checkIsRestaurantOpen } from '@/lib/schedule';
 import {
@@ -56,6 +57,23 @@ export async function POST(request: Request) {
     const orderType: 'dine_in' | 'delivery' =
       rawOrderType === 'delivery' ? 'delivery' : 'dine_in';
 
+    // Mandatory Google/Account Login before ordering (for both Dine-In & Delivery)
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user: authUser },
+    } = await authClient.auth.getUser();
+
+    if (!authUser) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please sign in with your Google account before placing an order.',
+          authRequired: true,
+        },
+        { status: 401 }
+      );
+    }
+
     // 1. Check In-Memory Idempotency Key
     if (idempotencyKey && idempotencyStore.has(idempotencyKey)) {
       const cached = idempotencyStore.get(idempotencyKey);
@@ -76,9 +94,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // R3: Mandatory Customer Phone & Email validation for dine-in and delivery
+    // R3: Mandatory Customer Name, Phone, Email & Location validation for dine-in and delivery
+    const normalizedName = String(customerName || participantName || authUser.user_metadata?.full_name || '').trim();
     const normalizedPhone = normalizePhone(String(customerPhone || ''));
-    const normalizedEmail = normalizeEmail(String(customerEmail || ''));
+    const normalizedEmail = normalizeEmail(String(customerEmail || authUser.email || ''));
+    if (normalizedName.length < 2) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter your full name before placing your order.' },
+        { status: 400 }
+      );
+    }
     if (!isValidPhone(normalizedPhone)) {
       return NextResponse.json(
         {
@@ -93,6 +118,20 @@ export async function POST(request: Request) {
         {
           success: false,
           error: 'Please enter a valid customer email address before placing your order.',
+        },
+        { status: 400 }
+      );
+    }
+    if (
+      orderType === 'dine_in' &&
+      (!customerCoordinates ||
+        typeof customerCoordinates.latitude !== 'number' ||
+        typeof customerCoordinates.longitude !== 'number')
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please enable/detect your location before placing a dine-in order.',
         },
         { status: 400 }
       );
