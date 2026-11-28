@@ -8,6 +8,7 @@ import { getGuestSession } from '@/lib/guest-session';
 import { createClient } from '@/lib/supabase/client';
 import { Category, Dish } from '@/types';
 import { DishCard } from '@/components/menu/DishCard';
+import { PromoBannerCarousel, PromoBannerItem } from '@/components/store/PromoBannerCarousel';
 import {
   Search,
   X,
@@ -65,6 +66,7 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
+  const [promoBanners, setPromoBanners] = useState<PromoBannerItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter & Search states
@@ -157,6 +159,15 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           setCategories(fetchedCats);
           setDishes(fetchedDishes);
           setMenuDishes(fetchedDishes);
+
+          fetch(`/api/restaurant/info?id=${encodeURIComponent(targetRestId)}`, { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((info) => {
+              if (info?.success && Array.isArray(info?.restaurant?.promoBanners)) {
+                setPromoBanners(info.restaurant.promoBanners);
+              }
+            })
+            .catch(() => {});
 
           // If table is still not set in context, set it from stored or default table
           if (stored?.tableNumber && stored.tableNumber !== 'Table 05' && (!table || table.number !== stored.tableNumber)) {
@@ -331,6 +342,9 @@ export default function DigitalMenuPage({ params }: MenuPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Promotional Rectangular Banners */}
+      <PromoBannerCarousel banners={promoBanners} placement="qr" />
 
       {/* Shop Closed Warning Banner */}
       {!isShopOpen && (

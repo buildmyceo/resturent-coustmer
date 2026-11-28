@@ -250,6 +250,7 @@ export async function GET(request: Request) {
       taxEnabled,
       taxRate,
       coupons,
+      promoBanners: Array.isArray(settingsObj?.promo_banners) ? settingsObj.promo_banners : [],
       socialLinks: cached?.socialLinks || socialLinks,
       geofence: cached?.geofence || geofence,
       landingPage: cached?.landingPage || landingPage,

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useCustomer } from '@/context/CustomerContext';
 import { DishCard } from '@/components/menu/DishCard';
+import { PromoBannerCarousel } from '@/components/store/PromoBannerCarousel';
 import { StorefrontBottomNav } from '@/components/store/StorefrontBottomNav';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import { createClient } from '@/lib/supabase/client';
@@ -337,6 +338,9 @@ export function StorefrontView({ restaurantSlug }: StorefrontViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Promotional Rectangular Banners */}
+      <PromoBannerCarousel banners={restaurant?.promoBanners} placement="online" />
 
       {/* Shop Closed Warning Banner */}
       {!isShopOpen && (
