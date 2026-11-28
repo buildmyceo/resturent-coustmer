@@ -57,17 +57,17 @@ export async function POST(request: Request) {
     const orderType: 'dine_in' | 'delivery' =
       rawOrderType === 'delivery' ? 'delivery' : 'dine_in';
 
-    // Mandatory Google/Account Login before ordering (for both Dine-In & Delivery)
+    // Mandatory Google/Account Login for Delivery orders (QR dine-in allows guest checkout)
     const authClient = await createServerSupabaseClient();
     const {
       data: { user: authUser },
     } = await authClient.auth.getUser();
 
-    if (!authUser) {
+    if (orderType === 'delivery' && !authUser) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Please sign in with your Google account before placing an order.',
+          error: 'Please sign in with your Google account before placing a delivery order.',
           authRequired: true,
         },
         { status: 401 }
@@ -95,9 +95,9 @@ export async function POST(request: Request) {
     }
 
     // R3: Mandatory Customer Name, Phone, Email & Location validation for dine-in and delivery
-    const normalizedName = String(customerName || participantName || authUser.user_metadata?.full_name || '').trim();
+    const normalizedName = String(customerName || participantName || authUser?.user_metadata?.full_name || '').trim();
     const normalizedPhone = normalizePhone(String(customerPhone || ''));
-    const normalizedEmail = normalizeEmail(String(customerEmail || authUser.email || ''));
+    const normalizedEmail = normalizeEmail(String(customerEmail || authUser?.email || ''));
     if (normalizedName.length < 2) {
       return NextResponse.json(
         { success: false, error: 'Please enter your full name before placing your order.' },

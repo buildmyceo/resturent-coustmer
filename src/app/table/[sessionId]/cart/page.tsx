@@ -251,13 +251,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
       return;
     }
 
-    if (!authUser) {
-      showToast('Login Required', 'Please sign in with Google before placing your order.', 'error');
-      setIsConfirmModalOpen(false);
-      setAuthModalOpen(true);
-      return;
-    }
-
     if (customerName.trim().length < 2) {
       showToast('Name Required', 'Please enter your full name before placing your order.', 'error');
       setIsConfirmModalOpen(false);
@@ -855,16 +848,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
               <p className="text-xs font-bold text-light-on-surface">
                 Customer Details (Required)
               </p>
-              {!authUser && (
-                <button
-                  type="button"
-                  onClick={() => setAuthModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold cursor-pointer"
-                >
-                  <User className="w-3 h-3" />
-                  Sign In with Google
-                </button>
-              )}
             </div>
             <input
               type="text"
@@ -937,19 +920,9 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
           </div>
 
           <div className="flex flex-col gap-2 pt-1">
-            {!authUser ? (
-              <button
-                type="button"
-                onClick={() => setAuthModalOpen(true)}
-                className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-black px-5 py-3.5 rounded-full font-label text-sm font-semibold transition-all shadow-md cursor-pointer"
-              >
-                <User className="w-4 h-4" />
-                <span>Sign In with Google to Order</span>
-              </button>
-            ) : (
-              <button
-                id="place-order-btn"
-                type="button"
+            <button
+              id="place-order-btn"
+              type="button"
                 onClick={() => {
                   if (customerName.trim().length < 2) {
                     showToast('Name Required', 'Please enter your full name.', 'error');
@@ -987,7 +960,6 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
                   : `Confirm Order • ${formatCurrency(cartTotals.totalAmount, currency)}`}
               </span>
             </button>
-            )}
 
             <Link
               href={`/table/${sessionId}`}
