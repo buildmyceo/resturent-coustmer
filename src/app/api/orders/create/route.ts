@@ -500,7 +500,10 @@ export async function POST(request: Request) {
     if (couponCode && typeof couponCode === 'string') {
       const normalizedCode = couponCode.trim().toUpperCase();
       const matchedCoupon = storedCoupons.find(
-        (c: any) => c.code?.toUpperCase() === normalizedCode && c.isActive
+        (c: any) =>
+          c.code?.toUpperCase() === normalizedCode &&
+          c.isActive &&
+          (!c.validUntil || new Date(c.validUntil).getTime() >= Date.now())
       );
 
       if (matchedCoupon && (!matchedCoupon.minOrderAmount || calculatedSubtotal >= matchedCoupon.minOrderAmount)) {

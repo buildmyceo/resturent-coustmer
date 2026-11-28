@@ -184,7 +184,12 @@ export default function ShoppingCartPage({ params }: CartPageProps) {
     if (!code) return;
 
     const availableCoupons = restaurant?.settings?.coupons || [];
-    const found = availableCoupons.find((c) => c.code.toUpperCase() === code && c.isActive);
+    const found = availableCoupons.find(
+      (c) =>
+        c.code.toUpperCase() === code &&
+        c.isActive &&
+        (!c.validUntil || new Date(c.validUntil).getTime() >= Date.now())
+    );
 
     if (!found) {
       setCouponError('Invalid or expired coupon code');

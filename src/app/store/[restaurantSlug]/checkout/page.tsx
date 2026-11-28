@@ -271,7 +271,10 @@ export default function DeliveryCheckoutPage() {
     if (!code) return;
     const availableCoupons: any[] = Array.isArray(restaurant?.coupons) ? restaurant.coupons : [];
     const matched = availableCoupons.find(
-      (c: any) => String(c.code || '').toUpperCase() === code && c.isActive !== false
+      (c: any) =>
+        String(c.code || '').toUpperCase() === code &&
+        c.isActive !== false &&
+        (!c.validUntil || new Date(c.validUntil).getTime() >= Date.now())
     );
     if (!matched) {
       setCouponError('Invalid or expired coupon code.');
